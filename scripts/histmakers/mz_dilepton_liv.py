@@ -1,19 +1,13 @@
 import os
-
-from utilities import common, parsing
-from wremnants import (muon_selections, muon_calibration, unfolding_tools)
-from wremnants.datasets.datagroups import Datagroups
-
-analysis_label = Datagroups.analysisLabel(os.path.basename(__file__))
-parser, initargs = parsing.common_parser(analysis_label)
-
 import hist
 import numpy as np
 import ROOT
 from datetime import datetime
-
-
 import narf
+
+from utilities import common, parsing
+from wremnants import (muon_selections, muon_calibration)
+from wremnants.datasets.datagroups import Datagroups
 from wremnants.datasets.dataset_tools import getDatasets
 from wremnants.histmaker_tools import (
     aggregate_groups,
@@ -24,6 +18,8 @@ from wums import logging
 from narf.lumitools import make_brilcalc_helper
 
 
+analysis_label = Datagroups.analysisLabel(os.path.basename(__file__))
+parser, initargs = parsing.common_parser(analysis_label)
 
 parser.add_argument(
     "--muonIsolation",
@@ -47,35 +43,28 @@ parser.add_argument(
 )
 
 
-
-args = parser.parse_args()
-
-logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
-era = args.era
-
-
-#hoping this can go up top
-lumicsv = f"{common.data_dir}/bylsoutput.csv" #do i need to call this every time?
-
-# brilcalc_helper = make_timehelper(lumicsv)
-
 def make_timehelper(filename):
     def to_time(x):
         timestamp = datetime.strptime(x, "%m/%d/%y %H:%M:%S")
-                
         ## calculate julian date since 01.01.2000
         jd = 367*timestamp.year - np.floor(7*(timestamp.year + np.floor((timestamp.month + 9)/12))/4) + np.floor(275*timestamp.month/9) + timestamp.day- 730531.5 + (timestamp.hour + timestamp.minute/60 + timestamp.second/3600)/24
-        
+        #calculate greenwich mst
         gmst = (67310.54841 + (876600 * 3600 + 8640184.812866) * jd  + 0.093104 * jd**2 - 6.2e-6 * jd**3) % 86400
-        
         gmst /= 3600
         
-        lst = (gmst + 46.309879/15) %24 ## include longitudinal correction, based on pt 5 at cern
-        
+        lst = (gmst + 46.309879/15) %24 ## include longitudinal correction, based on pt 5 at cern, could try to get a more accurate (and precise) number
         return lst
     
     return make_brilcalc_helper(filename, idx=2, action=to_time)
 
+
+
+args = parser.parse_args()
+logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
+era = args.era
+
+#hoping this can go up top
+lumicsv = f"{common.data_dir}/bylsoutput.csv" 
 brilcalc_helper = make_timehelper(lumicsv)
 
 datasets = getDatasets(
@@ -88,32 +77,24 @@ datasets = getDatasets(
     era=era,
 )
 
+axis_date = hist.axis.Regular(24, 0, 24, name = 'time')
+
+
 def build_graph_lumi(df, dataset):
     df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
-
-    axis_date = hist.axis.Regular(24, 0, 24)
-    
-    hist_time = df.HistoBoost(f"time", [axis_date], ['time', 'lumival'])
-    
+    hist_time = df.HistoBoost("time", [axis_date], ['time', 'lumival'])
     results = [hist_time]
     return results
 
 def build_graph(df, dataset):
     logger.info(f"build graph for dataset: {dataset.name}")
     era = args.era
-    
-    df = df.Define(
-        "isEvenEvent", f"event % 2 {'!=' if args.flipEventNumberSplitting else '=='} 0"
-    )
-    
-    
     calib_filepaths = common.calib_filepaths
-
     results = []
-    mc_calibration_helper, data_calibration_helper, calibration_uncertainty_helper = (
-        muon_calibration.make_muon_calibration_helpers(args, era=era)
-    )
     
+    mc_calibration_helper, data_calibration_helper, calibration_uncertainty_helper = (
+    muon_calibration.make_muon_calibration_helpers(args, era=era)
+    )
     (
         mc_jpsi_crctn_helper,
         data_jpsi_crctn_helper,
@@ -123,19 +104,23 @@ def build_graph(df, dataset):
         args, calib_filepaths, make_uncertainty_helper=True)
     
     
-
+    
     cvh_helper = data_calibration_helper if dataset.is_data else mc_calibration_helper
     jpsi_helper = data_jpsi_crctn_helper if dataset.is_data else mc_jpsi_crctn_helper
+    
+    smearing_helper, smearing_uncertainty_helper = (
+        (None, None) if args.noSmearing else muon_calibration.make_muon_smearing_helpers()
+    )
 
     if dataset.is_data:
         df = df.DefinePerSample("weight", "1.0")
     else:
         df = df.Define("weight", "std::copysign(1.0, genWeight)")
-
     weightsum = df.SumAndCount("weight")
     
-    ### keep writing over the object as we add more and more to it
+    df = df.Define( "isEvenEvent", f"event % 2 {'!=' if args.flipEventNumberSplitting else '=='} 0" ) ## not sure why i have this
     ## select for two muons, plot their invariant mass
+    
     df = df.Define("muon_pass_pt", "Muon_pt>=25") # [1,0,1,0 ...]
     df = df.Filter("std::accumulate(muon_pass_pt.begin(), muon_pass_pt.end(), 0) == 2")
 
@@ -143,28 +128,18 @@ def build_graph(df, dataset):
     df = df.Define("muon_subleading_pt", "Muon_pt[muon_pass_pt][1]") 
     df = df.Define("muon_total_pt", "Muon_pt[muon_pass_pt][0] + Muon_pt[muon_pass_pt][1]")
     
-    # df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
-
-    
     ### attempting to copy this section, really not sure what it means
                 
     mass_min, mass_max = common.get_default_mz_window()
-    
     isoBranch = muon_selections.getIsoBranch(args.isolationDefinition)
     era = args.era
   
-  
 
-    smearing_helper, smearing_uncertainty_helper = (
-        (None, None) if args.noSmearing else muon_calibration.make_muon_smearing_helpers()
-    )
     bias_helper = muon_calibration.make_muon_bias_helpers(args)
     
     df = df.Filter(muon_selections.hlt_string(era))
-
     df = muon_selections.veto_electrons(df)
-    df = muon_selections.apply_met_filters(df)
-
+    df = muon_selections.apply_met_filters(df) ## what is a met filter
     df = muon_calibration.define_corrected_muons(
         df, cvh_helper, jpsi_helper, args, dataset, smearing_helper, bias_helper
     )
@@ -200,7 +175,7 @@ def build_graph(df, dataset):
         "nonTrigMuons_passIso0", f"{isoBranch}[nonTrigMuons][0] < {isoThreshold}"
     )
     
-    df = muon_selections.select_z_candidate(df, mass_min, mass_max)
+    df = muon_selections.select_z_candidate(df, mass_min, mass_max) ## this is selecting the z to two muon candidates
 
     #### MUONS HAVE ALL BEEN SELECTED AT THIS POINT ###
 
@@ -210,23 +185,28 @@ def build_graph(df, dataset):
     axis_total_pt = hist.axis.Regular(int(args.pt[0]), 50, 118, name="total_pt")
     
     axis_mll = hist.axis.Variable([60,70,75,78,80,82,85,86,87,88,89,90,91,92,93,94,95,96,97,98,100,102,105,110,120], name = 'mll')
-    axis_date = hist.axis.Regular(24, 0, 24)
     
 
-    hist_total_pt = df.HistoBoost(f"total_pt", [axis_total_pt], ['muon_total_pt'])
-    hist_leading_pt = df.HistoBoost(f"leading_pt", [axis_pt], ['muon_leading_pt'])
-    hist_subleading_pt = df.HistoBoost(f"subleading_pt", [axis_pt], ['muon_subleading_pt'])
-    hist_mll = df.HistoBoost(f"mll", [axis_mll], ['mll'])
-    # hist_time = df.HistoBoost(f"time", [axis_date], ['time', 'lumival'])
+    hist_total_pt = df.HistoBoost("total_pt", [axis_total_pt], ['muon_total_pt'])
+    hist_leading_pt = df.HistoBoost("leading_pt", [axis_pt], ['muon_leading_pt'])
+    hist_subleading_pt = df.HistoBoost("subleading_pt", [axis_pt], ['muon_subleading_pt'])
+    hist_mll = df.HistoBoost("mll", [axis_mll], ['mll'])
+    
+    if dataset.is_data:
+        df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
+
+        hist_time = df.HistoBoost("time", [axis_date], ['time'])
+        hist_time_mll = df.HistoBoost("time_mll", [axis_date, axis_mll], ['time', "mll"])
+        results.append(hist_time)
+        results.append(hist_time_mll)
+        print("went through loop")
 
     ### want to make the dimuon object and we need to do that by selecting the muons that also satisfy the trigger criterion. so 
 
-    
     results.append(hist_total_pt)
     results.append(hist_leading_pt)
     results.append(hist_subleading_pt)
     results.append(hist_mll)
-    # results.append(hist_time)
 
     return results, weightsum
 

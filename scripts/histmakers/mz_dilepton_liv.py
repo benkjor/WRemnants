@@ -6,7 +6,7 @@ from datetime import datetime
 import narf
 
 from utilities import common, parsing
-from wremnants import (muon_selections, muon_calibration, pileup, vertex)
+from wremnants import (muon_calibration, muon_prefiring, muon_selections, pileup, theory_tools, vertex)
 from wremnants.datasets.datagroups import Datagroups
 from wremnants.datasets.dataset_tools import getDatasets
 from wremnants.histmaker_tools import (aggregate_groups, scale_to_data,  write_analysis_output)
@@ -38,6 +38,29 @@ parser.add_argument(
     help="Flip even with odd event numbers to consider the positive or negative muon as the W-like muon",
 )
 
+parser.add_argument(
+    "--selectNonPromptFromSV",
+    action="store_true",
+    help="Test: define a non-prompt muon enriched control region",
+)
+parser.add_argument(
+    "--selectNonPromptFromLightMesonDecay",
+    action="store_true",
+    help="Test: define a non-prompt muon enriched control region with muons from light meson decays",
+)
+
+parser.add_argument(
+    "--useGlobalOrTrackerVeto",
+    action="store_true",
+    help="Use global-or-tracker veto definition and scale factors instead of global only",
+)
+parser.add_argument(
+    "--vetoGenPartPt",
+    type=float,
+    default=15.0,
+    help="Minimum pT for the postFSR gen muon when defining the variation of the veto efficiency",
+)
+
 
 def make_timehelper(filename):
     def to_time(x):
@@ -63,31 +86,7 @@ calib_filepaths = common.calib_filepaths
 #hoping this can go up top
 lumicsv = f"{common.data_dir}/bylsoutput.csv" 
 brilcalc_helper = make_timehelper(lumicsv)
-mc_calibration_helper, data_calibration_helper, calibration_uncertainty_helper = ( muon_calibration.make_muon_calibration_helpers(args, era=era))
 
-(
-    mc_jpsi_crctn_helper,
-    data_jpsi_crctn_helper,
-    mc_jpsi_crctn_unc_helper,
-    data_jpsi_crctn_unc_helper,
-) = muon_calibration.make_jpsi_crctn_helpers(
-    args, calib_filepaths, make_uncertainty_helper=True)
-
-smearing_helper, smearing_uncertainty_helper = (
-    (None, None) if args.noSmearing else muon_calibration.make_muon_smearing_helpers()
-)
-pileup_helper = pileup.make_pileup_helper(era=era)
-vertex_helper = vertex.make_vertex_helper(era=era)
-# muon_prefiring_helper, muon_prefiring_helper_stat, muon_prefiring_helper_syst = (   muon_prefiring.make_muon_prefiring_helpers(era=era))
-    
-    
-# if args.binnedScaleFactors:
-
-#     muon_efficiency_helper, muon_efficiency_helper_syst, muon_efficiency_helper_stat = (
-#         muon_efficiencies_binned.make_muon_efficiency_helpers_binned(
-#             filename=args.sfFile, era=era, max_pt=args.pt[2], is_w_like=True
-        # )
-    # )
 datasets = getDatasets(
     maxFiles=args.maxFiles,
     filt=args.filterProcs,
@@ -100,9 +99,6 @@ datasets = getDatasets(
 
 axis_date = hist.axis.Regular(24, 0, 24, name = 'time')
 
-
-
-
 ########################################################
 def build_graph_lumi(df, dataset):
     df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
@@ -111,6 +107,12 @@ def build_graph_lumi(df, dataset):
     return results
 
 def build_graph(df, dataset):
+    
+    axis_pt = hist.axis.Regular(int(args.pt[0]), args.pt[1], args.pt[2], name="pt")
+    
+    axis_mll = hist.axis.Variable([60,70,75,78,80,82,85,86,87,88,89,90,91,92,93,94,95,96,97,98,100,102,105,110,120], name = 'mll')
+    
+    
     logger.info(f"build graph for dataset: {dataset.name}")
     era = args.era
     results = []
@@ -124,29 +126,80 @@ def build_graph(df, dataset):
     weightsum = df.SumAndCount("weight")
     
     
-    ### basically do the exact same thing as below but using the GenPart stettings(for generator particle)
+    
+###### NEED TO GENERATE THE RIGHT VARIABLES ####
+    ## need the original pt and eta and whatnot, this 
+
+    if not dataset.is_data:
+    # ### lines highlighted by david
+        df_gen = theory_tools.define_postfsr_vars(df)
+
+        df_gen = df_gen.Define(
+            "postfsrMuons_inAcc",
+            f"postfsrMuons && abs(GenPart_eta) < 2.4 && GenPart_pt > 25")# {args.vetoGenPartPt}",
+               
+        df_gen = df_gen.Filter("Sum(postfsrMuons_inAcc) == 2")
+
+        ### might need to use the corrected goodMuon versions, not sure
+        df_gen = df_gen.Define("gen_muon_leading_pt", "GenPart_pt[postfsrMuons_inAcc][0]")    
+        df_gen = df_gen.Define("gen_muon_leading_eta", "GenPart_eta[postfsrMuons_inAcc][0]") 
+        df_gen = df_gen.Define("gen_muon_leading_phi", "GenPart_phi[postfsrMuons_inAcc][0]") 
+
+        df_gen = df_gen.Define("gen_muon_subleading_pt", "GenPart_pt[postfsrMuons_inAcc][1]") 
+        df_gen = df_gen.Define("gen_muon_subleading_eta", "GenPart_eta[postfsrMuons_inAcc][1]") 
+        df_gen = df_gen.Define("gen_muon_subleading_phi", "GenPart_phi[postfsrMuons_inAcc][1]")
+
+        
+        df_gen = df_gen.Define(
+        "gen_mu_mom4",
+        "ROOT::Math::PtEtaPhiMVector(gen_muon_leading_pt, gen_muon_leading_eta, gen_muon_leading_phi, wrem::muon_mass)")
+        df_gen = df_gen.Define(
+            "gen_smu_mom4",
+            "ROOT::Math::PtEtaPhiMVector(gen_muon_subleading_pt, gen_muon_subleading_eta, gen_muon_subleading_phi, wrem::muon_mass)")
+        df_gen = df_gen.Define(
+            "gen_ll_mom4",
+            f"ROOT::Math::PxPyPzEVector(gen_mu_mom4)+ROOT::Math::PxPyPzEVector(gen_smu_mom4)")
+        df_gen = df_gen.Define("gen_mll", "gen_ll_mom4.mass()")
+        df_gen = df_gen.Filter("gen_mll >= 60 && gen_mll < 120")
+
+        
+        gen_counts = df_gen.HistoBoost("gen_mll", [axis_mll], ["gen_mll", 'weight'])
+        results.append(gen_counts)
+
+        
     
     
+    ###################################
+    # real muons
+    df = df.Define(
+        "vetoMuonsPre",
+        "Muon_looseId && abs(Muon_dxybs) < 0.05 && Muon_charge != -99",
+    )
     
-    df = df.Define( "isEvenEvent", f"event % 2 {'!=' if args.flipEventNumberSplitting else '=='} 0" ) ## not sure why i have this
-    df = df.Define("muon_pass_pt", "Muon_pt>=25") # [1,0,1,0 ...]
-    df = df.Filter("std::accumulate(muon_pass_pt.begin(), muon_pass_pt.end(), 0) == 2") 
+    df = df.Define(
+        "Muon_isGoodGlobal",
+        "Muon_isGlobal && Muon_highPurity",
+    )
+    
+    df = df.Define("veto_muon", "vetoMuonsPre && Muon_isGoodGlobal && Muon_pt>=25 && abs(Muon_eta) < 2.4") # [1,0,1,0 ...]
+
+    df = df.Filter("Sum(veto_muon) == 2") 
 
     df = df.Define(
         "goodTrigObjs",
         f"wrem::goodMuonTriggerCandidate<wrem::Era::Era_2016PostVFP>(TrigObj_id,TrigObj_filterBits)",
     )
     
-    df = df.Define("muon_leading_pt", "Muon_pt[muon_pass_pt][0]") 
-    df = df.Define("muon_leading_eta", "Muon_eta[muon_pass_pt][0]") 
-    df = df.Define("muon_leading_phi", "Muon_phi[muon_pass_pt][0]") 
+    df = df.Define("muon_leading_pt", "Muon_pt[veto_muon][0]") 
+    df = df.Define("muon_leading_eta", "Muon_eta[veto_muon][0]") 
+    df = df.Define("muon_leading_phi", "Muon_phi[veto_muon][0]") 
 
-    df = df.Define("muon_subleading_pt", "Muon_pt[muon_pass_pt][1]") 
-    df = df.Define("muon_subleading_eta", "Muon_eta[muon_pass_pt][1]") 
-    df = df.Define("muon_subleading_phi", "Muon_phi[muon_pass_pt][1]")
+    df = df.Define("muon_subleading_pt", "Muon_pt[veto_muon][1]") 
+    df = df.Define("muon_subleading_eta", "Muon_eta[veto_muon][1]") 
+    df = df.Define("muon_subleading_phi", "Muon_phi[veto_muon][1]")
     
-    df = df.Define("leading_muon_passTrigger", "wrem::hasTriggerMatch(muon_leading_eta,muon_leading_eta,TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])")
-    df = df.Define("subleading_muon_passTrigger", "wrem::hasTriggerMatch(muon_subleading_eta,muon_subleading_eta,TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])")
+    df = df.Define("leading_muon_passTrigger", "wrem::hasTriggerMatch(muon_leading_eta,muon_leading_phi,TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])")
+    df = df.Define("subleading_muon_passTrigger", "wrem::hasTriggerMatch(muon_subleading_eta,muon_subleading_phi,TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])")
     
     df = df.Define(
         "mu_mom4",
@@ -169,16 +222,7 @@ def build_graph(df, dataset):
     dtight_strig = dtight.Filter("subleading_muon_passTrigger != leading_muon_passTrigger" ) 
     
     stight_strig = df.Filter("(subleading_muon_passTrigger && Muon_tightId[1]) != (leading_muon_passTrigger && Muon_tightId[0])" ) 
-    
 
-    ### SHOULD SEE IF I CAN CHANGE THIS INTO A GLOBAL VARIABLE
-    axis_pt = hist.axis.Regular(int(args.pt[0]), args.pt[1], args.pt[2], name="pt")
-    
-    axis_mll = hist.axis.Variable([60,70,75,78,80,82,85,86,87,88,89,90,91,92,93,94,95,96,97,98,100,102,105,110,120], name = 'mll')
-    
-    hist_leading_pt = df.HistoBoost("leading_pt", [axis_pt], ['muon_leading_pt'])
-    hist_subleading_pt = df.HistoBoost("subleading_pt", [axis_pt], ['muon_subleading_pt'])
-    
     if dataset.is_data:
         hist_time_mll = dtight_dtrig.HistoBoost("time_mll", [axis_date, axis_mll], ['time', "mll"])
         hist_time_mll_dtight_strig = dtight_strig.HistoBoost("time_mll_dtight_strig", [axis_date, axis_mll], ['time', "mll"])
@@ -196,10 +240,6 @@ def build_graph(df, dataset):
         results.append(hist_mll)
         results.append(hist_mll_dtight_strig)
         results.append(hist_mll_stight_strig)
-
-
-    results.append(hist_leading_pt)
-    results.append(hist_subleading_pt)
 
     return results, weightsum
 

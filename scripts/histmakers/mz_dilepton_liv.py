@@ -76,8 +76,33 @@ def make_timehelper(filename):
     
     return make_brilcalc_helper(filename, idx=2, action=to_time)
 
+def mass_extraction(dataframe, name, root_dataype, filter_name):
+    # if len(name) != 0:
+    #     new_df = name
+    
+    new_df = dataframe.Define(f"{name}muon_leading_pt", f"{root_dataype}_pt[{filter_name}][0]")    
+    new_df = new_df.Define(f"{name}muon_leading_eta", f"{root_dataype}_eta[{filter_name}][0]") 
+    new_df = new_df.Define(f"{name}muon_leading_phi", f"{root_dataype}_phi[{filter_name}][0]") 
 
+    new_df = new_df.Define(f"{name}muon_subleading_pt", f"{root_dataype}_pt[{filter_name}][1]") 
+    new_df = new_df.Define(f"{name}muon_subleading_eta", f"{root_dataype}_eta[{filter_name}][1]") 
+    new_df = new_df.Define(f"{name}muon_subleading_phi", f"{root_dataype}_phi[{filter_name}][1]")
 
+    
+    new_df = new_df.Define(
+    f"{name}mu_mom4",
+    f"ROOT::Math::PtEtaPhiMVector({name}muon_leading_pt, {name}muon_leading_eta, {name}muon_leading_phi, wrem::muon_mass)")
+    new_df = new_df.Define(
+        f"{name}smu_mom4",
+        f"ROOT::Math::PtEtaPhiMVector({name}muon_subleading_pt, {name}muon_subleading_eta, {name}muon_subleading_phi, wrem::muon_mass)")
+    new_df = new_df.Define(
+        f"{name}ll_mom4",
+        f"ROOT::Math::PxPyPzEVector({name}mu_mom4)+ROOT::Math::PxPyPzEVector({name}smu_mom4)")
+    new_df = new_df.Define(f"{name}mll", f"{name}ll_mom4.mass()")
+    new_df = new_df.Filter(f"{name}mll >= 60 && {name}mll < 120")
+       
+    return new_df
+    
 args = parser.parse_args()
 logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
 era = args.era
@@ -141,82 +166,35 @@ def build_graph(df, dataset):
         df_gen = df_gen.Filter("Sum(postfsrMuons_inAcc) == 2")
 
         ### might need to use the corrected goodMuon versions, not sure
-        df_gen = df_gen.Define("gen_muon_leading_pt", "GenPart_pt[postfsrMuons_inAcc][0]")    
-        df_gen = df_gen.Define("gen_muon_leading_eta", "GenPart_eta[postfsrMuons_inAcc][0]") 
-        df_gen = df_gen.Define("gen_muon_leading_phi", "GenPart_phi[postfsrMuons_inAcc][0]") 
-
-        df_gen = df_gen.Define("gen_muon_subleading_pt", "GenPart_pt[postfsrMuons_inAcc][1]") 
-        df_gen = df_gen.Define("gen_muon_subleading_eta", "GenPart_eta[postfsrMuons_inAcc][1]") 
-        df_gen = df_gen.Define("gen_muon_subleading_phi", "GenPart_phi[postfsrMuons_inAcc][1]")
-
-        
-        df_gen = df_gen.Define(
-        "gen_mu_mom4",
-        "ROOT::Math::PtEtaPhiMVector(gen_muon_leading_pt, gen_muon_leading_eta, gen_muon_leading_phi, wrem::muon_mass)")
-        df_gen = df_gen.Define(
-            "gen_smu_mom4",
-            "ROOT::Math::PtEtaPhiMVector(gen_muon_subleading_pt, gen_muon_subleading_eta, gen_muon_subleading_phi, wrem::muon_mass)")
-        df_gen = df_gen.Define(
-            "gen_ll_mom4",
-            f"ROOT::Math::PxPyPzEVector(gen_mu_mom4)+ROOT::Math::PxPyPzEVector(gen_smu_mom4)")
-        df_gen = df_gen.Define("gen_mll", "gen_ll_mom4.mass()")
-        df_gen = df_gen.Filter("gen_mll >= 60 && gen_mll < 120")
-
-        
+        df_gen = mass_extraction(df_gen, 'gen_', 'GenPart', 'postfsrMuons_inAcc')
+       
         gen_counts = df_gen.HistoBoost("gen_mll", [axis_mll], ["gen_mll", 'weight'])
         results.append(gen_counts)
-
-        
-    
-    
+   
     ###################################
     # real muons
     df = df.Define(
         "vetoMuonsPre",
         "Muon_looseId && abs(Muon_dxybs) < 0.05 && Muon_charge != -99",
     )
-    
     df = df.Define(
         "Muon_isGoodGlobal",
         "Muon_isGlobal && Muon_highPurity",
     )
-    
     df = df.Define("veto_muon", "vetoMuonsPre && Muon_isGoodGlobal && Muon_pt>=25 && abs(Muon_eta) < 2.4") # [1,0,1,0 ...]
 
     df = df.Filter("Sum(veto_muon) == 2") 
-
     df = df.Define(
         "goodTrigObjs",
         f"wrem::goodMuonTriggerCandidate<wrem::Era::Era_2016PostVFP>(TrigObj_id,TrigObj_filterBits)",
     )
-    
-    df = df.Define("muon_leading_pt", "Muon_pt[veto_muon][0]") 
-    df = df.Define("muon_leading_eta", "Muon_eta[veto_muon][0]") 
-    df = df.Define("muon_leading_phi", "Muon_phi[veto_muon][0]") 
+    df = mass_extraction(df, "", "Muon", "veto_muon")
 
-    df = df.Define("muon_subleading_pt", "Muon_pt[veto_muon][1]") 
-    df = df.Define("muon_subleading_eta", "Muon_eta[veto_muon][1]") 
-    df = df.Define("muon_subleading_phi", "Muon_phi[veto_muon][1]")
-    
     df = df.Define("leading_muon_passTrigger", "wrem::hasTriggerMatch(muon_leading_eta,muon_leading_phi,TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])")
     df = df.Define("subleading_muon_passTrigger", "wrem::hasTriggerMatch(muon_subleading_eta,muon_subleading_phi,TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])")
     
-    df = df.Define(
-        "mu_mom4",
-        "ROOT::Math::PtEtaPhiMVector(muon_leading_pt, muon_leading_eta, muon_leading_phi, wrem::muon_mass)")
-    df = df.Define(
-        "smu_mom4",
-        "ROOT::Math::PtEtaPhiMVector(muon_subleading_pt, muon_subleading_eta, muon_subleading_phi, wrem::muon_mass)")
-    df = df.Define(
-        "ll_mom4",
-        f"ROOT::Math::PxPyPzEVector(mu_mom4)+ROOT::Math::PxPyPzEVector(smu_mom4)")
-  
-    df = df.Define("mll", "ll_mom4.mass()")
-    df = df.Filter("mll >= 60 && mll < 120")
-    
-    
    ### detects two muons but only one has the right momentum
-    dtight = df.Filter("std::accumulate(Muon_tightId.begin(), Muon_tightId.end(), 0) == 2")
+    dtight = df.Filter("Sum(Muon_tightId) == 2")
 
     dtight_dtrig = dtight.Filter("subleading_muon_passTrigger && leading_muon_passTrigger" )  
     dtight_strig = dtight.Filter("subleading_muon_passTrigger != leading_muon_passTrigger" ) 

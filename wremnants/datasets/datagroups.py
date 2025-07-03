@@ -1030,10 +1030,24 @@ class Datagroups(object):
         rebin_before_selection=False,
         rename=True,
     ):
+        if len(ax_lim):
+            if not all(x.real == 0 or x.imag == 0 for x in ax_lim):
+                raise ValueError(
+                    "In set_rebin_action(): ax_lim only accepts pure real or imaginary numbers"
+                )
+            if any(x.imag == 0 and (x.real % 1) != 0.0 for x in ax_lim):
+                raise ValueError(
+                    "In set_rebin_action(): ax_lim requires real numbers to be of integer type"
+                )
+
         self.rebinBeforeSelection = rebin_before_selection
 
         for a in hh.get_rebin_actions(
-            axes, ax_lim=ax_lim, ax_rebin=ax_rebin, ax_absval=ax_absval, rename=rename
+            axes,
+            ax_lim=ax_lim,
+            ax_rebin=ax_rebin,
+            ax_absval=ax_absval,
+            rename=rename,
         ):
             self.setRebinOp(a)
 
@@ -1410,6 +1424,7 @@ class Datagroups(object):
         systNameReplace=None,
         formatWithValue=None,
         outNames=[],
+        isPoiHistDecorr=False,
     ):
         if name == self.nominalName or len(systAxes) == 0:
             if hvar.axes.name != self.fit_axes:
@@ -1429,7 +1444,7 @@ class Datagroups(object):
                 f"Axes in hist are {str(hvar.axes.name)}"
             )
 
-        # Converting to a list becasue otherwise if you print it for debugging you loose it
+        # Converting to a list because otherwise if you print it for debugging you loose it
         def systIndexForAxis(axis, flow=False):
             if type(axis) == hist.axis.StrCategory:
                 bins = [x for x in axis]
@@ -1626,24 +1641,44 @@ class Datagroups(object):
         }
 
         # pair all up/down histograms, otherwise single histogram for mirroring
+        # NB: with decorrelated axis, Up/Down might not be at the end, must search them within the string
         result = {}
         for key in var_map.keys():
             if not key:
                 continue
-            if key.endswith("Up"):
-                base_key = key[:-2]
-                key_down = base_key + "Down"
-                if key_down in outNames:
-                    result[base_key] = (var_map[key], var_map[key_down])
-                else:
-                    result[key] = var_map[key]
-            elif key.endswith("Down"):
-                if key[:-4] + "Up" in outNames:
-                    continue
+            if isPoiHistDecorr:
+                # use Down for first search: less likely to be present on its own in the name
+                if "Down" in key:
+                    base_key, tail_key = key.split("Down", 1)
+                    key_up = base_key + "Up" + tail_key
+                    if key_up in outNames:
+                        result[base_key + tail_key] = (var_map[key_up], var_map[key])
+                    else:
+                        result[key] = var_map[key]
+                elif "Up" in key:
+                    base_key, tail_key = key.split("Up", 1)
+                    key_down = base_key + "Down" + tail_key
+                    if key_down in outNames:
+                        continue
+                    else:
+                        result[key] = var_map[key]
                 else:
                     result[key] = var_map[key]
             else:
-                result[key] = var_map[key]
+                if key.endswith("Up"):
+                    base_key = key[:-2]
+                    key_down = base_key + "Down"
+                    if key_down in outNames:
+                        result[base_key] = (var_map[key], var_map[key_down])
+                    else:
+                        result[key] = var_map[key]
+                elif key.endswith("Down"):
+                    if key[:-4] + "Up" in outNames:
+                        continue
+                    else:
+                        result[key] = var_map[key]
+                else:
+                    result[key] = var_map[key]
         return result
 
     def addPseudodataHistogramFakes(
@@ -2039,8 +2074,9 @@ class Datagroups(object):
     @staticmethod
     def analysisLabel(filename):
         if filename not in Datagroups.mode_map:
-            raise ValueError(
+            logger.warning(
                 f"Unrecognized analysis script {filename}! Expected one of {Datagroups.mode_map.keys()}"
             )
-
-        return Datagroups.mode_map[filename]
+            return filename.replace(".py", "")
+        else:
+            return Datagroups.mode_map[filename]

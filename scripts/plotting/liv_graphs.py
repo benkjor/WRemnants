@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import h5py
-from work.WRemnants.utilities.io_tools import input_tools
-from work.WRemnants.wums.wums.boostHistHelpers import broadcastSystHist, multiplyHists, divideHists
+from utilities.io_tools import input_tools
+from wums.boostHistHelpers import broadcastSystHist, multiplyHists, divideHists
 import numpy as np
 from scipy.optimize import curve_fit
 
@@ -24,7 +24,7 @@ def make_plot(data_all, plotname, legend_all = ["MC", "Data"], ylim = []):
     plt.legend(legend_all)
     
     plt.savefig(file_out + plotname + '.png')
-file_in_name = file_in + 'mz_dilepton_liv_scetlib_dyturboCorr_maxFiles_20.hdf5'
+file_in_name = file_in + 'mz_dilepton_liv_scetlib_dyturboCorr.hdf5'
 h5file = h5py.File(file_in_name, 'r')
 results = input_tools.load_results_h5py(h5file)
 

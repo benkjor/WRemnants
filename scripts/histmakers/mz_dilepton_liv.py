@@ -131,8 +131,8 @@ datasets = getDatasets(
 axis_date = hist.axis.Regular(24, 0, 24, name = 'time')
 axis_mll = hist.axis.Variable([60,70,75,78,80,82,85,86,87,88,89,90,91,92,93,94,95,96,97,98,100,102,105,110,120], name = 'mll')
 axis_mll_2 = hist.axis.Variable([60,70,75,78,80,82,85,86,87,88,89,90,91,92,93,94,95,96,97,98,100,102,105,110,120], name = 'gen_mll')
-axis_fsr_muons = hist.axis.Regular(3, -0.5, 2.5, name = 'num_veto_muons')
-axis_veto_muons = hist.axis.Regular(3,-0.5 , 2.5, name = 'num_fsr_muons')
+axis_num_muons = hist.axis.Regular(3, -0.5, 2.5, name = 'num_muons')
+# axis_veto_muons = hist.axis.Regular(3,-0.5 , 2.5, name = 'num_fsr_muons')
 
 ########################################################
 def build_graph_lumi(df, dataset):
@@ -175,7 +175,7 @@ def build_graph(df, dataset):
     )
     df = df.Define("sum_veto_muons", "Sum(veto_muon)")
     df = df.Filter("sum_veto_muons <= 2")
-    veto = df.HistoBoost("veto_muons", [axis_veto_muons], ["sum_veto_muons"])
+    veto = df.HistoBoost("veto_muons", [axis_num_muons], ["sum_veto_muons"])
     results.append(veto)
 
 
@@ -185,7 +185,7 @@ def build_graph(df, dataset):
         df = df.Define(
             "postfsrMuons_inAcc",
             f"postfsrMuons && abs(GenPart_eta) < 2.4 && GenPart_pt > 25")
-        df = df.Define("sum_post_fsr", "Sum(postfsrMuons_inAcc)")
+        df = df.Define("sum_gen_muons", "Sum(postfsrMuons_inAcc)")
 
         df = mass_extraction(df, 'gen_', 'GenPart', 'postfsrMuons_inAcc')
         df=  mass_extraction(df, "", "Muon", "veto_muon")
@@ -200,11 +200,25 @@ def build_graph(df, dataset):
 
 
         df_21 = df_1.Filter("sum_veto_muons == 2")
-        df_22= df_2.Filter("sum_veto_muons == 2")
-        hist_veto = df.HistoBoost("veto_muons", [axis_veto_muons], ["sum_veto_muons"])        
-        hist_post_fsr = df.HistoBoost("post_fsr_muons", [axis_fsr_muons], ["sum_post_fsr"])    
+        df_22 = df_2.Filter("sum_veto_muons == 2")
+        
+        
+        hist_veto = df.HistoBoost("veto_muons", [axis_num_muons], ["sum_veto_muons"])        
+        hist_post_fsr = df.HistoBoost("gen_muons", [axis_num_muons], ["sum_gen_muons"])    
         results.append(hist_veto)
         results.append(hist_post_fsr) 
+        
+        hist_veto_prpg = df_21.HistoBoost("veto_muons_prpg", [axis_num_muons], ["sum_veto_muons"])        
+        hist_post_fsr_prpg = df_21.HistoBoost("gen_muons_prpg", [axis_num_muons], ["sum_gen_muons"])    
+        results.append(hist_veto_prpg)
+        results.append(hist_post_fsr_prpg) 
+        
+        hist_veto_prfg = df_22.HistoBoost("veto_muons_prfg", [axis_num_muons], ["sum_veto_muons"])        
+        hist_post_fsr_prfg = df_22.HistoBoost("gen_muons_prfg", [axis_num_muons], ["sum_gen_muons"])    
+        results.append(hist_veto_prfg)
+        results.append(hist_post_fsr_prfg) 
+        
+        
         hist_pass_gen = df_1.HistoBoost("pass_gen", [axis_mll], ['gen_mll', 'weight'])       
         
         hist_pass_reco_pass_gen = df_21.HistoBoost("pass_reco_pass_gen", [axis_mll, axis_mll_2], ['mll', 'gen_mll', 'weight'])
@@ -230,7 +244,7 @@ def build_graph(df, dataset):
         
         dtight_dtrig, dtight_strig, stight_strig = trigger_tightID_sep(df)
       
-        hist_veto_time = df.HistoBoost("time_veto", [axis_date, axis_veto_muons], ["time", "sum_veto_muons"])
+        hist_veto_time = df.HistoBoost("time_veto", [axis_date, axis_num_muons], ["time", "sum_veto_muons"])
         hist_time_mll = dtight_dtrig.HistoBoost("time_mll", [axis_date, axis_mll], ['time', "mll"])
         hist_time_mll_dtight_strig = dtight_strig.HistoBoost("time_mll_dtight_strig", [axis_date, axis_mll], ['time', "mll"])
         hist_time_mll_stight_strig = stight_strig.HistoBoost("time_mll_stight_strig", [axis_date, axis_mll], ['time', "mll"])

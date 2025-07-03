@@ -77,31 +77,37 @@ def make_timehelper(filename):
     return make_brilcalc_helper(filename, idx=2, action=to_time)
 
 def mass_extraction(dataframe, name, root_dataype, filter_name):
-    # if len(name) != 0:
-    #     new_df = name
-    
-    new_df = dataframe.Define(f"{name}muon_leading_pt", f"{root_dataype}_pt[{filter_name}][0]")    
-    new_df = new_df.Define(f"{name}muon_leading_eta", f"{root_dataype}_eta[{filter_name}][0]") 
-    new_df = new_df.Define(f"{name}muon_leading_phi", f"{root_dataype}_phi[{filter_name}][0]") 
 
-    new_df = new_df.Define(f"{name}muon_subleading_pt", f"{root_dataype}_pt[{filter_name}][1]") 
-    new_df = new_df.Define(f"{name}muon_subleading_eta", f"{root_dataype}_eta[{filter_name}][1]") 
-    new_df = new_df.Define(f"{name}muon_subleading_phi", f"{root_dataype}_phi[{filter_name}][1]")
+    condition =  lambda x, idx, f=filter_name: f"Sum({f}) > {idx} ? ROOT::Math::PtEtaPhiMVector({x}_pt[{f}][{idx}], {x}_eta[{f}][{idx}], {x}_phi[{f}][{idx}], wrem::muon_mass) : ROOT::Math::PtEtaPhiMVector(0,0,0,0)"
 
-    
-    new_df = new_df.Define(
-    f"{name}mu_mom4",
-    f"ROOT::Math::PtEtaPhiMVector({name}muon_leading_pt, {name}muon_leading_eta, {name}muon_leading_phi, wrem::muon_mass)")
-    new_df = new_df.Define(
-        f"{name}smu_mom4",
-        f"ROOT::Math::PtEtaPhiMVector({name}muon_subleading_pt, {name}muon_subleading_eta, {name}muon_subleading_phi, wrem::muon_mass)")
+    new_df = dataframe.Define(f"{name}mu_mom4", condition(f"{root_dataype}", 0))    
+    new_df = new_df.Define(f"{name}smu_mom4", condition(f"{root_dataype}", 1))    
+
     new_df = new_df.Define(
         f"{name}ll_mom4",
         f"ROOT::Math::PxPyPzEVector({name}mu_mom4)+ROOT::Math::PxPyPzEVector({name}smu_mom4)")
     new_df = new_df.Define(f"{name}mll", f"{name}ll_mom4.mass()")
-    new_df = new_df.Filter(f"{name}mll >= 60 && {name}mll < 120")
+    new_df = new_df.Define(f"{name}pass", f"{name}mll >= 60 && {name}mll < 120 && Sum({filter_name})==2")
        
     return new_df
+
+
+def trigger_tightID_sep(dataframe):
+    dataframe = dataframe.Define("leading_muon_passTrigger", "wrem::hasTriggerMatch(mu_mom4.eta(),mu_mom4.phi(),TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])")
+    dataframe = dataframe.Define("subleading_muon_passTrigger", "wrem::hasTriggerMatch(smu_mom4.eta(),smu_mom4.phi(),TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])")
+    
+### detects two muons but only one has the right momentum
+    dtight = dataframe.Filter("Sum(Muon_tightId) == 2")
+
+    dtight_dtrig = dtight.Filter("subleading_muon_passTrigger && leading_muon_passTrigger" )  
+    dtight_strig = dtight.Filter("subleading_muon_passTrigger != leading_muon_passTrigger" ) 
+    
+    stight_strig = dataframe.Filter("(subleading_muon_passTrigger && Muon_tightId[1]) != (leading_muon_passTrigger && Muon_tightId[0])" ) 
+        
+    return dtight_dtrig, dtight_strig, stight_strig
+
+
+
     
 args = parser.parse_args()
 logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
@@ -123,6 +129,10 @@ datasets = getDatasets(
 )
 
 axis_date = hist.axis.Regular(24, 0, 24, name = 'time')
+axis_mll = hist.axis.Variable([60,70,75,78,80,82,85,86,87,88,89,90,91,92,93,94,95,96,97,98,100,102,105,110,120], name = 'mll')
+axis_mll_2 = hist.axis.Variable([60,70,75,78,80,82,85,86,87,88,89,90,91,92,93,94,95,96,97,98,100,102,105,110,120], name = 'gen_mll')
+axis_fsr_muons = hist.axis.Regular(3, -0.5, 2.5, name = 'num_veto_muons')
+axis_veto_muons = hist.axis.Regular(3,-0.5 , 2.5, name = 'num_fsr_muons')
 
 ########################################################
 def build_graph_lumi(df, dataset):
@@ -133,11 +143,7 @@ def build_graph_lumi(df, dataset):
 
 def build_graph(df, dataset):
     
-    axis_pt = hist.axis.Regular(int(args.pt[0]), args.pt[1], args.pt[2], name="pt")
-    
-    axis_mll = hist.axis.Variable([60,70,75,78,80,82,85,86,87,88,89,90,91,92,93,94,95,96,97,98,100,102,105,110,120], name = 'mll')
-    
-    
+
     logger.info(f"build graph for dataset: {dataset.name}")
     era = args.era
     results = []
@@ -154,25 +160,6 @@ def build_graph(df, dataset):
     
 ###### NEED TO GENERATE THE RIGHT VARIABLES ####
     ## need the original pt and eta and whatnot, this 
-
-    if not dataset.is_data:
-    # ### lines highlighted by david
-        df_gen = theory_tools.define_postfsr_vars(df)
-
-        df_gen = df_gen.Define(
-            "postfsrMuons_inAcc",
-            f"postfsrMuons && abs(GenPart_eta) < 2.4 && GenPart_pt > 25")# {args.vetoGenPartPt}",
-               
-        df_gen = df_gen.Filter("Sum(postfsrMuons_inAcc) == 2")
-
-        ### might need to use the corrected goodMuon versions, not sure
-        df_gen = mass_extraction(df_gen, 'gen_', 'GenPart', 'postfsrMuons_inAcc')
-       
-        gen_counts = df_gen.HistoBoost("gen_mll", [axis_mll], ["gen_mll", 'weight'])
-        results.append(gen_counts)
-   
-    ###################################
-    # real muons
     df = df.Define(
         "vetoMuonsPre",
         "Muon_looseId && abs(Muon_dxybs) < 0.05 && Muon_charge != -99",
@@ -181,36 +168,52 @@ def build_graph(df, dataset):
         "Muon_isGoodGlobal",
         "Muon_isGlobal && Muon_highPurity",
     )
-    df = df.Define("veto_muon", "vetoMuonsPre && Muon_isGoodGlobal && Muon_pt>=25 && abs(Muon_eta) < 2.4") # [1,0,1,0 ...]
-
-    df = df.Filter("Sum(veto_muon) == 2") 
+    df = df.Define("veto_muon", "vetoMuonsPre && Muon_isGoodGlobal && Muon_pt>=25 && abs(Muon_eta) < 2.4") 
     df = df.Define(
         "goodTrigObjs",
         f"wrem::goodMuonTriggerCandidate<wrem::Era::Era_2016PostVFP>(TrigObj_id,TrigObj_filterBits)",
     )
-    df = mass_extraction(df, "", "Muon", "veto_muon")
+    df = df.Define("sum_veto_muons", "Sum(veto_muon)")
+    df = df.Filter("sum_veto_muons <= 2")
+    veto = df.HistoBoost("veto_muons", [axis_veto_muons], ["sum_veto_muons"])
+    results.append(veto)
 
-    df = df.Define("leading_muon_passTrigger", "wrem::hasTriggerMatch(muon_leading_eta,muon_leading_phi,TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])")
-    df = df.Define("subleading_muon_passTrigger", "wrem::hasTriggerMatch(muon_subleading_eta,muon_subleading_phi,TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])")
-    
-   ### detects two muons but only one has the right momentum
-    dtight = df.Filter("Sum(Muon_tightId) == 2")
 
-    dtight_dtrig = dtight.Filter("subleading_muon_passTrigger && leading_muon_passTrigger" )  
-    dtight_strig = dtight.Filter("subleading_muon_passTrigger != leading_muon_passTrigger" ) 
-    
-    stight_strig = df.Filter("(subleading_muon_passTrigger && Muon_tightId[1]) != (leading_muon_passTrigger && Muon_tightId[0])" ) 
+    if not dataset.is_data:
+    # ### lines highlighted by david
+        df = theory_tools.define_postfsr_vars(df)
+        df = df.Define(
+            "postfsrMuons_inAcc",
+            f"postfsrMuons && abs(GenPart_eta) < 2.4 && GenPart_pt > 25")
+        df = df.Define("sum_post_fsr", "Sum(postfsrMuons_inAcc)")
 
-    if dataset.is_data:
-        hist_time_mll = dtight_dtrig.HistoBoost("time_mll", [axis_date, axis_mll], ['time', "mll"])
-        hist_time_mll_dtight_strig = dtight_strig.HistoBoost("time_mll_dtight_strig", [axis_date, axis_mll], ['time', "mll"])
-        hist_time_mll_stight_strig = stight_strig.HistoBoost("time_mll_stight_strig", [axis_date, axis_mll], ['time', "mll"])
+        df = mass_extraction(df, 'gen_', 'GenPart', 'postfsrMuons_inAcc')
+        df=  mass_extraction(df, "", "Muon", "veto_muon")
         
-        results.append(hist_time)
-        results.append(hist_time_mll)
-        results.append(hist_time_mll_dtight_strig)
-        results.append(hist_time_mll_stight_strig)
-    else:
+        ### these are all for the case that there are two veto muons
+        ### this is for the case that there are two ve
+        ### ones that JUST pass the generator
+        dtight_dtrig, dtight_strig, stight_strig = trigger_tightID_sep(df)
+        
+        df_1 = df.Filter("gen_pass")
+        df_2 = df.Filter("!gen_pass")
+
+
+        df_21 = df_1.Filter("sum_veto_muons == 2")
+        df_22= df_2.Filter("sum_veto_muons == 2")
+        hist_veto = df.HistoBoost("veto_muons", [axis_veto_muons], ["sum_veto_muons"])        
+        hist_post_fsr = df.HistoBoost("post_fsr_muons", [axis_fsr_muons], ["sum_post_fsr"])    
+        results.append(hist_veto)
+        results.append(hist_post_fsr) 
+        hist_pass_gen = df_1.HistoBoost("pass_gen", [axis_mll], ['gen_mll', 'weight'])       
+        
+        hist_pass_reco_pass_gen = df_21.HistoBoost("pass_reco_pass_gen", [axis_mll, axis_mll_2], ['mll', 'gen_mll', 'weight'])
+        hist_pass_reco_fail_gen = df_22.HistoBoost("pass_reco_fail_gen", [axis_mll, axis_mll_2], ['mll', 'gen_mll', 'weight'])
+
+        results.append(hist_pass_reco_pass_gen)
+        results.append(hist_pass_reco_fail_gen)
+        results.append(hist_pass_gen)
+        
         hist_mll = dtight_dtrig.HistoBoost("mll", [axis_mll], ['mll', 'weight'])
         hist_mll_dtight_strig = dtight_strig.HistoBoost("mll_dtight_strig", [axis_mll], ['mll', 'weight'])
         hist_mll_stight_strig = stight_strig.HistoBoost("mll_stight_strig", [axis_mll], ['mll', 'weight'])
@@ -218,7 +221,25 @@ def build_graph(df, dataset):
         results.append(hist_mll)
         results.append(hist_mll_dtight_strig)
         results.append(hist_mll_stight_strig)
+    
 
+    else: ### this is for real data
+
+
+        df=  mass_extraction(df, "", "Muon", "veto_muon")
+        
+        dtight_dtrig, dtight_strig, stight_strig = trigger_tightID_sep(df)
+      
+        hist_veto_time = df.HistoBoost("time_veto", [axis_date, axis_veto_muons], ["time", "sum_veto_muons"])
+        hist_time_mll = dtight_dtrig.HistoBoost("time_mll", [axis_date, axis_mll], ['time', "mll"])
+        hist_time_mll_dtight_strig = dtight_strig.HistoBoost("time_mll_dtight_strig", [axis_date, axis_mll], ['time', "mll"])
+        hist_time_mll_stight_strig = stight_strig.HistoBoost("time_mll_stight_strig", [axis_date, axis_mll], ['time', "mll"])
+        
+        results.append(hist_veto_time)
+        results.append(hist_time)
+        results.append(hist_time_mll)
+        results.append(hist_time_mll_dtight_strig)
+        results.append(hist_time_mll_stight_strig)
     return results, weightsum
 
 

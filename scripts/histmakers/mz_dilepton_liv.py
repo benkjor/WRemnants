@@ -109,7 +109,7 @@ def mass_extraction(dataframe, name, root_dataype, filter_name):
     )
     new_df = new_df.Define(f"{name}mll", f"{name}ll_mom4.mass()")
     new_df = new_df.Define(
-        f"{name}pass", f"{name}mll >= 60 && {name}mll < 120 && Sum({filter_name})==2"
+        f"{name}pass", f"{name}mll >= 60 && {name}mll <= 120 && Sum({filter_name})==2"
     )
 
     return new_df
@@ -161,7 +161,7 @@ datasets = getDatasets(
     era=era,
 )
 
-axis_date = hist.axis.Regular(24, 0, 24, name="time")
+axis_date = hist.axis.Regular(24, 0, 24, name="time", overflow=False, underflow=False)
 axis_mll = hist.axis.Variable(
     [
         60,
@@ -267,12 +267,8 @@ def build_graph(df, dataset):
         f"wrem::goodMuonTriggerCandidate<wrem::Era::Era_2016PostVFP>(TrigObj_id,TrigObj_filterBits)",
     )
     df = df.Define("sum_veto_muons", "Sum(veto_muon)")
-    df = df.Filter("sum_veto_muons <= 2")
-    veto = df.HistoBoost("veto_muons", [axis_num_muons], ["sum_veto_muons"])
-    results.append(veto)
 
     if not dataset.is_data:
-        # ### lines highlighted by david
         df = theory_tools.define_postfsr_vars(df)
         df = df.Define(
             "postfsrMuons_inAcc",
@@ -286,7 +282,6 @@ def build_graph(df, dataset):
         ### these are all for the case that there are two veto muons
         ### this is for the case that there are two ve
         ### ones that JUST pass the generator
-        dtight_dtrig, dtight_strig, stight_strig = trigger_tightID_sep(df)
 
         df_1 = df.Filter("gen_pass")
         df_2 = df.Filter("!gen_pass")
@@ -294,30 +289,7 @@ def build_graph(df, dataset):
         df_21 = df_1.Filter("sum_veto_muons == 2")
         df_22 = df_2.Filter("sum_veto_muons == 2")
 
-        hist_veto = df.HistoBoost("veto_muons", [axis_num_muons], ["sum_veto_muons"])
-        hist_post_fsr = df.HistoBoost("gen_muons", [axis_num_muons], ["sum_gen_muons"])
-        results.append(hist_veto)
-        results.append(hist_post_fsr)
-
-        hist_veto_prpg = df_21.HistoBoost(
-            "veto_muons_prpg", [axis_num_muons], ["sum_veto_muons"]
-        )
-        hist_post_fsr_prpg = df_21.HistoBoost(
-            "gen_muons_prpg", [axis_num_muons], ["sum_gen_muons"]
-        )
-        results.append(hist_veto_prpg)
-        results.append(hist_post_fsr_prpg)
-
-        hist_veto_prfg = df_22.HistoBoost(
-            "veto_muons_prfg", [axis_num_muons], ["sum_veto_muons"]
-        )
-        hist_post_fsr_prfg = df_22.HistoBoost(
-            "gen_muons_prfg", [axis_num_muons], ["sum_gen_muons"]
-        )
-        results.append(hist_veto_prfg)
-        results.append(hist_post_fsr_prfg)
-
-        hist_pass_gen = df_1.HistoBoost("pass_gen", [axis_mll], ["gen_mll", "weight"])
+        hist_pass_gen = df_1.HistoBoost("pass_gen", [axis_mll_2], ["gen_mll", "weight"])
 
         hist_pass_reco_pass_gen = df_21.HistoBoost(
             "pass_reco_pass_gen", [axis_mll, axis_mll_2], ["mll", "gen_mll", "weight"]
@@ -326,30 +298,61 @@ def build_graph(df, dataset):
             "pass_reco_fail_gen", [axis_mll, axis_mll_2], ["mll", "gen_mll", "weight"]
         )
 
+        ##### pass reco, fail generator
+        dtight_dtrig_df_22, dtight_strig_df_22, stight_strig_df_22 = (
+            trigger_tightID_sep(df_22)
+        )
+
+        hist_mll_prfg = dtight_dtrig_df_22.HistoBoost(
+            "mll_dtdt_prfg", [axis_mll, axis_mll_2], ["mll", "gen_mll", "weight"]
+        )
+        hist_mll_dtight_strig_prfg = dtight_strig_df_22.HistoBoost(
+            "mll_dtst_prfg",
+            [axis_mll, axis_mll_2],
+            ["mll", "gen_mll", "weight"],  # double tight single trigger
+        )
+        hist_mll_stight_strig_prfg = stight_strig_df_22.HistoBoost(
+            "mll_stst_prfg", [axis_mll, axis_mll_2], ["mll", "gen_mll", "weight"]
+        )
+
+        ##### pass reco, pass generator
+        dtight_dtrig_df_21, dtight_strig_df_21, stight_strig_df_21 = (
+            trigger_tightID_sep(df_21)
+        )
+
+        hist_mll_prpg = dtight_dtrig_df_21.HistoBoost(
+            "mll_dtdt_prpg", [axis_mll, axis_mll_2], ["mll", "gen_mll", "weight"]
+        )
+        hist_mll_dtight_strig_prpg = dtight_strig_df_21.HistoBoost(
+            "mll_dtst_prpg",
+            [axis_mll, axis_mll_2],
+            ["mll", "gen_mll", "weight"],  # double tight single trigger
+        )
+        hist_mll_stight_strig_prpg = stight_strig_df_21.HistoBoost(
+            "mll_stst_prpg", [axis_mll, axis_mll_2], ["mll", "gen_mll", "weight"]
+        )
+
+        # results.append(hist_veto_prpg)
+        # results.append(hist_post_fsr_prpg)
         results.append(hist_pass_reco_pass_gen)
         results.append(hist_pass_reco_fail_gen)
         results.append(hist_pass_gen)
-
-        hist_mll = dtight_dtrig.HistoBoost("mll", [axis_mll], ["mll", "weight"])
-        hist_mll_dtight_strig = dtight_strig.HistoBoost(
-            "mll_dtight_strig", [axis_mll], ["mll", "weight"]
-        )
-        hist_mll_stight_strig = stight_strig.HistoBoost(
-            "mll_stight_strig", [axis_mll], ["mll", "weight"]
-        )
-
-        results.append(hist_mll)
-        results.append(hist_mll_dtight_strig)
-        results.append(hist_mll_stight_strig)
+        results.append(hist_mll_prpg)
+        results.append(hist_mll_dtight_strig_prpg)
+        results.append(hist_mll_stight_strig_prpg)
+        results.append(hist_mll_prfg)
+        results.append(hist_mll_dtight_strig_prfg)
+        results.append(hist_mll_stight_strig_prfg)
 
     else:  ### this is for real data
+        df = df.Filter("sum_veto_muons == 2")
 
         df = mass_extraction(df, "", "Muon", "veto_muon")
 
         dtight_dtrig, dtight_strig, stight_strig = trigger_tightID_sep(df)
 
-        hist_veto_time = df.HistoBoost(
-            "time_veto", [axis_date, axis_num_muons], ["time", "sum_veto_muons"]
+        hist_time_proj = df.HistoBoost(
+            "time_proj", [axis_date, axis_mll, axis_mll_2], ["time", "mll", "mll"]
         )
         hist_time_mll = dtight_dtrig.HistoBoost(
             "time_mll", [axis_date, axis_mll], ["time", "mll"]
@@ -361,7 +364,7 @@ def build_graph(df, dataset):
             "time_mll_stight_strig", [axis_date, axis_mll], ["time", "mll"]
         )
 
-        results.append(hist_veto_time)
+        results.append(hist_time_proj)
         results.append(hist_time)
         results.append(hist_time_mll)
         results.append(hist_time_mll_dtight_strig)

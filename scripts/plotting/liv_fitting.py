@@ -1,11 +1,17 @@
 import argparse
-import hist
-import numpy as np
-from utilities.io_tools import input_tools
+
 import h5py
-from wums.boostHistHelpers import broadcastSystHist, multiplyHists, divideHists
 
 from rabbit import tensorwriter
+from utilities.io_tools import input_tools
+from wums.boostHistHelpers import (
+    addHists,
+    broadcastSystHist,
+    divideHists,
+    expand_hist_by_duplicate_axes,
+    expand_hist_by_duplicate_axis,
+    multiplyHists,
+)
 
 parser = argparse.ArgumentParser()
 ### if i need additonal arguments add them here
@@ -13,71 +19,113 @@ parser = argparse.ArgumentParser()
 args = parser.parse_args()
 
 
-file_in = '/work/submit/jbenke/WRemnants/scripts/histmakers/'
-file_in_name = file_in + 'mz_dilepton_liv_scetlib_dyturboCorr.hdf5'
-h5file = h5py.File(file_in_name, 'r')
+file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
+file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturboCorr_maxFiles_20.hdf5"
+h5file = h5py.File(file_in_name, "r")
 results = input_tools.load_results_h5py(h5file)
 
-reco_data = results['dataPostVFP']['output']['time_veto'].get()
-reco_mc = results['ZmumuPostVFP']['output']['veto_muons'].get()
-gen_mc = results['ZmumuPostVFP']['output']['gen_muons'].get()
-pass_reco_pass_gen_veto = results['ZmumuPostVFP']['output']['veto_muons_prpg'].get()
-pass_reco_pass_gen_gen = results['ZmumuPostVFP']['output']['gen_muons_prpg'].get()
-pass_reco_fail_gen_veto = results['ZmumuPostVFP']['output']['veto_muons_prfg'].get()
-pass_reco_fail_gen_gen = results['ZmumuPostVFP']['output']['gen_muons_prfg'].get()
+reco_dtdt_data = results["dataPostVFP"]["output"]["time_mll"].get()
+time_proj = results["dataPostVFP"]["output"]["time_proj"].get()
+time_proj_gen_mll = (
+    results["dataPostVFP"]["output"]["time_proj"].get().project("time", "gen_mll")
+)
+### pass reco, fail generator
+dtdt_prfg_mc = results["ZmumuPostVFP"]["output"]["mll_dtdt_prfg"].get()
+dtst_prfg_mc = results["ZmumuPostVFP"]["output"]["mll_dtst_prfg"].get()
+stst_prfg_mc = results["ZmumuPostVFP"]["output"]["mll_stst_prfg"].get()
+### pass reco, pass generator
+dtdt_prpg_mc = results["ZmumuPostVFP"]["output"]["mll_dtdt_prpg"].get()
+dtst_prpg_mc = results["ZmumuPostVFP"]["output"]["mll_dtst_prpg"].get()
+stst_prpg_mc = results["ZmumuPostVFP"]["output"]["mll_stst_prpg"].get()
+
+pass_gen = results["ZmumuPostVFP"]["output"]["pass_gen"].get()
 
 # background_processes = ### NOT SURE WHAT GOES HERE YET
 
-lumi_scaling = results['dataPostVFP']['lumi_outout']['time'].get()
-
-weightsum = results['ZmumuPostVFP']['weight_sum']
+lumi_scaling = results["dataPostVFP"]["lumi_outout"]["time"].get()
+weightsum = results["ZmumuPostVFP"]["weight_sum"]
 cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 
-def mc_corrections(mc_results):
+
+def mc_scaling(mc_results):
     mc_results /= weightsum
     mc_results *= cross_sec
     mc_results *= 1000
     return mc_results
 
-reco_mc = mc_corrections(reco_mc)
-gen_mc = mc_corrections(gen_mc)
-pass_reco_fail_gen_veto = mc_corrections(pass_reco_fail_gen_veto)
-pass_reco_fail_gen_gen = mc_corrections(pass_reco_fail_gen_gen)
-pass_reco_pass_gen_veto = mc_corrections(pass_reco_pass_gen_veto)
-pass_reco_pass_gen_gen = mc_corrections(pass_reco_pass_gen_gen)
+
+def all_mc_corrections(hist_in, hist_proj):
+    hist_in = mc_scaling(hist_in)
+    hist_in_2d = broadcastSystHist(hist_in, hist_proj)
+    hist_in_2d = multiplyHists(hist_in_2d, lumi_scaling)
+    return hist_in_2d
 
 
-reco_mc_2d = broadcastSystHist(reco_mc, reco_data)
-gen_mc_2d = broadcastSystHist(gen_mc, reco_data)
-pass_reco_fail_gen_veto_2d = broadcastSystHist(pass_reco_fail_gen_veto, reco_data)
-pass_reco_fail_gen_gen_2d = broadcastSystHist(pass_reco_fail_gen_gen, reco_data)
-pass_reco_pass_gen_veto_2d = broadcastSystHist(pass_reco_pass_gen_veto, reco_data)
-pass_reco_pass_gen_gen_2d = broadcastSystHist(pass_reco_pass_gen_gen, reco_data)
+dtdt_prfg_mc = all_mc_corrections(dtdt_prfg_mc, time_proj)
+dtst_prfg_mc = all_mc_corrections(dtst_prfg_mc, time_proj)
+stst_prfg_mc = all_mc_corrections(stst_prfg_mc, time_proj)
+dtdt_prpg_mc = all_mc_corrections(dtdt_prpg_mc, time_proj)
+dtst_prpg_mc = all_mc_corrections(dtst_prpg_mc, time_proj)
+stst_prpg_mc = all_mc_corrections(stst_prpg_mc, time_proj)
+pass_gen = all_mc_corrections(pass_gen, time_proj_gen_mll)
 
-reco_mc_2d = multiplyHists(reco_mc_2d, lumi_scaling)
-gen_mc_2d = multiplyHists(gen_mc_2d, lumi_scaling)
-pass_reco_fail_gen_veto_2d = multiplyHists(pass_reco_fail_gen_veto_2d, lumi_scaling)
-pass_reco_fail_gen_gen_2d = multiplyHists(pass_reco_fail_gen_gen_2d, lumi_scaling)
-pass_reco_pass_gen_veto_2d = multiplyHists(pass_reco_pass_gen_veto_2d, lumi_scaling)
-pass_reco_pass_gen_gen_2d = multiplyHists(pass_reco_pass_gen_gen_2d, lumi_scaling)
+writer = tensorwriter.TensorWriter()
 
-writer = tensorwriter.TensorWriter(
-    sparse=args.sparse,
-    systematic_type=args.systematicType,
+### doesn't really matter which one we select here
+writer.add_channel(reco_dtdt_data.axes, "ch_dtdt")
+writer.add_data(divideHists(reco_dtdt_data, lumi_scaling), "ch_dtdt")
+n = dtdt_prpg_mc.project("time", "mll")
+dtdt_prpg_mc = expand_hist_by_duplicate_axis(dtdt_prpg_mc, "time", "gen_time")
+writer.add_process(n, "prpg", "ch_dtdt", signal=False)
+
+
+writer.add_channel(pass_gen.axes, "ch_masked", masked=True)
+writer.add_process(
+    divideHists(pass_gen, lumi_scaling), "prpg", "ch_masked", signal=False
+)
+n_masked = pass_gen.project("time", "gen_mll")
+pass_gen_expanded = expand_hist_by_duplicate_axes(
+    pass_gen, ["time", "gen_mll"], ["gen_time", "gen_mll_0"]
 )
 
-writer.add_channel(reco_data.axes, "time")
-writer.add_channel(reco_data.axes, "num_muons")
 
-writer.add_data(reco_data, "time")
-writer.add_data(reco_data, "num_muons")
-writer.add_data(reco_mc_2d, "time")
-writer.add_data(reco_mc_2d, "num_muons")
-writer.add_data(gen_mc_2d, "time")
-writer.add_data(gen_mc_2d, "num_muons")
+for i in range(len(dtdt_prpg_mc.axes["gen_mll"])):
+    for j in range(len(dtdt_prpg_mc.axes["gen_time"])):
+        v = dtdt_prpg_mc[{"gen_mll": i, "gen_time": j}]
+        var = addHists(v * 0.1, n)
+        cross_section = divideHists(var, lumi_scaling)
+        writer.add_systematic(
+            cross_section,
+            f"n_mll{i}_time{j}",
+            "prpg",
+            "ch_dtdt",
+            constrained=False,
+            groups=["nz"],
+        )
+
+        # for masked channel
+        v_masked = pass_gen_expanded[{"gen_mll_0": i, "gen_time": j}]
+        var_masked = addHists(v_masked * 0.1, n_masked)
+        cross_section_masked = divideHists(var_masked, lumi_scaling)
+        writer.add_systematic(
+            cross_section_masked,
+            f"n_mll{i}_time{j}",
+            "prpg",
+            "ch_masked",
+            constrained=False,
+            groups=["nz"],
+        )
 
 
-writer.add_process(pass_reco_pass_gen_2d, "bkg", "time")
-writer.add_process(pass_reco_fail_gen_2d, "bkg", "time")
+# n2 = number that pass both high level triggers
+# n1 = number that pass only one high level trigger
+# n2 = dtdt_prpg_mc
+# n1 = stst_prpg_mc
+
+# eps = 2*n2/(n1 + 2*n2)
+# neff = n2/eps**2
+# n2_prime = neff*eps_prime**2
+# n1_prime = 2*neff*eps_prime/eps*(1-eps*eps_prime)
 
 
+writer.write(outfolder="./", outfilename="liv")

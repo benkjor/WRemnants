@@ -73,7 +73,7 @@ writer = tensorwriter.TensorWriter()
 
 ### doesn't really matter which one we select here
 writer.add_channel(reco_dtdt_data.axes, "ch_dtdt")
-writer.add_data(divideHists(reco_dtdt_data, lumi_scaling), "ch_dtdt")
+writer.add_data(reco_dtdt_data, "ch_dtdt")
 n = dtdt_prpg_mc.project("time", "mll")
 dtdt_prpg_mc = expand_hist_by_duplicate_axis(dtdt_prpg_mc, "time", "gen_time")
 writer.add_process(n, "prpg", "ch_dtdt", signal=False)
@@ -89,13 +89,25 @@ pass_gen_expanded = expand_hist_by_duplicate_axes(
 )
 
 
+writer.add_channel(dtst_prpg_mc.axes, "ch_dtst", masked=True)
+### not sure if i want this in the same process
+writer.add_process(
+    divideHists(dtst_prpg_mc, lumi_scaling), "eps_prime", "ch_dtst", signal=False
+)
+n_dtst = dtst_prpg_mc.project("time", "mll")
+
+
+dtst_prpg_mc = expand_hist_by_duplicate_axis(dtst_prpg_mc, "time", "gen_time")
+# dtst_prpg_mc = expand_hist_by_duplicate_axis(dtst_prpg_mc, "time", "gen_time")
+# writer.add_process(n_dtst, "prpg_dtst", "ch_dtst", signal=False)
+
+
 for i in range(len(dtdt_prpg_mc.axes["gen_mll"])):
     for j in range(len(dtdt_prpg_mc.axes["gen_time"])):
-        v = dtdt_prpg_mc[{"gen_mll": i, "gen_time": j}]
+        v = dtdt_prpg_mc[{"gen_mll": i, "gen_time": j}]  ## equivalent to n2
         var = addHists(v * 0.1, n)
-        cross_section = divideHists(var, lumi_scaling)
         writer.add_systematic(
-            cross_section,
+            var,
             f"n_mll{i}_time{j}",
             "prpg",
             "ch_dtdt",
@@ -116,6 +128,30 @@ for i in range(len(dtdt_prpg_mc.axes["gen_mll"])):
             groups=["nz"],
         )
 
+        n2 = v
+        n1 = dtst_prpg_mc[{"gen_mll": i, "gen_time": j}]
+        eps = 2 * divideHists(n2, addHists(n1, 2 * n2))
+
+        neff = divideHists(n2, multiplyHists(eps, eps))
+
+        eps_prime = 0.1 * eps
+        eps_prime = eps_prime.project("time", "mll")
+        # import pdb
+        # pdb.set_trace()
+
+        writer.add_systematic(
+            eps_prime,
+            f"eps_prime_mll{i}_time{j}",
+            "eps_prime",
+            "ch_dtst",
+            constrained=False,
+            groups=["nz"],
+        )
+
+        n2_prime = multiplyHists(neff, multiplyHists(eps_prime, eps_prime))
+        n1_prime = 2 * multiplyHists(neff, eps_prime)
+        n1_prime = divideHists(n1_prime, eps)
+        n1_prime = multiplyHists(n1_prime, 1 - multiplyHists(eps, eps_prime))
 
 # n2 = number that pass both high level triggers
 # n1 = number that pass only one high level trigger

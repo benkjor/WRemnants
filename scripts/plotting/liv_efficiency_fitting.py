@@ -145,9 +145,6 @@ eps_hlt_prime = 1.01
 
 eps_id_var = scaleHist(eps_id.copy(), eps_id_prime)
 eps_hlt_var = scaleHist(eps_hlt.copy(), eps_hlt_prime)
-# eps_id_var_inv= scaleHist(eps_id, 1/eps_id_prime)
-# eps_hlt_var_inv = scaleHist(eps_hlt, 1/eps_hlt_prime)
-# pdb.set_trace()
 
 h0var_id = get_h0var(eps_id_var, eps_hlt, heff, h_ones)
 h0var_hlt = get_h0var(eps_id, eps_hlt_var, heff, h_ones)

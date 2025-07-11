@@ -5,7 +5,11 @@ import hist
 import numpy as np
 
 import narf
-from narf.lumitools import make_brilcalc_helper
+from narf.lumitools import (
+    make_brilcalc_filter_helper,
+    make_brilcalc_helper,
+    make_lumihelper,
+)
 from utilities import common, parsing
 from wremnants import theory_tools
 from wremnants.datasets.datagroups import Datagroups
@@ -142,6 +146,23 @@ def trigger_tightID_sep(dataframe):
     return dtight_dtrig, dtight_strig, stight_strig
 
 
+def luminometer_filter(df, lumi_name, filter_helper, helper):
+    df_filtered = df.Define(
+        f"in_{lumi_name}", filter_helper, ["run", "luminosityBlock"]
+    )
+    df_filtered = df_filtered.Filter(f"in_{lumi_name}")
+    df_filtered = df_filtered.Define(
+        f"lumival_{lumi_name}", helper, ["run", "luminosityBlock"]
+    )
+    df_filtered_hist = df_filtered.HistoBoost(
+        f"lumi_{lumi_name}", [axis_date], ["time", f"lumival_{lumi_name}"]
+    )
+    df_filtered_hist_nominal = df_filtered.HistoBoost(
+        f"lumi_in_{lumi_name}", [axis_date], ["time", "lumival"]
+    )
+    return df_filtered, df_filtered_hist, df_filtered_hist_nominal
+
+
 args = parser.parse_args()
 logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
 era = args.era
@@ -149,7 +170,20 @@ calib_filepaths = common.calib_filepaths
 
 # hoping this can go up top
 lumicsv = f"{common.data_dir}/bylsoutput.csv"
+hfoc_csv = f"{common.data_dir}/bylsoutput_HFOC.csv"
+pcc_csv = f"{common.data_dir}/bylsoutput_PCC.csv"
+ramses_csv = f"{common.data_dir}/bylsoutput_RAMSES.csv"
+
 brilcalc_helper = make_timehelper(lumicsv)
+
+hfoc_helper = make_lumihelper(hfoc_csv)
+pcc_helper = make_lumihelper(pcc_csv)
+ramses_helper = make_lumihelper(ramses_csv)
+
+hfoc_filter_helper = make_brilcalc_filter_helper(hfoc_csv)
+pcc_filter_helper = make_brilcalc_filter_helper(pcc_csv)
+ramses_filter_helper = make_brilcalc_filter_helper(ramses_csv)
+
 
 datasets = getDatasets(
     maxFiles=args.maxFiles,
@@ -223,26 +257,44 @@ axis_mll_2 = hist.axis.Variable(
     name="gen_mll",
 )
 axis_num_muons = hist.axis.Regular(3, -0.5, 2.5, name="num_muons")
-# axis_veto_muons = hist.axis.Regular(3,-0.5 , 2.5, name = 'num_fsr_muons')
 
 
 ########################################################
 def build_graph_lumi(df, dataset):
     df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
-    hist_time = df.HistoBoost("time", [axis_date], ["time", "lumival"])
-    results = [hist_time]
+    hist_lumi_nom = df.HistoBoost("lumi_nom", [axis_date], ["time", "lumival"])
+
+    df_hfoc, hist_hfoc_filtered, hist_nominal_in_hfoc_filtered = luminometer_filter(
+        df, "hfoc", hfoc_filter_helper, hfoc_helper
+    )
+    df_pcc, hist_pcc_filtered, hist_nominal_in_pcc_filtered = luminometer_filter(
+        df, "pcc", pcc_filter_helper, pcc_helper
+    )
+    df_ramses, hist_ramses_filtered, hist_nominal_in_ramses_filtered = (
+        luminometer_filter(df, "ramses", ramses_filter_helper, ramses_helper)
+    )
+    results = [
+        hist_lumi_nom,
+        hist_hfoc_filtered,
+        hist_pcc_filtered,
+        hist_ramses_filtered,
+        hist_nominal_in_hfoc_filtered,
+        hist_nominal_in_pcc_filtered,
+        hist_nominal_in_ramses_filtered,
+    ]
     return results
 
 
 def build_graph(df, dataset):
 
-    logger.info(f"build graph for dataset: {dataset.name}")
+    logger.info(f"fomrbuild graph for dataset: {dataset.name}")
     era = args.era
     results = []
 
     if dataset.is_data:
         df = df.DefinePerSample("weight", "1.0")
         df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
+        # hist_lumi_nom = df.HistoBoost("lumi_nom", [axis_date], ["time", "lumival"])
         hist_time = df.HistoBoost("time", [axis_date], ["time"])
     else:
         df = df.Define("weight", "std::copysign(1.0, genWeight)")
@@ -332,8 +384,6 @@ def build_graph(df, dataset):
             "mll_stst_prpg", [axis_mll, axis_mll_2], ["mll", "gen_mll", "weight"]
         )
 
-        # results.append(hist_veto_prpg)
-        # results.append(hist_post_fsr_prpg)
         results.append(hist_pass_reco_pass_gen)
         results.append(hist_pass_reco_fail_gen)
         results.append(hist_pass_gen)
@@ -358,10 +408,10 @@ def build_graph(df, dataset):
             "time_mll", [axis_date, axis_mll], ["time", "mll"]
         )
         hist_time_mll_dtight_strig = dtight_strig.HistoBoost(
-            "time_mll_dtight_strig", [axis_date, axis_mll], ["time", "mll"]
+            "time_mll_dtst", [axis_date, axis_mll], ["time", "mll"]
         )
         hist_time_mll_stight_strig = stight_strig.HistoBoost(
-            "time_mll_stight_strig", [axis_date, axis_mll], ["time", "mll"]
+            "time_mll_stst", [axis_date, axis_mll], ["time", "mll"]
         )
 
         results.append(hist_time_proj)

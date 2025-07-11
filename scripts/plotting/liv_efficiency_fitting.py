@@ -74,8 +74,8 @@ h5file = h5py.File(file_in_name, "r")
 results = input_tools.load_results_h5py(h5file)
 
 reco_dtdt_data = results["dataPostVFP"]["output"]["time_mll"].get()
-reco_dtst_data = results["dataPostVFP"]["output"]["time_mll_dtight_strig"].get()
-reco_stst_data = results["dataPostVFP"]["output"]["time_mll_stight_strig"].get()
+reco_dtst_data = results["dataPostVFP"]["output"]["time_mll_dtst"].get()
+reco_stst_data = results["dataPostVFP"]["output"]["time_mll_stst"].get()
 
 time_proj = results["dataPostVFP"]["output"]["time_proj"].get()
 time_proj_gen_mll = (
@@ -91,7 +91,16 @@ pass_gen = results["ZmumuPostVFP"]["output"]["pass_gen"].get()
 
 # background_processes = ### NOT SURE WHAT GOES HERE YET
 
-lumi_scaling = results["dataPostVFP"]["lumi_outout"]["time"].get()
+lumi_scaling = results["dataPostVFP"]["lumi_outout"]["lumi_nom"].get()
+
+lumi_hfoc = results["dataPostVFP"]["lumi_outout"]["lumi_hfoc"].get()
+lumi_pcc = results["dataPostVFP"]["lumi_outout"]["lumi_pcc"].get()
+lumi_ramses = results["dataPostVFP"]["lumi_outout"]["lumi_ramses"].get()
+
+lumi_hfoc_nom = results["dataPostVFP"]["lumi_outout"]["lumi_in_hfoc"].get()
+lumi_pcc_nom = results["dataPostVFP"]["lumi_outout"]["lumi_in_pcc"].get()
+lumi_ramses_nom = results["dataPostVFP"]["lumi_outout"]["lumi_in_ramses"].get()
+
 weightsum = results["ZmumuPostVFP"]["weight_sum"]
 cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 
@@ -110,6 +119,50 @@ stst_prpg_mc = all_mc_corrections(
 )
 pass_gen = all_mc_corrections(
     pass_gen, time_proj_gen_mll, lumi_scaling, weightsum, cross_sec
+)
+
+
+# pdb.set_trace()
+### lumi uncertainties
+hfoc_scaling = divideHists(lumi_hfoc, lumi_hfoc_nom)
+hfoc_scaling = multiplyHists(hfoc_scaling, lumi_scaling)
+
+pcc_scaling = divideHists(lumi_pcc, lumi_pcc_nom)
+pcc_scaling = multiplyHists(pcc_scaling, lumi_scaling)
+
+ramses_scaling = divideHists(lumi_ramses, lumi_ramses_nom)
+ramses_scaling = multiplyHists(ramses_scaling, lumi_scaling)
+
+
+dtdt_prpg_mc_hfoc = all_mc_corrections(
+    dtdt_prpg_mc, time_proj, hfoc_scaling, weightsum, cross_sec
+)
+dtst_prpg_mc_hfoc = all_mc_corrections(
+    dtst_prpg_mc, time_proj, hfoc_scaling, weightsum, cross_sec
+)
+stst_prpg_mc_hfoc = all_mc_corrections(
+    stst_prpg_mc, time_proj, hfoc_scaling, weightsum, cross_sec
+)
+
+dtdt_prpg_mc_pcc = all_mc_corrections(
+    dtdt_prpg_mc, time_proj, pcc_scaling, weightsum, cross_sec
+)
+dtst_prpg_mc_pcc = all_mc_corrections(
+    dtst_prpg_mc, time_proj, pcc_scaling, weightsum, cross_sec
+)
+stst_prpg_mc_pcc = all_mc_corrections(
+    stst_prpg_mc, time_proj, pcc_scaling, weightsum, cross_sec
+)
+
+
+dtdt_prpg_mc_ramses = all_mc_corrections(
+    dtdt_prpg_mc, time_proj, ramses_scaling, weightsum, cross_sec
+)
+dtst_prpg_mc_ramses = all_mc_corrections(
+    dtst_prpg_mc, time_proj, ramses_scaling, weightsum, cross_sec
+)
+stst_prpg_mc_ramses = all_mc_corrections(
+    stst_prpg_mc, time_proj, ramses_scaling, weightsum, cross_sec
 )
 
 
@@ -132,12 +185,10 @@ eps_id = multiplyHists(h0, eps_id)
 eps_id = addHists(eps_id, h1)
 eps_id = divideHists(h1, eps_id)
 
-
 heff = divideHists(h2, multiplyHists(eps_hlt, eps_hlt))
 heff = divideHists(heff, multiplyHists(eps_id, eps_id))
 
 # generate histogram of ones
-
 
 eps_id_prime = 1.01
 eps_hlt_prime = 1.01
@@ -158,11 +209,13 @@ n_masked = pass_gen.project("time", "gen_mll")
 
 ## create the tensor
 writer = tensorwriter.TensorWriter()
+
+##g# enerator channel
 writer.add_channel(pass_gen.axes, "ch_masked", masked=True)
 writer.add_process(
     divideHists(pass_gen, lumi_scaling), "prpg", "ch_masked", signal=False
 )
-### doesn't really matter which one we select here
+### efficiency channels
 writer.add_channel(reco_dtdt_data.axes, "ch_dtdt")
 writer.add_data(reco_dtdt_data, "ch_dtdt")
 writer.add_process(h2, "prpg", "ch_dtdt", signal=False)
@@ -174,8 +227,8 @@ writer.add_process(h1, "prpg", "ch_dtst", signal=False)
 writer.add_channel(reco_stst_data.axes, "ch_stst")
 writer.add_data(reco_stst_data, "ch_stst")
 writer.add_process(h0, "prpg", "ch_stst", signal=False)
-### not sure if i want this in the same process
 
+### adding axes as appropriate to make everything 4 dimensional
 dtdt_prpg_mc = expand_hist_by_duplicate_axis(dtdt_prpg_mc, "time", "gen_time")
 dtst_prpg_mc = expand_hist_by_duplicate_axis(dtst_prpg_mc, "time", "gen_time")
 stst_prpg_mc = expand_hist_by_duplicate_axis(stst_prpg_mc, "time", "gen_time")
@@ -183,75 +236,9 @@ pass_gen_expanded = expand_hist_by_duplicate_axes(
     pass_gen, ["time", "gen_mll"], ["gen_time", "gen_mll_0"]
 )
 
-# pdb.set_trace()
 
-
-for i in range(10, 13):
+for i in range(10, 13):  # just select two mass bins in the center
     for j in range(nbins_time):
-
-        ## efficiency
-        h2var_id_primed = get_eff_hist(h2var_id, h2, i, j)
-        h1var_id_primed = get_eff_hist(h1var_id, h1, i, j)
-        h0var_id_primed = get_eff_hist(h0var_id, h0, i, j)
-
-        h2var_hlt_primed = get_eff_hist(h2var_hlt, h2, i, j)
-        h1var_hlt_primed = get_eff_hist(h1var_hlt, h1, i, j)
-        h0var_hlt_primed = get_eff_hist(h0var_hlt, h0, i, j)
-
-        ### is there a way to make this more compact?
-        #### EPSILON 1
-        writer.add_systematic(
-            h2var_id_primed,
-            f"id_prime_mll{i}_time{j}",
-            "prpg",
-            "ch_dtdt",
-            constrained=False,
-            groups=["eff_1"],
-        )
-        writer.add_systematic(
-            h1var_id_primed,
-            f"id_prime_mll{i}_time{j}",
-            "prpg",
-            "ch_dtst",
-            constrained=False,
-            groups=["eff_1"],
-        )
-
-        writer.add_systematic(
-            h0var_id_primed,
-            f"id_prime_mll{i}_time{j}",
-            "prpg",
-            "ch_stst",
-            constrained=False,
-            groups=["eff_1"],
-        )
-
-        ### EPSILON 2
-
-        writer.add_systematic(
-            h2var_hlt_primed,
-            f"hlt_prime_mll{i}_time{j}",
-            "prpg",
-            "ch_dtdt",
-            constrained=False,
-            groups=["eff_2"],
-        )
-        writer.add_systematic(
-            h1var_hlt_primed,
-            f"hlt_prime_mll{i}_time{j}",
-            "prpg",
-            "ch_dtst",
-            constrained=False,
-            groups=["eff_2"],
-        )
-        writer.add_systematic(
-            h0var_hlt_primed,
-            f"hlt_prime_mll{i}_time{j}",
-            "prpg",
-            "ch_stst",
-            constrained=False,
-            groups=["eff_2"],
-        )
 
         ### be more consistent about ordering of time and mll
         ### fitting for the number of events
@@ -298,6 +285,148 @@ for i in range(10, 13):
             constrained=False,
             groups=["nz"],
         )
-    #     pdb.set_trace()
+
+        ## efficiency
+        h2var_id_primed = get_eff_hist(h2var_id, h2, i, j)
+        h1var_id_primed = get_eff_hist(h1var_id, h1, i, j)
+        h0var_id_primed = get_eff_hist(h0var_id, h0, i, j)
+
+        h2var_hlt_primed = get_eff_hist(h2var_hlt, h2, i, j)
+        h1var_hlt_primed = get_eff_hist(h1var_hlt, h1, i, j)
+        h0var_hlt_primed = get_eff_hist(h0var_hlt, h0, i, j)
+
+        #### ID EFFICIENCY
+        writer.add_systematic(
+            h2var_id_primed,
+            f"id_prime_mll{i}_time{j}",
+            "prpg",
+            "ch_dtdt",
+            constrained=False,
+            groups=["eff_1"],
+        )
+        writer.add_systematic(
+            h1var_id_primed,
+            f"id_prime_mll{i}_time{j}",
+            "prpg",
+            "ch_dtst",
+            constrained=False,
+            groups=["eff_1"],
+        )
+
+        writer.add_systematic(
+            h0var_id_primed,
+            f"id_prime_mll{i}_time{j}",
+            "prpg",
+            "ch_stst",
+            constrained=False,
+            groups=["eff_1"],
+        )
+
+        ### HLT EFFICIENCY
+
+        writer.add_systematic(
+            h2var_hlt_primed,
+            f"hlt_prime_mll{i}_time{j}",
+            "prpg",
+            "ch_dtdt",
+            constrained=False,
+            groups=["eff_2"],
+        )
+        writer.add_systematic(
+            h1var_hlt_primed,
+            f"hlt_prime_mll{i}_time{j}",
+            "prpg",
+            "ch_dtst",
+            constrained=False,
+            groups=["eff_2"],
+        )
+        writer.add_systematic(
+            h0var_hlt_primed,
+            f"hlt_prime_mll{i}_time{j}",
+            "prpg",
+            "ch_stst",
+            constrained=False,
+            groups=["eff_2"],
+        )
+### HFOC
+# pdb.set_trace()
+
+writer.add_systematic(
+    dtdt_prpg_mc_hfoc.project("time", "mll"),
+    "hfoc",
+    "prpg",
+    "ch_dtdt",
+    constrained=True,
+    groups=["lumi_stability"],
+)
+writer.add_systematic(
+    dtst_prpg_mc_hfoc.project("time", "mll"),
+    "hfoc",
+    "prpg",
+    "ch_dtst",
+    constrained=True,
+    groups=["lumi_stability"],
+)
+writer.add_systematic(
+    stst_prpg_mc_hfoc.project("time", "mll"),
+    "hfoc",
+    "prpg",
+    "ch_stst",
+    constrained=True,
+    groups=["lumi_stability"],
+)
+
+#### PCC
+writer.add_systematic(
+    dtdt_prpg_mc_pcc.project("time", "mll"),
+    "pcc",
+    "prpg",
+    "ch_dtdt",
+    constrained=True,
+    groups=["lumi_stability"],
+)
+writer.add_systematic(
+    dtst_prpg_mc_pcc.project("time", "mll"),
+    "pcc",
+    "prpg",
+    "ch_dtst",
+    constrained=True,
+    groups=["lumi_stability"],
+)
+writer.add_systematic(
+    stst_prpg_mc_pcc.project("time", "mll"),
+    "pcc",
+    "prpg",
+    "ch_stst",
+    constrained=True,
+    groups=["lumi_stability"],
+)
+
+
+#### RAMSES
+writer.add_systematic(
+    dtdt_prpg_mc_ramses.project("time", "mll"),
+    "ramses",
+    "prpg",
+    "ch_dtdt",
+    constrained=True,
+    groups=["lumi_stability"],
+)
+writer.add_systematic(
+    dtst_prpg_mc_ramses.project("time", "mll"),
+    "ramses",
+    "prpg",
+    "ch_dtst",
+    constrained=True,
+    groups=["lumi_stability"],
+)
+writer.add_systematic(
+    stst_prpg_mc_ramses.project("time", "mll"),
+    "ramses",
+    "prpg",
+    "ch_stst",
+    constrained=True,
+    groups=["lumi_stability"],
+)
 
 writer.write(outfolder="./", outfilename="liv")

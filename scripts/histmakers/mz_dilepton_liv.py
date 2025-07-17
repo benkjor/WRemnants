@@ -24,6 +24,7 @@ from wums import logging
 analysis_label = Datagroups.analysisLabel(os.path.basename(__file__))
 parser, initargs = parsing.common_parser(analysis_label)
 
+
 parser.add_argument(
     "--muonIsolation",
     type=int,
@@ -154,13 +155,37 @@ def luminometer_filter(df, lumi_name, filter_helper, helper):
     df_filtered = df_filtered.Define(
         f"lumival_{lumi_name}", helper, ["run", "luminosityBlock"]
     )
+    df_filtered = df_filtered.Define(
+        f"sbilval_{lumi_name}", f"lumival_{lumi_name}/fill_count*1/24"
+    )
+
+    df_filtered = df_filtered.Define(
+        f"sbilval_nom_{lumi_name}", "lumival/fill_count*1/24"
+    )
+    ### histogram
+    df_count_hist = df_filtered.HistoBoost(f"count_{lumi_name}", [axis_date], ["time"])
+
     df_filtered_hist = df_filtered.HistoBoost(
         f"lumi_{lumi_name}", [axis_date], ["time", f"lumival_{lumi_name}"]
     )
+
     df_filtered_hist_nominal = df_filtered.HistoBoost(
         f"lumi_in_{lumi_name}", [axis_date], ["time", "lumival"]
     )
-    return df_filtered, df_filtered_hist, df_filtered_hist_nominal
+
+    df_filtered_hist_sbil = df_filtered.HistoBoost(
+        f"sbil_{lumi_name}", [axis_date], ["time", f"sbilval_{lumi_name}"]
+    )
+
+    if lumi_name == "pcc":
+        return (
+            df_filtered_hist,
+            df_filtered_hist_nominal,
+            df_count_hist,
+            df_filtered_hist_sbil,
+        )
+    else:
+        return df_filtered_hist, df_filtered_hist_nominal, df_count_hist
 
 
 args = parser.parse_args()
@@ -169,16 +194,22 @@ era = args.era
 calib_filepaths = common.calib_filepaths
 
 # hoping this can go up top
-lumicsv = f"{common.data_dir}/bylsoutput.csv"
-hfoc_csv = f"{common.data_dir}/bylsoutput_HFOC.csv"
-pcc_csv = f"{common.data_dir}/bylsoutput_PCC.csv"
-ramses_csv = f"{common.data_dir}/bylsoutput_RAMSES.csv"
+lumicsv = f"{common.data_dir}/bylsoutput_nBunches.csv"
+hfoc_csv = f"{common.data_dir}/bylsoutput_nBunches_HFOC.csv"
+pcc_csv = f"{common.data_dir}/bylsoutput_nBunches_PCC.csv"
+ramses_csv = f"{common.data_dir}/bylsoutput_nBunches_RAMSES.csv"
 
 brilcalc_helper = make_timehelper(lumicsv)
+lumi_no_time = make_lumihelper(lumicsv)
+lumi_bunch_helper = make_brilcalc_helper(lumicsv, idx=9, action=float)
 
 hfoc_helper = make_lumihelper(hfoc_csv)
 pcc_helper = make_lumihelper(pcc_csv)
 ramses_helper = make_lumihelper(ramses_csv)
+
+hfoc_bunch_helper = make_brilcalc_helper(hfoc_csv, idx=9, action=float)
+pcc_bunch_helper = make_brilcalc_helper(pcc_csv, idx=9, action=float)
+ramses_bunch_helper = make_brilcalc_helper(ramses_csv, idx=9, action=float)
 
 hfoc_filter_helper = make_brilcalc_filter_helper(hfoc_csv)
 pcc_filter_helper = make_brilcalc_filter_helper(pcc_csv)
@@ -256,6 +287,8 @@ axis_mll_2 = hist.axis.Variable(
     ],
     name="gen_mll",
 )
+
+axis_sbil = hist.axis.Regular(24, 9e-7, 3e-8, name="sbil")
 axis_num_muons = hist.axis.Regular(3, -0.5, 2.5, name="num_muons")
 
 
@@ -263,16 +296,18 @@ axis_num_muons = hist.axis.Regular(3, -0.5, 2.5, name="num_muons")
 def build_graph_lumi(df, dataset):
     df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
     hist_lumi_nom = df.HistoBoost("lumi_nom", [axis_date], ["time", "lumival"])
+    df = df.Define("fill_count", lumi_bunch_helper, ["run", "luminosityBlock"])
 
-    df_hfoc, hist_hfoc_filtered, hist_nominal_in_hfoc_filtered = luminometer_filter(
-        df, "hfoc", hfoc_filter_helper, hfoc_helper
+    hist_hfoc_filtered, hist_nominal_in_hfoc_filtered, hist_hfoc_count = (
+        luminometer_filter(df, "hfoc", hfoc_filter_helper, hfoc_helper)
     )
-    df_pcc, hist_pcc_filtered, hist_nominal_in_pcc_filtered = luminometer_filter(
-        df, "pcc", pcc_filter_helper, pcc_helper
+    hist_pcc_filtered, hist_nominal_in_pcc_filtered, hist_pcc_count, hist_pcc_sbil = (
+        luminometer_filter(df, "pcc", pcc_filter_helper, pcc_helper)
     )
-    df_ramses, hist_ramses_filtered, hist_nominal_in_ramses_filtered = (
+    hist_ramses_filtered, hist_nominal_in_ramses_filtered, hist_ramses_count = (
         luminometer_filter(df, "ramses", ramses_filter_helper, ramses_helper)
     )
+
     results = [
         hist_lumi_nom,
         hist_hfoc_filtered,
@@ -281,6 +316,10 @@ def build_graph_lumi(df, dataset):
         hist_nominal_in_hfoc_filtered,
         hist_nominal_in_pcc_filtered,
         hist_nominal_in_ramses_filtered,
+        hist_pcc_sbil,
+        hist_hfoc_count,
+        hist_pcc_count,
+        hist_ramses_count,
     ]
     return results
 
@@ -294,7 +333,6 @@ def build_graph(df, dataset):
     if dataset.is_data:
         df = df.DefinePerSample("weight", "1.0")
         df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
-        # hist_lumi_nom = df.HistoBoost("lumi_nom", [axis_date], ["time", "lumival"])
         hist_time = df.HistoBoost("time", [axis_date], ["time"])
     else:
         df = df.Define("weight", "std::copysign(1.0, genWeight)")

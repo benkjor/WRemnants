@@ -29,10 +29,11 @@ def make_plot(data_all, plotname, legend_all=["MC", "Data"], ylim=[]):
 
 
 def mc_scaling(mc_results, weightsum, cross_sec):
-    mc_results /= weightsum
-    mc_results *= cross_sec
-    mc_results *= 1000
-    return mc_results
+    temp = mc_results.copy()
+    temp /= weightsum
+    temp *= cross_sec
+    temp *= 1000
+    return temp
 
 
 def all_mc_corrections(hist_in, hist_proj, weightsum, cross_sec):
@@ -161,7 +162,7 @@ make_plot(
 )
 
 # make_plot([hfoc_scaling], "lumi_ratios", ["HFOC/nominal"], [0.9, 1.1])
-# make_plot([pcc_scaling], "lumi_ratios", ["PCC/nominal"], [0.9, 1.1])
+make_plot([pcc_scaling], "lumi_ratios", ["PCC/nominal"], [0.999, 1.001])
 # make_plot([ramses_scaling], "lumi_ratios", ["RAMSES/nominal"], [0.9, 1.1])
 
 # make_plot([sum_generator], "generator", legend_all=["Generator"])

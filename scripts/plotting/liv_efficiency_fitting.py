@@ -18,6 +18,9 @@ from wums.boostHistHelpers import (
 parser = argparse.ArgumentParser()
 args = parser.parse_args()
 
+slope_ramses = 0.0006
+slope_hfoc = 0.0007
+
 
 def get_h2var(eps_id, eps_hlt, heff):
     #  h2var = heff * (eps_prime * eps)
@@ -55,17 +58,42 @@ def get_eff_hist(eps_hist, ref_hist, i, j):
 
 
 def mc_scaling(mc_results, weightsum, cross_sec):
-    mc_results /= weightsum
-    mc_results *= cross_sec
-    mc_results *= 1000
-    return mc_results
+    temp = mc_results.copy()
+    temp /= weightsum
+    temp *= cross_sec
+    temp *= 1000
+    return temp
 
 
 def all_mc_corrections(hist_in, hist_proj, lumi_scaling, weightsum, cross_sec):
-    hist_in = mc_scaling(hist_in, weightsum, cross_sec)
-    hist_in_2d = broadcastSystHist(hist_in, hist_proj)
+    hist_in_new = hist_in.copy()
+    hist_in_new = mc_scaling(hist_in_new, weightsum, cross_sec)
+    hist_in_2d = broadcastSystHist(hist_in_new, hist_proj)
     hist_in_2d = multiplyHists(hist_in_2d, lumi_scaling)
     return hist_in_2d
+
+
+def mc_corrections_all_cases(
+    dtdt_mc, dtst_mc, stst_mc, hist_proj, lumi_scaling, weightsum, cross_sec
+):
+
+    dtdt = all_mc_corrections(
+        dtdt_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
+    )
+    dtst = all_mc_corrections(
+        dtst_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
+    )
+    stst = all_mc_corrections(
+        stst_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
+    )
+    return dtdt, dtst, stst
+
+
+def make_ones_hist(hist_ref):
+    ones = np.ones_like(hist_ref.values())
+    h_ones = hist_ref.copy()
+    h_ones.values()[...] = ones
+    return h_ones
 
 
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
@@ -91,8 +119,10 @@ pass_gen = results["ZmumuPostVFP"]["output"]["pass_gen"].get()
 
 # background_processes = ### NOT SURE WHAT GOES HERE YET
 
-lumi_scaling = results["dataPostVFP"]["lumi_outout"]["lumi_nom"].get()
 
+### probably need to pull these back'
+lumi_scaling = results["dataPostVFP"]["lumi_outout"]["lumi_nom"].get()
+### pulling for cross detector scaling
 lumi_hfoc = results["dataPostVFP"]["lumi_outout"]["lumi_hfoc"].get()
 lumi_pcc = results["dataPostVFP"]["lumi_outout"]["lumi_pcc"].get()
 lumi_ramses = results["dataPostVFP"]["lumi_outout"]["lumi_ramses"].get()
@@ -100,6 +130,12 @@ lumi_ramses = results["dataPostVFP"]["lumi_outout"]["lumi_ramses"].get()
 lumi_hfoc_nom = results["dataPostVFP"]["lumi_outout"]["lumi_in_hfoc"].get()
 lumi_pcc_nom = results["dataPostVFP"]["lumi_outout"]["lumi_in_pcc"].get()
 lumi_ramses_nom = results["dataPostVFP"]["lumi_outout"]["lumi_in_ramses"].get()
+## pulling for linearity
+sbil_pcc = results["dataPostVFP"]["lumi_outout"][
+    "sbil_pcc"
+].get()  #### turns out this is nominal so going to not create a separate nominal one
+count_pcc = results["dataPostVFP"]["lumi_outout"]["count_pcc"].get()
+
 
 weightsum = results["ZmumuPostVFP"]["weight_sum"]
 cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
@@ -107,23 +143,11 @@ cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 nbins_mll = len(dtdt_prpg_mc.axes["mll"])
 nbins_time = len(reco_dtst_data.axes["time"])
 
+##### caluclating the effieincies and the variation matricies
+### units are initially 1/fb, want in 1/ub
 
-dtdt_prpg_mc = all_mc_corrections(
-    dtdt_prpg_mc, time_proj, lumi_scaling, weightsum, cross_sec
-)
-dtst_prpg_mc = all_mc_corrections(
-    dtst_prpg_mc, time_proj, lumi_scaling, weightsum, cross_sec
-)
-stst_prpg_mc = all_mc_corrections(
-    stst_prpg_mc, time_proj, lumi_scaling, weightsum, cross_sec
-)
-pass_gen = all_mc_corrections(
-    pass_gen, time_proj_gen_mll, lumi_scaling, weightsum, cross_sec
-)
+### cross-detector uncertainties
 
-
-# pdb.set_trace()
-### lumi uncertainties
 hfoc_scaling = divideHists(lumi_hfoc, lumi_hfoc_nom)
 hfoc_scaling = multiplyHists(hfoc_scaling, lumi_scaling)
 
@@ -133,54 +157,101 @@ pcc_scaling = multiplyHists(pcc_scaling, lumi_scaling)
 ramses_scaling = divideHists(lumi_ramses, lumi_ramses_nom)
 ramses_scaling = multiplyHists(ramses_scaling, lumi_scaling)
 
-
-dtdt_prpg_mc_hfoc = all_mc_corrections(
-    dtdt_prpg_mc, time_proj, hfoc_scaling, weightsum, cross_sec
+dtdt_prpg_mc_hfoc, dtst_prpg_mc_hfoc, stst_prpg_mc_hfoc = mc_corrections_all_cases(
+    dtdt_prpg_mc,
+    dtst_prpg_mc,
+    stst_prpg_mc,
+    time_proj,
+    hfoc_scaling,
+    weightsum,
+    cross_sec,
 )
-dtst_prpg_mc_hfoc = all_mc_corrections(
-    dtst_prpg_mc, time_proj, hfoc_scaling, weightsum, cross_sec
+dtdt_prpg_mc_pcc, dtst_prpg_mc_pcc, stst_prpg_mc_pcc = mc_corrections_all_cases(
+    dtdt_prpg_mc,
+    dtst_prpg_mc,
+    stst_prpg_mc,
+    time_proj,
+    hfoc_scaling,
+    weightsum,
+    cross_sec,
 )
-stst_prpg_mc_hfoc = all_mc_corrections(
-    stst_prpg_mc, time_proj, hfoc_scaling, weightsum, cross_sec
-)
-
-dtdt_prpg_mc_pcc = all_mc_corrections(
-    dtdt_prpg_mc, time_proj, pcc_scaling, weightsum, cross_sec
-)
-dtst_prpg_mc_pcc = all_mc_corrections(
-    dtst_prpg_mc, time_proj, pcc_scaling, weightsum, cross_sec
-)
-stst_prpg_mc_pcc = all_mc_corrections(
-    stst_prpg_mc, time_proj, pcc_scaling, weightsum, cross_sec
-)
-
-
-dtdt_prpg_mc_ramses = all_mc_corrections(
-    dtdt_prpg_mc, time_proj, ramses_scaling, weightsum, cross_sec
-)
-dtst_prpg_mc_ramses = all_mc_corrections(
-    dtst_prpg_mc, time_proj, ramses_scaling, weightsum, cross_sec
-)
-stst_prpg_mc_ramses = all_mc_corrections(
-    stst_prpg_mc, time_proj, ramses_scaling, weightsum, cross_sec
+dtdt_prpg_mc_ramses, dtst_prpg_mc_ramses, stst_prpg_mc_ramses = (
+    mc_corrections_all_cases(
+        dtdt_prpg_mc,
+        dtst_prpg_mc,
+        stst_prpg_mc,
+        time_proj,
+        hfoc_scaling,
+        weightsum,
+        cross_sec,
+    )
 )
 
+avg_sbil_pcc = scaleHist(divideHists(sbil_pcc, count_pcc), 1e9)
 
-##### caluclating the effieincies and the variation matricies
+sbil_hfoc_fit = scaleHist(avg_sbil_pcc, slope_hfoc)
+
+sbil_ones = make_ones_hist(sbil_hfoc_fit)
+sbil_hfoc_fit = addHists(sbil_hfoc_fit, sbil_ones)
+sbil_hfoc_fit = multiplyHists(sbil_hfoc_fit, lumi_scaling)
+
+sbil_ramses_fit = scaleHist(avg_sbil_pcc, slope_ramses)
+sbil_ramses_fit = addHists(sbil_ramses_fit, sbil_ones)
+sbil_ramses_fit = multiplyHists(sbil_ramses_fit, lumi_scaling)
+
+dtdt_prpg_mc_sbil_hfoc, dtst_prpg_mc_sbil_hfoc, stst_prpg_mc_sbil_hfoc = (
+    mc_corrections_all_cases(
+        dtdt_prpg_mc,
+        dtst_prpg_mc,
+        stst_prpg_mc,
+        time_proj,
+        sbil_hfoc_fit,
+        weightsum,
+        cross_sec,
+    )
+)
+dtdt_prpg_mc_sbil_ramses, dtst_prpg_mc_sbil_ramses, stst_prpg_mc_sbil_ramses = (
+    mc_corrections_all_cases(
+        dtdt_prpg_mc,
+        dtst_prpg_mc,
+        stst_prpg_mc,
+        time_proj,
+        sbil_ramses_fit,
+        weightsum,
+        cross_sec,
+    )
+)
+
+#### normal
+
+dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = mc_corrections_all_cases(
+    dtdt_prpg_mc,
+    dtst_prpg_mc,
+    stst_prpg_mc,
+    time_proj,
+    lumi_scaling,
+    weightsum,
+    cross_sec,
+)
+
+pass_gen = all_mc_corrections(
+    pass_gen, time_proj_gen_mll, lumi_scaling, weightsum, cross_sec
+)
+
+### efficiencies
 h2 = dtdt_prpg_mc.project("time", "mll")
 h1 = dtst_prpg_mc.project("time", "mll")
 h0 = stst_prpg_mc.project("time", "mll")
 
-ones = np.ones_like(h1.values())
-h_ones = h1.copy()
-h_ones.values()[...] = ones
+efficiency_ones = make_ones_hist(h1)
+
 
 ## e2 = 2*h2/(h1 + 2*h1)
 eps_hlt = addHists(h1, scaleHist(h2, 2))
 eps_hlt = divideHists(h2, eps_hlt)
 eps_hlt = scaleHist(eps_hlt, 2)
 ##e1 = h1/(h0*(1-e2) + h1)
-eps_id = addHists(h_ones, scaleHist(eps_hlt, -1))
+eps_id = addHists(efficiency_ones, scaleHist(eps_hlt, -1))
 eps_id = multiplyHists(h0, eps_id)
 eps_id = addHists(eps_id, h1)
 eps_id = divideHists(h1, eps_id)
@@ -197,10 +268,10 @@ eps_hlt_prime = 1.01
 eps_id_var = scaleHist(eps_id.copy(), eps_id_prime)
 eps_hlt_var = scaleHist(eps_hlt.copy(), eps_hlt_prime)
 
-h0var_id = get_h0var(eps_id_var, eps_hlt, heff, h_ones)
-h0var_hlt = get_h0var(eps_id, eps_hlt_var, heff, h_ones)
-h1var_id = get_h1var(eps_id_var, eps_hlt, heff, h_ones)
-h1var_hlt = get_h1var(eps_id, eps_hlt_var, heff, h_ones)
+h0var_id = get_h0var(eps_id_var, eps_hlt, heff, efficiency_ones)
+h0var_hlt = get_h0var(eps_id, eps_hlt_var, heff, efficiency_ones)
+h1var_id = get_h1var(eps_id_var, eps_hlt, heff, efficiency_ones)
+h1var_hlt = get_h1var(eps_id, eps_hlt_var, heff, efficiency_ones)
 h2var_id = get_h2var(eps_id_var, eps_hlt, heff)
 h2var_hlt = get_h2var(eps_id, eps_hlt_var, heff)
 
@@ -349,84 +420,137 @@ for i in range(10, 13):  # just select two mass bins in the center
             groups=["eff_2"],
         )
 ### HFOC
-# pdb.set_trace()
-
-writer.add_systematic(
-    dtdt_prpg_mc_hfoc.project("time", "mll"),
-    "hfoc",
-    "prpg",
-    "ch_dtdt",
-    constrained=True,
-    groups=["lumi_stability"],
-)
-writer.add_systematic(
-    dtst_prpg_mc_hfoc.project("time", "mll"),
-    "hfoc",
-    "prpg",
-    "ch_dtst",
-    constrained=True,
-    groups=["lumi_stability"],
-)
-writer.add_systematic(
-    stst_prpg_mc_hfoc.project("time", "mll"),
-    "hfoc",
-    "prpg",
-    "ch_stst",
-    constrained=True,
-    groups=["lumi_stability"],
-)
-
-#### PCC
+##### MAKE LESS STUPID
+#### PCC cross detector
 writer.add_systematic(
     dtdt_prpg_mc_pcc.project("time", "mll"),
-    "pcc",
+    "pcc_stability",
     "prpg",
     "ch_dtdt",
     constrained=True,
-    groups=["lumi_stability"],
+    groups=["cross_detector_stability"],
 )
 writer.add_systematic(
     dtst_prpg_mc_pcc.project("time", "mll"),
-    "pcc",
+    "pcc_stability",
     "prpg",
     "ch_dtst",
     constrained=True,
-    groups=["lumi_stability"],
+    groups=["cross_detector_stability"],
 )
 writer.add_systematic(
     stst_prpg_mc_pcc.project("time", "mll"),
-    "pcc",
+    "pcc_stability",
     "prpg",
     "ch_stst",
     constrained=True,
-    groups=["lumi_stability"],
+    groups=["cross_detector_stability"],
 )
-
-
-#### RAMSES
+## HFOC cross detector
 writer.add_systematic(
-    dtdt_prpg_mc_ramses.project("time", "mll"),
-    "ramses",
+    dtdt_prpg_mc_hfoc.project("time", "mll"),
+    "hfoc_stability",
     "prpg",
     "ch_dtdt",
     constrained=True,
-    groups=["lumi_stability"],
+    groups=["cross_detector_stability"],
 )
 writer.add_systematic(
-    dtst_prpg_mc_ramses.project("time", "mll"),
-    "ramses",
+    dtst_prpg_mc_hfoc.project("time", "mll"),
+    "hfoc_stability",
     "prpg",
     "ch_dtst",
     constrained=True,
-    groups=["lumi_stability"],
+    groups=["cross_detector_stability"],
 )
 writer.add_systematic(
-    stst_prpg_mc_ramses.project("time", "mll"),
-    "ramses",
+    stst_prpg_mc_hfoc.project("time", "mll"),
+    "hfoc_stability",
     "prpg",
     "ch_stst",
     constrained=True,
-    groups=["lumi_stability"],
+    groups=["cross_detector_stability"],
 )
+
+#### RAMSES cross detector
+writer.add_systematic(
+    dtdt_prpg_mc_ramses.project("time", "mll"),
+    "ramses_stability",
+    "prpg",
+    "ch_dtdt",
+    constrained=True,
+    groups=["cross_detector_stability"],
+)
+writer.add_systematic(
+    dtst_prpg_mc_ramses.project("time", "mll"),
+    "ramses_stability",
+    "prpg",
+    "ch_dtst",
+    constrained=True,
+    groups=["cross_detector_stability"],
+)
+writer.add_systematic(
+    stst_prpg_mc_ramses.project("time", "mll"),
+    "ramses_stability",
+    "prpg",
+    "ch_stst",
+    constrained=True,
+    groups=["cross_detector_stability"],
+)
+
+
+#### HFOC linearity
+writer.add_systematic(
+    dtdt_prpg_mc_sbil_hfoc.project("time", "mll"),
+    "hfoc_linearity",
+    "prpg",
+    "ch_dtdt",
+    constrained=True,
+    groups=["linearity"],
+)
+writer.add_systematic(
+    dtst_prpg_mc_sbil_hfoc.project("time", "mll"),
+    "hfoc_linearity",
+    "prpg",
+    "ch_dtst",
+    constrained=True,
+    groups=["linearity"],
+)
+writer.add_systematic(
+    stst_prpg_mc_sbil_hfoc.project("time", "mll"),
+    "hfoc_linearity",
+    "prpg",
+    "ch_stst",
+    constrained=True,
+    groups=["linearity"],
+)
+
+
+#### RAMSES linearity
+writer.add_systematic(
+    dtdt_prpg_mc_sbil_ramses.project("time", "mll"),
+    "ramses_linearity",
+    "prpg",
+    "ch_dtdt",
+    constrained=True,
+    groups=["linearity"],
+)
+writer.add_systematic(
+    dtst_prpg_mc_sbil_ramses.project("time", "mll"),
+    "ramses_linearity",
+    "prpg",
+    "ch_dtst",
+    constrained=True,
+    groups=["linearity"],
+)
+writer.add_systematic(
+    stst_prpg_mc_sbil_ramses.project("time", "mll"),
+    "ramses_linearity",
+    "prpg",
+    "ch_stst",
+    constrained=True,
+    groups=["linearity"],
+)
+
 
 writer.write(outfolder="./", outfilename="liv")

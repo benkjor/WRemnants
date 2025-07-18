@@ -1,4 +1,5 @@
 import argparse
+import pdb
 
 import h5py
 import numpy as np
@@ -143,8 +144,6 @@ cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 nbins_mll = len(dtdt_prpg_mc.axes["mll"])
 nbins_time = len(reco_dtst_data.axes["time"])
 
-##### caluclating the effieincies and the variation matricies
-### units are initially 1/fb, want in 1/ub
 
 ### cross-detector uncertainties
 
@@ -192,6 +191,7 @@ avg_sbil_pcc = scaleHist(divideHists(sbil_pcc, count_pcc), 1e9)
 sbil_hfoc_fit = scaleHist(avg_sbil_pcc, slope_hfoc)
 
 sbil_ones = make_ones_hist(sbil_hfoc_fit)
+pdb.set_trace()
 sbil_hfoc_fit = addHists(sbil_hfoc_fit, sbil_ones)
 sbil_hfoc_fit = multiplyHists(sbil_hfoc_fit, lumi_scaling)
 

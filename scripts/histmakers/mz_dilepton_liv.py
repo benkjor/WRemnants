@@ -188,6 +188,31 @@ def luminometer_filter(df, lumi_name, filter_helper, helper):
         return df_filtered_hist, df_filtered_hist_nominal, df_count_hist
 
 
+# def get_cdf(hist_in):
+#     arr = hist_in.copy().to_numpy()
+#     # pdb.set_trace()
+#     data_arr = arr[0]
+#     # mass_data = np.sum(data_arr, axis = 0)
+#     cdf_arr = np.cumsum(data_arr)
+#     cdf_arr /= cdf_arr[-1]
+
+#     return cdf_arr, data_arr.shape
+
+# def make_quantiles(hist_in, n_quantiles, axis_name):
+#     cdf_output, hist_shape = get_cdf(hist_in)
+#     pdb.set_trace()
+#     if ((hist_shape[0]) % n_quantiles) != 0:
+#         print("wrong number of quantiles. choose something that factors into %s" %hist_shape[0])
+#     else:
+#         cdf_vals_in = np.linspace(0, 1, n_quantiles+1)
+#         x_vals = hist_in.axes[0].edges[1:]
+#         new_edges = np.interp(cdf_vals_in, cdf_output, x_vals)
+#         print(new_edges)
+#         new_axis = hist.axis.Variable(new_edges, name = axis_name)
+#         # pdb.set_trace()
+
+#         return new_axis
+
 args = parser.parse_args()
 logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
 era = args.era
@@ -290,6 +315,38 @@ axis_mll_2 = hist.axis.Variable(
 
 axis_sbil = hist.axis.Regular(24, 9e-7, 3e-8, name="sbil")
 axis_num_muons = hist.axis.Regular(3, -0.5, 2.5, name="num_muons")
+axis_mll = hist.axis.Variable(
+    [
+        60.3,
+        85.2298,
+        88.1398,
+        89.3644,
+        90.16,
+        90.8102,
+        91.428,
+        92.1163,
+        93.0461,
+        94.9463,
+        120,
+    ],
+    name="mll",
+)
+axis_mll_2 = hist.axis.Variable(
+    [
+        60.3,
+        85.2298,
+        88.1398,
+        89.3644,
+        90.16,
+        90.8102,
+        91.428,
+        92.1163,
+        93.0461,
+        94.9463,
+        120,
+    ],
+    name="gen_mll",
+)
 
 
 ########################################################
@@ -421,6 +478,10 @@ def build_graph(df, dataset):
         hist_mll_stight_strig_prpg = stight_strig_df_21.HistoBoost(
             "mll_stst_prpg", [axis_mll, axis_mll_2], ["mll", "gen_mll", "weight"]
         )
+        fine_bin_axis = hist.axis.Regular(200, 60, 120, name="mll_fine_bin")
+        fine_bin_mll = dtight_dtrig_df_21.HistoBoost(
+            "fine_bin_axis_gen", [fine_bin_axis], ["mll", "weight"]
+        )
 
         results.append(hist_pass_reco_pass_gen)
         results.append(hist_pass_reco_fail_gen)
@@ -431,6 +492,7 @@ def build_graph(df, dataset):
         results.append(hist_mll_prfg)
         results.append(hist_mll_dtight_strig_prfg)
         results.append(hist_mll_stight_strig_prfg)
+        results.append(fine_bin_mll)
 
     else:  ### this is for real data
         df = df.Filter("sum_veto_muons == 2")
@@ -439,17 +501,38 @@ def build_graph(df, dataset):
 
         dtight_dtrig, dtight_strig, stight_strig = trigger_tightID_sep(df)
 
+        fine_bin_axis = hist.axis.Regular(200, 60, 120, name="mll_fine_bin")
+        fine_bin_mll = df.HistoBoost(
+            "fine_bin_axis_gen", [fine_bin_axis], ["mll", "weight"]
+        )
+
         hist_time_proj = df.HistoBoost(
             "time_proj", [axis_date, axis_mll, axis_mll_2], ["time", "mll", "mll"]
         )
+
         hist_time_mll = dtight_dtrig.HistoBoost(
-            "time_mll", [axis_date, axis_mll], ["time", "mll"]
+            "time_mll",
+            [
+                axis_date,
+                axis_mll,
+            ],
+            ["time", "mll"],
         )
         hist_time_mll_dtight_strig = dtight_strig.HistoBoost(
-            "time_mll_dtst", [axis_date, axis_mll], ["time", "mll"]
+            "time_mll_dtst",
+            [
+                axis_date,
+                axis_mll,
+            ],
+            ["time", "mll"],
         )
         hist_time_mll_stight_strig = stight_strig.HistoBoost(
-            "time_mll_stst", [axis_date, axis_mll], ["time", "mll"]
+            "time_mll_stst",
+            [
+                axis_date,
+                axis_mll,
+            ],
+            ["time", "mll"],
         )
 
         results.append(hist_time_proj)
@@ -457,6 +540,7 @@ def build_graph(df, dataset):
         results.append(hist_time_mll)
         results.append(hist_time_mll_dtight_strig)
         results.append(hist_time_mll_stight_strig)
+        results.append(fine_bin_mll)
     return results, weightsum
 
 

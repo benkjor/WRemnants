@@ -1,5 +1,4 @@
 import argparse
-import pdb
 
 import h5py
 import numpy as np
@@ -191,7 +190,6 @@ avg_sbil_pcc = scaleHist(divideHists(sbil_pcc, count_pcc), 1e9)
 sbil_hfoc_fit = scaleHist(avg_sbil_pcc, slope_hfoc)
 
 sbil_ones = make_ones_hist(sbil_hfoc_fit)
-pdb.set_trace()
 sbil_hfoc_fit = addHists(sbil_hfoc_fit, sbil_ones)
 sbil_hfoc_fit = multiplyHists(sbil_hfoc_fit, lumi_scaling)
 
@@ -308,7 +306,7 @@ pass_gen_expanded = expand_hist_by_duplicate_axes(
 )
 
 
-for i in range(10, 13):  # just select two mass bins in the center
+for i in range(3, 6):  # just select two mass bins in the center
     for j in range(nbins_time):
 
         ### be more consistent about ordering of time and mll

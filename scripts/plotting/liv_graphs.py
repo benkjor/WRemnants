@@ -16,14 +16,35 @@ file_out = "/home/submit/jbenke/public_html/"
 file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturboCorr.hdf5"
 
 
-def make_plot(data_all, plotname, legend_all=["MC", "Data"], ylim=[]):
+def make_plot(
+    data_all,
+    plotname,
+    legend_all=["MC", "Data"],
+    ylim=[],
+    error_bars=True,
+    ylabel="",
+    colors=[],
+    linestyles=[],
+):
     plt.clf()
     for i in range(len(legend_all)):
-        data_all[i].plot1d()
+        if len(linestyles) != 0:
+            if len(colors) != 0:
+                data_all[i].plot1d(
+                    yerr=error_bars, color=colors[i], linestyle=linestyles[i]
+                )
+        elif len(colors) != 0:
+            data_all[i].plot1d(yerr=error_bars, color=colors[i])
+        else:
+            data_all[i].plot1d(yerr=error_bars)
     plt.xlim([0.01, 24])
     if len(ylim) != 0:
         plt.ylim(ylim)
-    plt.title(plotname)
+    if len(ylabel) != 0:
+        plt.ylabel(ylabel, fontsize=12)
+
+    plt.xlabel("Sidereal Time [hrs]", fontsize=12)
+    # plt.title(plotname)
     plt.legend(legend_all)
     plt.savefig(file_out + plotname + ".png")
 
@@ -108,7 +129,7 @@ sum_generator = empty_hist_copy(dtst_mc_2d[{"mll": 0}])
 sum_stst_data = empty_hist_copy(stst_data[{"mll": 0}])
 sum_dtst_data = empty_hist_copy(dtst_data[{"mll": 0}])
 
-for i in range(len(time_data.values())):
+for i in range(len(mll_data.values())):
     # for i in range(2):
     ### UGH THIS DOESN'T WORK ANYMORE
     time_mc_proj = dtdt_mc_2d[{"mll": i}]
@@ -133,36 +154,42 @@ for i in range(len(time_data.values())):
 
 make_plot(
     [
-        sum_mc,
         sum_data,
-        sum_stst_mc,
-        sum_stst_data,
-        sum_dtst_mc,
+        sum_mc,
         sum_dtst_data,
+        sum_dtst_mc,
+        sum_stst_data,
+        sum_stst_mc,
         sum_generator,
     ],
     "sum_all",
     legend_all=[
-        "MC: 2 tightID, 2 trig",
         "Data: 2 tightID, 2 trig",
-        "MC: 1 tightID, 1 trig",
-        "Data: 1 tightID, 1 trig",
-        "MC: 2 tightID, 1 trig",
+        "MC: 2 tightID, 2 trig",
         "Data: 2 tightID, 1 trig",
+        "MC: 2 tightID, 1 trig",
+        "Data: 1 tightID, 1 trig",
+        "MC: 1 tightID, 1 trig",
         "Generator",
     ],
+    ylabel="Events",
+    colors=["red", "red", "blue", "blue", "orange", "orange", "black"],
+    linestyles=["-", "--", "-", "--", "-", "--", "-"],
 )
 
 
 make_plot(
-    [hfoc_scaling, pcc_scaling, ramses_scaling],
+    [pcc_scaling, hfoc_scaling, ramses_scaling],
     "lumi_ratios",
-    ["HFOC/nominal", "PCC/nominal", "RAMSES/nominal"],
-    [0.99, 1.01],
+    ["PCC", "HFOC", "RAMSES"],
+    [0.995, 1.005],
+    False,
+    "ratio of inst. lumi to PHYSICS",
+    colors=["black", "red", "blue"],
 )
 
 # make_plot([hfoc_scaling], "lumi_ratios", ["HFOC/nominal"], [0.9, 1.1])
-make_plot([pcc_scaling], "lumi_ratios", ["PCC/nominal"], [0.999, 1.001])
+# make_plot([pcc_scaling], "lumi_ratios", ["PCC/nominal"], [0.999, 1.001])
 # make_plot([ramses_scaling], "lumi_ratios", ["RAMSES/nominal"], [0.9, 1.1])
 
 # make_plot([sum_generator], "generator", legend_all=["Generator"])

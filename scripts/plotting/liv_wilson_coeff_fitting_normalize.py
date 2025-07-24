@@ -1,0 +1,80 @@
+import argparse
+
+import h5py
+import hist
+import numpy as np
+
+from rabbit import tensorwriter
+from utilities.io_tools import input_tools
+from wums.boostHistHelpers import (
+    addHists,
+    scaleHist,
+)
+
+variation_list = [1, -1, 1.22, 1.26]
+# variation_list = [0.0002, -0.0002, 0.0002, 0.0002]
+
+coeff_num = 2
+channel_name = f"1d_coeff_{coeff_num}_norm"
+var_scale_factor = variation_list[coeff_num]
+
+parser = argparse.ArgumentParser()
+args = parser.parse_args()
+
+indir_data = "/work/submit/jbenke/WRemnants/scripts/plotting/"
+infile_data = indir_data + "fitresults.hdf5"
+h5file = h5py.File(infile_data, "r")
+results_data = input_tools.load_results_h5py(h5file)
+
+data = results_data["results_asimov"]["physics_models"]["Select"]["channels"][
+    "ch_masked"
+]["hist_postfit_inclusive"].get()
+data_cov = results_data["results_asimov"]["physics_models"]["Select"][
+    "hist_postfit_inclusive_cov"
+].get()
+
+# pdb.set_trace()
+indir_liv_model = "/home/submit/jbenke/LIV/coupling_models/"
+mass_dependence_loc = indir_liv_model + "mass_dependence_down.npy"
+mass_dependence = np.load(mass_dependence_loc)
+infile_liv_model = indir_liv_model + f"coupling_before_{coeff_num+1}.npy"
+print(infile_liv_model)
+vals = np.load(infile_liv_model)  # (SM+LV)/SM = 1 + LV/SM
+var = hist.Hist(
+    hist.axis.Regular(24, 0, 24, metadata="time", underflow=False, overflow=False),
+    data=vals[:, 1] - 1,
+)
+
+##g# enerator channel
+writer = tensorwriter.TensorWriter()
+
+num_mass_bins = len(data[0, :].values())
+for j in range(num_mass_bins):
+    channel = f"ch{channel_name}_mass_{j}"
+    process = f"liv_fit_mass_{j}"
+    this_data = data[:, j]
+
+    data_int = np.sum(this_data.values())
+    flat_line = hist.Hist(
+        hist.axis.Regular(24, 0, 24, metadata="time", overflow=False, underflow=False),
+        data=np.ones(24) * data_int / 24,
+    )
+    var_scaled = scaleHist(var, data_int / 24)  # LV
+    # pdb.set_trace()
+
+    writer.add_channel(this_data.axes, channel)
+    writer.add_data(this_data, channel)
+    writer.add_process(flat_line, process, channel, signal=True)
+
+    writer.add_systematic(
+        addHists(flat_line, var_scaled * mass_dependence[j + 1]),
+        f"coeff_{coeff_num+1}",
+        process,
+        channel,
+        constrained=False,
+        noi=True,
+    )
+
+writer.add_data_covariance(data_cov)
+
+writer.write(outfolder="./", outfilename="wilson_coeff_norm")

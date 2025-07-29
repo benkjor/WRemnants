@@ -14,7 +14,7 @@ from wums.boostHistHelpers import (
 variation_list = [1, -1, 1.22, 1.26]
 # variation_list = [0.0002, -0.0002, 0.0002, 0.0002]
 
-coeff_num = 2
+coeff_num = 1
 channel_name = f"1d_coeff_{coeff_num}_norm"
 var_scale_factor = variation_list[coeff_num]
 
@@ -60,14 +60,12 @@ for j in range(num_mass_bins):
         data=np.ones(24) * data_int / 24,
     )
     var_scaled = scaleHist(var, data_int / 24)  # LV
-    # pdb.set_trace()
 
     writer.add_channel(this_data.axes, channel)
     writer.add_data(this_data, channel)
     writer.add_process(flat_line, process, channel, signal=True)
-
     writer.add_systematic(
-        addHists(flat_line, var_scaled * mass_dependence[j + 1]),
+        addHists(flat_line, var_scaled * (mass_dependence[j + 1] + 2001.9) / 2001.9),
         f"coeff_{coeff_num+1}",
         process,
         channel,

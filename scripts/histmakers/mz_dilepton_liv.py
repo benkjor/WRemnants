@@ -188,31 +188,6 @@ def luminometer_filter(df, lumi_name, filter_helper, helper):
         return df_filtered_hist, df_filtered_hist_nominal, df_count_hist
 
 
-# def get_cdf(hist_in):
-#     arr = hist_in.copy().to_numpy()
-#     # pdb.set_trace()
-#     data_arr = arr[0]
-#     # mass_data = np.sum(data_arr, axis = 0)
-#     cdf_arr = np.cumsum(data_arr)
-#     cdf_arr /= cdf_arr[-1]
-
-#     return cdf_arr, data_arr.shape
-
-# def make_quantiles(hist_in, n_quantiles, axis_name):
-#     cdf_output, hist_shape = get_cdf(hist_in)
-#     pdb.set_trace()
-#     if ((hist_shape[0]) % n_quantiles) != 0:
-#         print("wrong number of quantiles. choose something that factors into %s" %hist_shape[0])
-#     else:
-#         cdf_vals_in = np.linspace(0, 1, n_quantiles+1)
-#         x_vals = hist_in.axes[0].edges[1:]
-#         new_edges = np.interp(cdf_vals_in, cdf_output, x_vals)
-#         print(new_edges)
-#         new_axis = hist.axis.Variable(new_edges, name = axis_name)
-#         # pdb.set_trace()
-
-#         return new_axis
-
 args = parser.parse_args()
 logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
 era = args.era

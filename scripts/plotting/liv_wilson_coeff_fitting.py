@@ -23,7 +23,6 @@ else:
     end_range = start_range + 1
     channel_name = f"1d_coeff_{start_range}"
 
-
 parser = argparse.ArgumentParser()
 args = parser.parse_args()
 
@@ -31,6 +30,7 @@ indir_data = "/work/submit/jbenke/WRemnants/scripts/plotting/"
 infile_data = indir_data + "fitresults.hdf5"
 h5file = h5py.File(infile_data, "r")
 results_data = input_tools.load_results_h5py(h5file)
+indir_liv_model = "/home/submit/jbenke/LIV/coupling_models/"
 
 # pdb.set_trace()
 data = results_data["results_asimov"]["physics_models"]["Project ch_masked time"][
@@ -39,8 +39,6 @@ data = results_data["results_asimov"]["physics_models"]["Project ch_masked time"
 data_cov = results_data["results_asimov"]["physics_models"]["Project ch_masked time"][
     "hist_postfit_inclusive_cov"
 ].get()
-
-indir_liv_model = "/home/submit/jbenke/LIV/coupling_models/"
 
 data_int = np.sum(data.values())
 flat_line = hist.Hist(
@@ -66,10 +64,8 @@ for i in range(start_range, end_range):
     )
     var = scaleHist(var, data_int / 24)  # LV
 
-    # pdb.set_trace()
-
     writer.add_systematic(
-        addHists(flat_line, var * 0.1),
+        addHists(flat_line, var),
         f"coeff_{i+1}",
         "liv_fit",
         f"ch{channel_name}",

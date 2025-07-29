@@ -139,7 +139,6 @@ count_pcc = results["dataPostVFP"]["lumi_outout"]["count_pcc"].get()
 
 weightsum = results["ZmumuPostVFP"]["weight_sum"]
 cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
-
 nbins_mll = len(dtdt_prpg_mc.axes["mll"])
 nbins_time = len(reco_dtst_data.axes["time"])
 
@@ -296,7 +295,6 @@ writer.add_process(h1, "prpg", "ch_dtst", signal=False)
 writer.add_channel(reco_stst_data.axes, "ch_stst")
 writer.add_data(reco_stst_data, "ch_stst")
 writer.add_process(h0, "prpg", "ch_stst", signal=False)
-
 ### adding axes as appropriate to make everything 4 dimensional
 dtdt_prpg_mc = expand_hist_by_duplicate_axis(dtdt_prpg_mc, "time", "gen_time")
 dtst_prpg_mc = expand_hist_by_duplicate_axis(dtst_prpg_mc, "time", "gen_time")
@@ -304,7 +302,12 @@ stst_prpg_mc = expand_hist_by_duplicate_axis(stst_prpg_mc, "time", "gen_time")
 pass_gen_expanded = expand_hist_by_duplicate_axes(
     pass_gen, ["time", "gen_mll"], ["gen_time", "gen_mll_0"]
 )
-
+h2_var_id_ALL = []
+h1_var_id_ALL = []
+h0_var_id_ALL = []
+h2_var_hlt_ALL = []
+h1_var_hlt_ALL = []
+h0_var_hlt_ALL = []
 
 for i in range(3, 6):  # just select two mass bins in the center
     for j in range(nbins_time):
@@ -364,7 +367,16 @@ for i in range(3, 6):  # just select two mass bins in the center
         h1var_hlt_primed = get_eff_hist(h1var_hlt, h1, i, j)
         h0var_hlt_primed = get_eff_hist(h0var_hlt, h0, i, j)
 
+        h2_var_id_ALL.append(h2var_id_primed)
+        h1_var_id_ALL.append(h1var_id_primed)
+        h0_var_id_ALL.append(h0var_id_primed)
+        h2_var_hlt_ALL.append(h2var_hlt_primed)
+        h1_var_hlt_ALL.append(h1var_hlt_primed)
+        h0_var_hlt_ALL.append(h0var_hlt_primed)
+
+        # import pdb
         #### ID EFFICIENCY
+
         writer.add_systematic(
             h2var_id_primed,
             f"id_prime_mll{i}_time{j}",
@@ -550,5 +562,5 @@ writer.add_systematic(
     groups=["linearity"],
 )
 
-
+# pdb.set_trace()
 writer.write(outfolder="./", outfilename="liv")

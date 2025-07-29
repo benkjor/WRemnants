@@ -15,6 +15,9 @@ file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
 file_out = "/home/submit/jbenke/public_html/"
 file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturboCorr.hdf5"
 
+ramses_slope = 0.0007
+hfoc_slope = 0.0006
+
 
 def make_plot(
     data_all,
@@ -27,6 +30,8 @@ def make_plot(
     linestyles=[],
 ):
     plt.clf()
+    plt.tight_layout()
+    plt.subplots_adjust(left=0.17)
     for i in range(len(legend_all)):
         if len(linestyles) != 0:
             if len(colors) != 0:
@@ -88,7 +93,7 @@ lumi_ramses = results["dataPostVFP"]["lumi_outout"]["lumi_ramses"].get()
 lumi_hfoc_nom = results["dataPostVFP"]["lumi_outout"]["lumi_in_hfoc"].get()
 lumi_pcc_nom = results["dataPostVFP"]["lumi_outout"]["lumi_in_pcc"].get()
 lumi_ramses_nom = results["dataPostVFP"]["lumi_outout"]["lumi_in_ramses"].get()
-
+sbil_pcc = results["dataPostVFP"]["lumi_outout"]["sbil_pcc"].get()
 
 mll_data = dtdt_data.project("mll")
 time_data = dtdt_data.project("time")
@@ -128,6 +133,7 @@ sum_generator = empty_hist_copy(dtst_mc_2d[{"mll": 0}])
 
 sum_stst_data = empty_hist_copy(stst_data[{"mll": 0}])
 sum_dtst_data = empty_hist_copy(dtst_data[{"mll": 0}])
+
 
 for i in range(len(mll_data.values())):
     # for i in range(2):
@@ -191,7 +197,6 @@ make_plot(
 # make_plot([hfoc_scaling], "lumi_ratios", ["HFOC/nominal"], [0.9, 1.1])
 # make_plot([pcc_scaling], "lumi_ratios", ["PCC/nominal"], [0.999, 1.001])
 # make_plot([ramses_scaling], "lumi_ratios", ["RAMSES/nominal"], [0.9, 1.1])
-
 # make_plot([sum_generator], "generator", legend_all=["Generator"])
 
 make_plot([sum_mc, sum_data], "sum_new")

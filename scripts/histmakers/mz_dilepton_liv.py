@@ -11,7 +11,7 @@ from narf.lumitools import (
     make_lumihelper,
 )
 from utilities import common, parsing
-from wremnants import theory_tools
+from wremnants import muon_prefiring, syst_tools, theory_tools
 from wremnants.datasets.datagroups import Datagroups
 from wremnants.datasets.dataset_tools import getDatasets
 from wremnants.histmaker_tools import (
@@ -188,6 +188,41 @@ def luminometer_filter(df, lumi_name, filter_helper, helper):
         return df_filtered_hist, df_filtered_hist_nominal, df_count_hist
 
 
+def make_prefire_hists(df, results, name):
+    df_prevfp = df.Define(
+        "weight_newMuonPrefiringSF_H",
+        muon_prefiring_helper_H,
+        ["Muon_eta", "Muon_pt", "Muon_phi", "Muon_charge", "Muon_tightId"],
+    )
+    df_postvfp = df.Define(
+        "weight_newMuonPrefiringSF_BG",
+        muon_prefiring_helper_BG,
+        ["Muon_eta", "Muon_pt", "Muon_phi", "Muon_charge", "Muon_tightId"],
+    )
+
+    syst_tools.add_L1Prefire_unc_hists(
+        results,
+        df_prevfp,
+        [axis_mll],
+        ["mll"],
+        helper_stat=muon_prefiring_helper_stat_BG,
+        helper_syst=muon_prefiring_helper_syst_BG,
+        storage_type=hist.storage.Double(),
+        base_name=name + "_pre",
+    )
+
+    syst_tools.add_L1Prefire_unc_hists(
+        results,
+        df_postvfp,
+        [axis_mll],
+        ["mll"],
+        helper_stat=muon_prefiring_helper_stat_H,
+        helper_syst=muon_prefiring_helper_syst_H,
+        storage_type=hist.storage.Double(),
+        base_name=name + "_post",
+    )
+
+
 args = parser.parse_args()
 logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
 era = args.era
@@ -200,7 +235,7 @@ pcc_csv = f"{common.data_dir}/bylsoutput_nBunches_PCC.csv"
 ramses_csv = f"{common.data_dir}/bylsoutput_nBunches_RAMSES.csv"
 
 brilcalc_helper = make_timehelper(lumicsv)
-lumi_no_time = make_lumihelper(lumicsv)
+lumi_no_time = make_lumihelper(lumicsv)  # post_vfp
 lumi_bunch_helper = make_brilcalc_helper(lumicsv, idx=9, action=float)
 
 hfoc_helper = make_lumihelper(hfoc_csv)
@@ -215,6 +250,15 @@ hfoc_filter_helper = make_brilcalc_filter_helper(hfoc_csv)
 pcc_filter_helper = make_brilcalc_filter_helper(pcc_csv)
 ramses_filter_helper = make_brilcalc_filter_helper(ramses_csv)
 
+### or are these the right ones?
+(
+    muon_prefiring_helper_BG,
+    muon_prefiring_helper_stat_BG,
+    muon_prefiring_helper_syst_BG,
+) = muon_prefiring.make_muon_prefiring_helpers(era="2016BG")
+muon_prefiring_helper_H, muon_prefiring_helper_stat_H, muon_prefiring_helper_syst_H = (
+    muon_prefiring.make_muon_prefiring_helpers(era="2016H")
+)
 
 datasets = getDatasets(
     maxFiles=args.maxFiles,
@@ -227,66 +271,6 @@ datasets = getDatasets(
 )
 
 axis_date = hist.axis.Regular(24, 0, 24, name="time", overflow=False, underflow=False)
-axis_mll = hist.axis.Variable(
-    [
-        60,
-        70,
-        75,
-        78,
-        80,
-        82,
-        85,
-        86,
-        87,
-        88,
-        89,
-        90,
-        91,
-        92,
-        93,
-        94,
-        95,
-        96,
-        97,
-        98,
-        100,
-        102,
-        105,
-        110,
-        120,
-    ],
-    name="mll",
-)
-axis_mll_2 = hist.axis.Variable(
-    [
-        60,
-        70,
-        75,
-        78,
-        80,
-        82,
-        85,
-        86,
-        87,
-        88,
-        89,
-        90,
-        91,
-        92,
-        93,
-        94,
-        95,
-        96,
-        97,
-        98,
-        100,
-        102,
-        105,
-        110,
-        120,
-    ],
-    name="gen_mll",
-)
 
 axis_sbil = hist.axis.Regular(24, 9e-7, 3e-8, name="sbil")
 axis_num_muons = hist.axis.Regular(3, -0.5, 2.5, name="num_muons")
@@ -322,6 +306,7 @@ axis_mll_2 = hist.axis.Variable(
     ],
     name="gen_mll",
 )
+axis_pt = hist.axis.Regular(25, 25, 50)
 
 
 ########################################################
@@ -329,6 +314,11 @@ def build_graph_lumi(df, dataset):
     df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
     hist_lumi_nom = df.HistoBoost("lumi_nom", [axis_date], ["time", "lumival"])
     df = df.Define("fill_count", lumi_bunch_helper, ["run", "luminosityBlock"])
+
+    df_H = df.Filter("run >= 281613")
+    hist_lumi_post = df_H.HistoBoost("lumi_post", [axis_date], ["time", "lumival"])
+    df_B = df.Filter("run < 281613")
+    hist_lumi_pre = df_B.HistoBoost("lumi_pre", [axis_date], ["time", "lumival"])
 
     hist_hfoc_filtered, hist_nominal_in_hfoc_filtered, hist_hfoc_count = (
         luminometer_filter(df, "hfoc", hfoc_filter_helper, hfoc_helper)
@@ -352,6 +342,8 @@ def build_graph_lumi(df, dataset):
         hist_hfoc_count,
         hist_pcc_count,
         hist_ramses_count,
+        hist_lumi_pre,
+        hist_lumi_post,
     ]
     return results
 
@@ -389,6 +381,13 @@ def build_graph(df, dataset):
         f"wrem::goodMuonTriggerCandidate<wrem::Era::Era_2016PostVFP>(TrigObj_id,TrigObj_filterBits)",
     )
     df = df.Define("sum_veto_muons", "Sum(veto_muon)")
+    # df = df.Define("muon_charge_test", "Muon_Charge")
+
+    # df = df.Define("Muon_correctedEta", "Muon_eta")
+    # df = df.Define("Muon_correctedCharge", "Muon_charge")
+    # df = df.Define("Muon_correctedPt", "Muon_pt")
+    # df = df.Define("Muon_correctedPhi", "Muon_phi")
+    # df = df.Define("nominal_weight", "weight")
 
     if not dataset.is_data:
         df = theory_tools.define_postfsr_vars(df)
@@ -469,9 +468,13 @@ def build_graph(df, dataset):
         results.append(hist_mll_stight_strig_prfg)
         results.append(fine_bin_mll)
 
-    else:  ### this is for real data
-        df = df.Filter("sum_veto_muons == 2")
+        make_prefire_hists(stight_strig_df_21, results, "stst_prpg")
+        make_prefire_hists(dtight_strig_df_21, results, "dtst_prpg")
+        make_prefire_hists(dtight_dtrig_df_21, results, "dtdt_prpg")
 
+    else:  ### this is for real data
+
+        df = df.Filter("sum_veto_muons == 2")
         df = mass_extraction(df, "", "Muon", "veto_muon")
 
         dtight_dtrig, dtight_strig, stight_strig = trigger_tightID_sep(df)
@@ -487,26 +490,17 @@ def build_graph(df, dataset):
 
         hist_time_mll = dtight_dtrig.HistoBoost(
             "time_mll",
-            [
-                axis_date,
-                axis_mll,
-            ],
+            [axis_date, axis_mll],
             ["time", "mll"],
         )
         hist_time_mll_dtight_strig = dtight_strig.HistoBoost(
             "time_mll_dtst",
-            [
-                axis_date,
-                axis_mll,
-            ],
+            [axis_date, axis_mll],
             ["time", "mll"],
         )
         hist_time_mll_stight_strig = stight_strig.HistoBoost(
             "time_mll_stst",
-            [
-                axis_date,
-                axis_mll,
-            ],
+            [axis_date, axis_mll],
             ["time", "mll"],
         )
 

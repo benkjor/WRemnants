@@ -1,11 +1,13 @@
 import argparse
 
 import h5py
+import hist
 import numpy as np
 
 from rabbit import tensorwriter
 from utilities.io_tools import input_tools
 from wums.boostHistHelpers import (
+    addGenericAxis,
     addHists,
     broadcastSystHist,
     divideHists,
@@ -52,7 +54,12 @@ def get_h0var(eps_id, eps_hlt, heff, hist_ones):
 def get_eff_hist(eps_hist, ref_hist, i, j):
     hist_copy = ref_hist.copy()
     hist_values = hist_copy.values()
-    hist_values[j, i] = eps_hist[{"time": j, "mll": i}].value
+    # pdb.set_trace()
+    try:
+        hist_values[j, i] = eps_hist[{"time": j, "mll": i}].value
+    except:
+        hist_values[j, i] = eps_hist[{"time": j, "mll": i}]
+
     hist_copy.values()[...] = hist_values
     return hist_copy
 
@@ -96,6 +103,61 @@ def make_ones_hist(hist_ref):
     return h_ones
 
 
+def averaged_prefiring_hist(prefiring_hist, ref_hist):
+    axis_len = len(prefiring_hist.axes[0])
+    avg_arr = np.zeros([axis_len])
+
+    for i in range(axis_len):
+        this_set = prefiring_hist[{"mll": i}].values()
+        avg_arr[i] = np.average(this_set)
+    ### this axis needs to be an mll axis
+    copy_hist = hist.Hist(ref_hist.axes[0])
+    copy_hist.values()[...] = avg_arr
+    copy_hist = expand_hist_by_duplicate_axis(copy_hist, "mll", "gen_mll")
+    return copy_hist
+
+
+def get_mc_lumis(
+    dtdt_pre,
+    dtst_pre,
+    stst_pre,
+    dtdt_post,
+    dtst_post,
+    stst_post,
+    time_proj,
+    scaling,
+    lumi_pre,
+    lumi_post,
+    lumi_nom,
+    weightsum,
+    cross_sec,
+):
+    dtdt_pre, dtst_pre, stst_pre = mc_corrections_all_cases(
+        dtdt_pre,
+        dtst_pre,
+        stst_pre,
+        time_proj,
+        multiplyHists(scaling, divideHists(lumi_pre, lumi_nom)),
+        weightsum,
+        cross_sec,
+    )
+    dtdt_post, dtst_post, stst_post = mc_corrections_all_cases(
+        dtdt_post,
+        dtst_post,
+        stst_post,
+        time_proj,
+        multiplyHists(scaling, divideHists(lumi_post, lumi_nom)),
+        weightsum,
+        cross_sec,
+    )
+
+    dtdt = addHists(dtdt_pre, dtdt_post)
+    dtst = addHists(dtst_pre, dtst_post)
+    stst = addHists(stst_pre, stst_post)
+
+    return dtdt, dtst, stst
+
+
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
 file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturboCorr.hdf5"
 h5file = h5py.File(file_in_name, "r")
@@ -105,23 +167,50 @@ reco_dtdt_data = results["dataPostVFP"]["output"]["time_mll"].get()
 reco_dtst_data = results["dataPostVFP"]["output"]["time_mll_dtst"].get()
 reco_stst_data = results["dataPostVFP"]["output"]["time_mll_stst"].get()
 
-time_proj = results["dataPostVFP"]["output"]["time_proj"].get()
-time_proj_gen_mll = (
-    results["dataPostVFP"]["output"]["time_proj"].get().project("time", "gen_mll")
-)
 
 ### pass reco, pass generator
 dtdt_prpg_mc = results["ZmumuPostVFP"]["output"]["mll_dtdt_prpg"].get()
 dtst_prpg_mc = results["ZmumuPostVFP"]["output"]["mll_dtst_prpg"].get()
 stst_prpg_mc = results["ZmumuPostVFP"]["output"]["mll_stst_prpg"].get()
 
+dtdt_prpg_mc_prevfp = results["ZmumuPostVFP"]["output"][
+    "dtdt_prpg_pre_muonL1PrefireStat"
+].get()[{"downUpVar": 0}]
+dtst_prpg_mc_prevfp = results["ZmumuPostVFP"]["output"][
+    "dtst_prpg_pre_muonL1PrefireStat"
+].get()[{"downUpVar": 0}]
+stst_prpg_mc_prevfp = results["ZmumuPostVFP"]["output"][
+    "stst_prpg_pre_muonL1PrefireStat"
+].get()[{"downUpVar": 0}]
+
+dtdt_prpg_mc_postvfp = results["ZmumuPostVFP"]["output"][
+    "dtdt_prpg_post_muonL1PrefireStat"
+].get()[{"downUpVar": 0}]
+dtst_prpg_mc_postvfp = results["ZmumuPostVFP"]["output"][
+    "dtst_prpg_post_muonL1PrefireStat"
+].get()[{"downUpVar": 0}]
+stst_prpg_mc_postvfp = results["ZmumuPostVFP"]["output"][
+    "stst_prpg_post_muonL1PrefireStat"
+].get()[{"downUpVar": 0}]
+
+time_proj = results["dataPostVFP"]["output"]["time_proj"].get()
+time_proj_gen_mll = (
+    results["dataPostVFP"]["output"]["time_proj"].get().project("time", "gen_mll")
+)
+time_proj_mll = (
+    results["dataPostVFP"]["output"]["time_proj"].get().project("time", "mll")
+)
+time_eta_axis = addGenericAxis(time_proj_mll, dtdt_prpg_mc_prevfp.axes[1])
+
 pass_gen = results["ZmumuPostVFP"]["output"]["pass_gen"].get()
 
 # background_processes = ### NOT SURE WHAT GOES HERE YET
 
-
 ### probably need to pull these back'
 lumi_scaling = results["dataPostVFP"]["lumi_outout"]["lumi_nom"].get()
+lumi_scaling_pre = results["dataPostVFP"]["lumi_outout"]["lumi_pre"].get()
+lumi_scaling_post = results["dataPostVFP"]["lumi_outout"]["lumi_post"].get()
+
 ### pulling for cross detector scaling
 lumi_hfoc = results["dataPostVFP"]["lumi_outout"]["lumi_hfoc"].get()
 lumi_pcc = results["dataPostVFP"]["lumi_outout"]["lumi_pcc"].get()
@@ -136,12 +225,10 @@ sbil_pcc = results["dataPostVFP"]["lumi_outout"][
 ].get()  #### turns out this is nominal so going to not create a separate nominal one
 count_pcc = results["dataPostVFP"]["lumi_outout"]["count_pcc"].get()
 
-
 weightsum = results["ZmumuPostVFP"]["weight_sum"]
 cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 nbins_mll = len(dtdt_prpg_mc.axes["mll"])
 nbins_time = len(reco_dtst_data.axes["time"])
-
 
 ### cross-detector uncertainties
 
@@ -154,34 +241,61 @@ pcc_scaling = multiplyHists(pcc_scaling, lumi_scaling)
 ramses_scaling = divideHists(lumi_ramses, lumi_ramses_nom)
 ramses_scaling = multiplyHists(ramses_scaling, lumi_scaling)
 
-dtdt_prpg_mc_hfoc, dtst_prpg_mc_hfoc, stst_prpg_mc_hfoc = mc_corrections_all_cases(
-    dtdt_prpg_mc,
-    dtst_prpg_mc,
-    stst_prpg_mc,
+
+dtdt_prpg_mc_prevfp = averaged_prefiring_hist(dtdt_prpg_mc_prevfp, dtdt_prpg_mc)
+dtst_prpg_mc_prevfp = averaged_prefiring_hist(dtst_prpg_mc_prevfp, dtdt_prpg_mc)
+stst_prpg_mc_prevfp = averaged_prefiring_hist(stst_prpg_mc_prevfp, dtdt_prpg_mc)
+
+dtdt_prpg_mc_postvfp = averaged_prefiring_hist(dtdt_prpg_mc_postvfp, dtdt_prpg_mc)
+dtst_prpg_mc_postvfp = averaged_prefiring_hist(dtst_prpg_mc_postvfp, dtdt_prpg_mc)
+stst_prpg_mc_postvfp = averaged_prefiring_hist(stst_prpg_mc_postvfp, dtdt_prpg_mc)
+
+
+dtdt_prpg_mc_hfoc, dtst_prpg_mc_hfoc, stst_prpg_mc_hfoc = get_mc_lumis(
+    dtdt_prpg_mc_prevfp,
+    dtst_prpg_mc_prevfp,
+    stst_prpg_mc_prevfp,
+    dtdt_prpg_mc_postvfp,
+    dtst_prpg_mc_postvfp,
+    stst_prpg_mc_postvfp,
     time_proj,
     hfoc_scaling,
+    lumi_scaling_pre,
+    lumi_scaling_post,
+    lumi_scaling,
     weightsum,
     cross_sec,
 )
-dtdt_prpg_mc_pcc, dtst_prpg_mc_pcc, stst_prpg_mc_pcc = mc_corrections_all_cases(
-    dtdt_prpg_mc,
-    dtst_prpg_mc,
-    stst_prpg_mc,
+dtdt_prpg_mc_pcc, dtst_prpg_mc_pcc, stst_prpg_mc_pcc = get_mc_lumis(
+    dtdt_prpg_mc_prevfp,
+    dtst_prpg_mc_prevfp,
+    stst_prpg_mc_prevfp,
+    dtdt_prpg_mc_postvfp,
+    dtst_prpg_mc_postvfp,
+    stst_prpg_mc_postvfp,
     time_proj,
-    hfoc_scaling,
+    pcc_scaling,
+    lumi_scaling_pre,
+    lumi_scaling_post,
+    lumi_scaling,
     weightsum,
     cross_sec,
 )
-dtdt_prpg_mc_ramses, dtst_prpg_mc_ramses, stst_prpg_mc_ramses = (
-    mc_corrections_all_cases(
-        dtdt_prpg_mc,
-        dtst_prpg_mc,
-        stst_prpg_mc,
-        time_proj,
-        hfoc_scaling,
-        weightsum,
-        cross_sec,
-    )
+
+dtdt_prpg_mc_ramses, dtst_prpg_mc_ramses, stst_prpg_mc_ramses = get_mc_lumis(
+    dtdt_prpg_mc_prevfp,
+    dtst_prpg_mc_prevfp,
+    stst_prpg_mc_prevfp,
+    dtdt_prpg_mc_postvfp,
+    dtst_prpg_mc_postvfp,
+    stst_prpg_mc_postvfp,
+    time_proj,
+    ramses_scaling,
+    lumi_scaling_pre,
+    lumi_scaling_post,
+    lumi_scaling,
+    weightsum,
+    cross_sec,
 )
 
 avg_sbil_pcc = scaleHist(divideHists(sbil_pcc, count_pcc), 1e9)
@@ -196,46 +310,65 @@ sbil_ramses_fit = scaleHist(avg_sbil_pcc, slope_ramses)
 sbil_ramses_fit = addHists(sbil_ramses_fit, sbil_ones)
 sbil_ramses_fit = multiplyHists(sbil_ramses_fit, lumi_scaling)
 
-dtdt_prpg_mc_sbil_hfoc, dtst_prpg_mc_sbil_hfoc, stst_prpg_mc_sbil_hfoc = (
-    mc_corrections_all_cases(
-        dtdt_prpg_mc,
-        dtst_prpg_mc,
-        stst_prpg_mc,
-        time_proj,
-        sbil_hfoc_fit,
-        weightsum,
-        cross_sec,
-    )
-)
-dtdt_prpg_mc_sbil_ramses, dtst_prpg_mc_sbil_ramses, stst_prpg_mc_sbil_ramses = (
-    mc_corrections_all_cases(
-        dtdt_prpg_mc,
-        dtst_prpg_mc,
-        stst_prpg_mc,
-        time_proj,
-        sbil_ramses_fit,
-        weightsum,
-        cross_sec,
-    )
-)
 
-#### normal
-
-dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = mc_corrections_all_cases(
-    dtdt_prpg_mc,
-    dtst_prpg_mc,
-    stst_prpg_mc,
+dtdt_prpg_mc_sbil_hfoc, dtst_prpg_mc_sbil_hfoc, stst_prpg_mc_sbil_hfoc = get_mc_lumis(
+    dtdt_prpg_mc_prevfp,
+    dtst_prpg_mc_prevfp,
+    stst_prpg_mc_prevfp,
+    dtdt_prpg_mc_postvfp,
+    dtst_prpg_mc_postvfp,
+    stst_prpg_mc_postvfp,
     time_proj,
+    sbil_hfoc_fit,
+    lumi_scaling_pre,
+    lumi_scaling_post,
     lumi_scaling,
     weightsum,
     cross_sec,
 )
 
+
+dtdt_prpg_mc_sbil_ramses, dtst_prpg_mc_sbil_ramses, stst_prpg_mc_sbil_ramses = (
+    get_mc_lumis(
+        dtdt_prpg_mc_prevfp,
+        dtst_prpg_mc_prevfp,
+        stst_prpg_mc_prevfp,
+        dtdt_prpg_mc_postvfp,
+        dtst_prpg_mc_postvfp,
+        stst_prpg_mc_postvfp,
+        time_proj,
+        sbil_ramses_fit,
+        lumi_scaling_pre,
+        lumi_scaling_post,
+        lumi_scaling,
+        weightsum,
+        cross_sec,
+    )
+)
+
+dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = get_mc_lumis(
+    dtdt_prpg_mc_prevfp,
+    dtst_prpg_mc_prevfp,
+    stst_prpg_mc_prevfp,
+    dtdt_prpg_mc_postvfp,
+    dtst_prpg_mc_postvfp,
+    stst_prpg_mc_postvfp,
+    time_proj,
+    lumi_scaling,
+    lumi_scaling_pre,
+    lumi_scaling_post,
+    lumi_scaling,
+    weightsum,
+    cross_sec,
+)
 pass_gen = all_mc_corrections(
     pass_gen, time_proj_gen_mll, lumi_scaling, weightsum, cross_sec
 )
 
+## should average over etaPhi
 ### efficiencies
+
+
 h2 = dtdt_prpg_mc.project("time", "mll")
 h1 = dtst_prpg_mc.project("time", "mll")
 h0 = stst_prpg_mc.project("time", "mll")
@@ -272,7 +405,6 @@ h1var_hlt = get_h1var(eps_id, eps_hlt_var, heff, efficiency_ones)
 h2var_id = get_h2var(eps_id_var, eps_hlt, heff)
 h2var_hlt = get_h2var(eps_id, eps_hlt_var, heff)
 
-# pdb.set_trace()
 n_masked = pass_gen.project("time", "gen_mll")
 
 ## create the tensor
@@ -299,9 +431,12 @@ writer.add_process(h0, "prpg", "ch_stst", signal=False)
 dtdt_prpg_mc = expand_hist_by_duplicate_axis(dtdt_prpg_mc, "time", "gen_time")
 dtst_prpg_mc = expand_hist_by_duplicate_axis(dtst_prpg_mc, "time", "gen_time")
 stst_prpg_mc = expand_hist_by_duplicate_axis(stst_prpg_mc, "time", "gen_time")
+
+
 pass_gen_expanded = expand_hist_by_duplicate_axes(
     pass_gen, ["time", "gen_mll"], ["gen_time", "gen_mll_0"]
 )
+
 h2_var_id_ALL = []
 h1_var_id_ALL = []
 h0_var_id_ALL = []
@@ -374,7 +509,6 @@ for i in range(3, 6):  # just select two mass bins in the center
         h1_var_hlt_ALL.append(h1var_hlt_primed)
         h0_var_hlt_ALL.append(h0var_hlt_primed)
 
-        # import pdb
         #### ID EFFICIENCY
 
         writer.add_systematic(
@@ -562,5 +696,4 @@ writer.add_systematic(
     groups=["linearity"],
 )
 
-# pdb.set_trace()
 writer.write(outfolder="./", outfilename="liv")

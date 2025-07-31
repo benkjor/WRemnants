@@ -2186,12 +2186,12 @@ def add_Muon_L1Prefire_unc_hists(
             "muonL1PrefireStat_tensor",
             helper_stat,
             [
-                "Muon_correctedEta",
-                "Muon_correctedPt",
-                "Muon_correctedPhi",
-                "Muon_correctedCharge",
+                "Muon_eta",
+                "Muon_pt",
+                "Muon_phi",
+                "Muon_charge",
                 "Muon_looseId",
-                "nominal_weight",
+                "weight",
             ],
         )
         name = Datagroups.histName(base_name, syst="muonL1PrefireStat")
@@ -2227,12 +2227,12 @@ def add_Muon_L1Prefire_unc_hists(
             "muonL1PrefireSyst_tensor",
             helper_syst,
             [
-                "Muon_correctedEta",
-                "Muon_correctedPt",
-                "Muon_correctedPhi",
-                "Muon_correctedCharge",
+                "Muon_eta",
+                "Muon_pt",
+                "Muon_phi",
+                "Muon_charge",
                 "Muon_looseId",
-                "nominal_weight",
+                "weight",
             ],
         )
         name = Datagroups.histName(base_name, syst="muonL1PrefireSyst")
@@ -2287,7 +2287,7 @@ def add_L1Prefire_unc_hists(
     df = add_Muon_L1Prefire_unc_hists(
         results, df, axes, cols, base_name, helper_stat, helper_syst, **kwargs
     )
-    df = add_ECAL_L1Prefire_unc_hists(results, df, axes, cols, base_name, **kwargs)
+    # df = add_ECAL_L1Prefire_unc_hists(results, df, axes, cols, base_name, **kwargs)
     return df
 
 

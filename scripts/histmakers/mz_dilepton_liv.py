@@ -227,12 +227,12 @@ args = parser.parse_args()
 logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
 era = args.era
 calib_filepaths = common.calib_filepaths
-
+lumi_files_path = "/work/submit/jbenke/WRemnants/wremnants/datasets"  #### THIS IS A REALLY DUMB WAY TO DO THIS
 # hoping this can go up top
-lumicsv = f"{common.data_dir}/bylsoutput_nBunches.csv"
-hfoc_csv = f"{common.data_dir}/bylsoutput_nBunches_HFOC.csv"
-pcc_csv = f"{common.data_dir}/bylsoutput_nBunches_PCC.csv"
-ramses_csv = f"{common.data_dir}/bylsoutput_nBunches_RAMSES.csv"
+lumicsv = f"{lumi_files_path}/bylsoutput_nBunches.csv"
+hfoc_csv = f"{lumi_files_path}/bylsoutput_nBunches_HFOC.csv"
+pcc_csv = f"{lumi_files_path}/bylsoutput_nBunches_PCC.csv"
+ramses_csv = f"{lumi_files_path}/bylsoutput_nBunches_RAMSES.csv"
 
 brilcalc_helper = make_timehelper(lumicsv)
 lumi_no_time = make_lumihelper(lumicsv)  # post_vfp

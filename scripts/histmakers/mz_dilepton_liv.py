@@ -189,38 +189,55 @@ def luminometer_filter(df, lumi_name, filter_helper, helper):
 
 
 def make_prefire_hists(df, results, name):
-    df_prevfp = df.Define(
+    df_H = df.Define(
         "weight_newMuonPrefiringSF_H",
         muon_prefiring_helper_H,
         ["Muon_eta", "Muon_pt", "Muon_phi", "Muon_charge", "Muon_tightId"],
     )
-    df_postvfp = df.Define(
+    df_BG = df.Define(
         "weight_newMuonPrefiringSF_BG",
         muon_prefiring_helper_BG,
         ["Muon_eta", "Muon_pt", "Muon_phi", "Muon_charge", "Muon_tightId"],
     )
 
+    h_weights = df_H.HistoBoost(
+        f"{name}_H",
+        [axis_mll, axis_mll_2],
+        ["mll", "gen_mll", "weight_newMuonPrefiringSF_H"],
+    )
+    bg_weights = df_BG.HistoBoost(
+        f"{name}_BG",
+        [axis_mll, axis_mll_2],
+        ["mll", "gen_mll", "weight_newMuonPrefiringSF_BG"],
+    )
+
+    results.append(h_weights)
+    results.append(bg_weights)
+
     syst_tools.add_L1Prefire_unc_hists(
         results,
-        df_prevfp,
-        [axis_mll],
-        ["mll"],
+        df_BG,
+        [axis_mll, axis_mll_2],
+        ["mll", "gen_mll"],
         helper_stat=muon_prefiring_helper_stat_BG,
         helper_syst=muon_prefiring_helper_syst_BG,
         storage_type=hist.storage.Double(),
-        base_name=name + "_pre",
+        base_name=name + "_BG",
+        weight="weight_newMuonPrefiringSF_BG",
     )
 
     syst_tools.add_L1Prefire_unc_hists(
         results,
-        df_postvfp,
-        [axis_mll],
-        ["mll"],
+        df_H,
+        [axis_mll, axis_mll_2],
+        ["mll", "gen_mll"],
         helper_stat=muon_prefiring_helper_stat_H,
         helper_syst=muon_prefiring_helper_syst_H,
         storage_type=hist.storage.Double(),
-        base_name=name + "_post",
+        base_name=name + "_H",
+        weight="weight_newMuonPrefiringSF_H",
     )
+    return bg_weights, h_weights
 
 
 args = parser.parse_args()
@@ -381,13 +398,6 @@ def build_graph(df, dataset):
         f"wrem::goodMuonTriggerCandidate<wrem::Era::Era_2016PostVFP>(TrigObj_id,TrigObj_filterBits)",
     )
     df = df.Define("sum_veto_muons", "Sum(veto_muon)")
-    # df = df.Define("muon_charge_test", "Muon_Charge")
-
-    # df = df.Define("Muon_correctedEta", "Muon_eta")
-    # df = df.Define("Muon_correctedCharge", "Muon_charge")
-    # df = df.Define("Muon_correctedPt", "Muon_pt")
-    # df = df.Define("Muon_correctedPhi", "Muon_phi")
-    # df = df.Define("nominal_weight", "weight")
 
     if not dataset.is_data:
         df = theory_tools.define_postfsr_vars(df)
@@ -452,6 +462,7 @@ def build_graph(df, dataset):
         hist_mll_stight_strig_prpg = stight_strig_df_21.HistoBoost(
             "mll_stst_prpg", [axis_mll, axis_mll_2], ["mll", "gen_mll", "weight"]
         )
+
         fine_bin_axis = hist.axis.Regular(200, 60, 120, name="mll_fine_bin")
         fine_bin_mll = dtight_dtrig_df_21.HistoBoost(
             "fine_bin_axis_gen", [fine_bin_axis], ["mll", "weight"]
@@ -468,9 +479,20 @@ def build_graph(df, dataset):
         results.append(hist_mll_stight_strig_prfg)
         results.append(fine_bin_mll)
 
-        make_prefire_hists(stight_strig_df_21, results, "stst_prpg")
-        make_prefire_hists(dtight_strig_df_21, results, "dtst_prpg")
         make_prefire_hists(dtight_dtrig_df_21, results, "dtdt_prpg")
+        make_prefire_hists(dtight_strig_df_21, results, "dtst_prpg")
+        make_prefire_hists(stight_strig_df_21, results, "stst_prpg")
+
+        # prevfp_stst_prefiring_weights, postvfp_stst_prefiring_weights = make_prefire_hists(stight_strig_df_21, results, "stst_prpg")
+        # prevfp_dtst_prefiring_weights, postvfp_dtst_prefiring_weights = make_prefire_hists(dtight_strig_df_21, results, "dtst_prpg")
+        # prevfp_dtdt_prefiring_weights, postvfp_dtdt_prefiring_weights = make_prefire_hists(dtight_dtrig_df_21, results, "dtdt_prpg")
+
+        # results.append(prevfp_stst_prefiring_weights)
+        # results.append(postvfp_stst_prefiring_weights)
+        # results.append(prevfp_dtst_prefiring_weights)
+        # results.append(postvfp_dtst_prefiring_weights)
+        # results.append(prevfp_dtdt_prefiring_weights)
+        # results.append(postvfp_dtdt_prefiring_weights)
 
     else:  ### this is for real data
 

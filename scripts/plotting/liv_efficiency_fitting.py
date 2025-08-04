@@ -1,8 +1,6 @@
 import argparse
-import pdb
 
 import h5py
-import hist
 import numpy as np
 
 from rabbit import tensorwriter
@@ -102,20 +100,6 @@ def make_ones_hist(hist_ref):
     return h_ones
 
 
-def averaged_prefiring_hist(prefiring_hist, ref_hist):
-    axis_len = len(prefiring_hist.axes[0])
-    avg_arr = np.zeros([axis_len])
-
-    for i in range(axis_len):
-        this_set = prefiring_hist[{"mll": i}].values()
-        avg_arr[i] = np.average(this_set)
-    ### this axis needs to be an mll axis
-    copy_hist = hist.Hist(ref_hist.axes[0])
-    copy_hist.values()[...] = avg_arr
-    copy_hist = expand_hist_by_duplicate_axis(copy_hist, "mll", "gen_mll")
-    return copy_hist
-
-
 def get_mc_lumis(
     dtdt_h,
     dtst_h,
@@ -139,7 +123,7 @@ def get_mc_lumis(
         dtst_h,
         stst_h,
         time_proj,
-        multiplyHists(lumi_scaling_h, lumi_nom),
+        multiplyHists(lumi_scaling_h, scaling),
         weightsum,
         cross_sec,
     )
@@ -149,7 +133,7 @@ def get_mc_lumis(
         dtst_bg,
         stst_bg,
         time_proj,
-        multiplyHists(lumi_scaling_bg, lumi_nom),
+        multiplyHists(lumi_scaling_bg, scaling),
         weightsum,
         cross_sec,
     )
@@ -219,55 +203,92 @@ def eta_phi_systematic(
     )
 
 
+def get_era_vals(mc, trigger_cut, era):
+    return (
+        mc[f"{trigger_cut}_prpg_{era}"].get(),
+        mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireSyst"].get(),
+        mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireStat"].get(),
+    )
+
+
+def luminometer_syst(writer, luminometer, dtdt, dtst, stst, syst):
+    writer.add_systematic(
+        dtdt.project("time", "mll"),
+        f"{luminometer}_{syst}",
+        "prpg",
+        "ch_dtdt",
+        constrained=True,
+        groups=[f"{syst}"],
+    )
+    writer.add_systematic(
+        dtst.project("time", "mll"),
+        f"{luminometer}_{syst}",
+        "prpg",
+        "ch_dtst",
+        constrained=True,
+        groups=[f"{syst}"],
+    )
+    writer.add_systematic(
+        stst.project("time", "mll"),
+        f"{luminometer}_{syst}",
+        "prpg",
+        "ch_stst",
+        constrained=True,
+        groups=[f"{syst}"],
+    )
+
+
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
 file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturboCorr.hdf5"
 h5file = h5py.File(file_in_name, "r")
 results = input_tools.load_results_h5py(h5file)
+
 MC_Zmumu = results["ZmumuPostVFP"]["output"]
 data_output = results["dataPostVFP"]["output"]
 lumi_output = results["dataPostVFP"]["lumi_outout"]
+# ## for backgrounds do i want the other Z events or the other muon events
+# MC_Ztautau = results["ZtautauPostVFP"]["output"]
+# ### i think i want other muon events? none of the other ones are labeled as dimuon so am quite confused
+# ##
+
 
 reco_dtdt_data = data_output["time_mll"].get()
 reco_dtst_data = data_output["time_mll_dtst"].get()
 reco_stst_data = data_output["time_mll_stst"].get()
-
-
-### pass reco, pass generator
-
-dtdt_prpg_mc_true = MC_Zmumu["mll_dtdt_prpg"].get()
-dtst_prpg_mc_true = MC_Zmumu["mll_dtst_prpg"].get()
-stst_prpg_mc_true = MC_Zmumu["mll_stst_prpg"].get()
-
-### should loop over these instead of calling them explicitly
-dtdt_prpg_mc_BG = MC_Zmumu["dtdt_prpg_BG"].get()
-dtst_prpg_mc_BG = MC_Zmumu["dtst_prpg_BG"].get()
-stst_prpg_mc_BG = MC_Zmumu["stst_prpg_BG"].get()
-
-dtdt_prpg_mc_H = MC_Zmumu["dtdt_prpg_H"].get()
-dtst_prpg_mc_H = MC_Zmumu["dtst_prpg_H"].get()
-stst_prpg_mc_H = MC_Zmumu["stst_prpg_H"].get()
-
-
-dtdt_prpg_mc_BG_syst = MC_Zmumu["dtdt_prpg_BG_muonL1PrefireSyst"].get()
-dtst_prpg_mc_BG_syst = MC_Zmumu["dtst_prpg_BG_muonL1PrefireSyst"].get()
-stst_prpg_mc_BG_syst = MC_Zmumu["stst_prpg_BG_muonL1PrefireSyst"].get()
-
-dtdt_prpg_mc_H_syst = MC_Zmumu["dtdt_prpg_H_muonL1PrefireSyst"].get()
-dtst_prpg_mc_H_syst = MC_Zmumu["dtst_prpg_H_muonL1PrefireSyst"].get()
-stst_prpg_mc_H_syst = MC_Zmumu["stst_prpg_H_muonL1PrefireSyst"].get()
-
-dtdt_prpg_mc_BG_stat = MC_Zmumu["dtdt_prpg_BG_muonL1PrefireStat"].get()
-dtst_prpg_mc_BG_stat = MC_Zmumu["dtst_prpg_BG_muonL1PrefireStat"].get()
-stst_prpg_mc_BG_stat = MC_Zmumu["stst_prpg_BG_muonL1PrefireStat"].get()
-
-dtdt_prpg_mc_H_stat = MC_Zmumu["dtdt_prpg_H_muonL1PrefireStat"].get()
-dtst_prpg_mc_H_stat = MC_Zmumu["dtst_prpg_H_muonL1PrefireStat"].get()
-stst_prpg_mc_H_stat = MC_Zmumu["stst_prpg_H_muonL1PrefireStat"].get()
-
-
 time_proj = data_output["time_proj"].get()
 time_proj_gen_mll = data_output["time_proj"].get().project("time", "gen_mll")
 time_proj_mll = data_output["time_proj"].get().project("time", "mll")
+
+
+weightsum = results["ZmumuPostVFP"]["weight_sum"]
+cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
+
+### pass reco, pass generator
+
+dtdt_prpg_true = MC_Zmumu["mll_dtdt_prpg"].get()
+dtst_prpg_true = MC_Zmumu["mll_dtst_prpg"].get()
+stst_prpg_true = MC_Zmumu["mll_stst_prpg"].get()
+
+dtdt_prfg_true = MC_Zmumu["mll_dtdt_prfg"].get()
+dtst_prfg_true = MC_Zmumu["mll_dtst_prfg"].get()
+stst_prfg_true = MC_Zmumu["mll_stst_prfg"].get()
+
+### should loop over these instead of calling them explicitly
+
+dtdt_prpg_BG, dtdt_prpg_BG_syst, dtdt_prpg_BG_stat = get_era_vals(
+    MC_Zmumu, "dtdt", "BG"
+)
+dtst_prpg_BG, dtst_prpg_BG_syst, dtst_prpg_BG_stat = get_era_vals(
+    MC_Zmumu, "dtst", "BG"
+)
+stst_prpg_BG, stst_prpg_BG_syst, stst_prpg_BG_stat = get_era_vals(
+    MC_Zmumu, "stst", "BG"
+)
+
+dtdt_prpg_H, dtdt_prpg_H_syst, dtdt_prpg_H_stat = get_era_vals(MC_Zmumu, "dtdt", "H")
+dtst_prpg_H, dtst_prpg_H_syst, dtst_prpg_H_stat = get_era_vals(MC_Zmumu, "dtst", "H")
+stst_prpg_H, stst_prpg_H_syst, stst_prpg_H_stat = get_era_vals(MC_Zmumu, "stst", "H")
+
 
 pass_gen = MC_Zmumu["pass_gen"].get()
 
@@ -290,9 +311,8 @@ lumi_ramses_nom = lumi_output["lumi_in_ramses"].get()
 sbil_pcc = lumi_output["sbil_pcc"].get()
 count_pcc = lumi_output["count_pcc"].get()
 
-weightsum = results["ZmumuPostVFP"]["weight_sum"]
-cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
-nbins_mll = len(dtdt_prpg_mc_true.axes["mll"])
+
+nbins_mll = len(dtdt_prpg_true.axes["mll"])
 nbins_time = len(reco_dtst_data.axes["time"])
 
 ### cross-detector uncertainties
@@ -309,13 +329,13 @@ ramses_scaling = multiplyHists(ramses_scaling, lumi_scaling)
 
 ############################# CURRENTLY WORKING ON ##########################################
 ### i should prabably do this for each of the 3 cases. but for now will just implement one
-dtdt_prpg_mc_hfoc, dtst_prpg_mc_hfoc, stst_prpg_mc_hfoc = get_mc_lumis(
-    dtdt_prpg_mc_H,
-    dtst_prpg_mc_H,
-    stst_prpg_mc_H,
-    dtdt_prpg_mc_BG,
-    dtst_prpg_mc_BG,
-    stst_prpg_mc_BG,
+dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
+    dtdt_prpg_H,
+    dtst_prpg_H,
+    stst_prpg_H,
+    dtdt_prpg_BG,
+    dtst_prpg_BG,
+    stst_prpg_BG,
     time_proj,
     hfoc_scaling,
     lumi_scaling_h,
@@ -324,13 +344,13 @@ dtdt_prpg_mc_hfoc, dtst_prpg_mc_hfoc, stst_prpg_mc_hfoc = get_mc_lumis(
     weightsum,
     cross_sec,
 )
-dtdt_prpg_mc_pcc, dtst_prpg_mc_pcc, stst_prpg_mc_pcc = get_mc_lumis(
-    dtdt_prpg_mc_H,
-    dtst_prpg_mc_H,
-    stst_prpg_mc_H,
-    dtdt_prpg_mc_BG,
-    dtst_prpg_mc_BG,
-    stst_prpg_mc_BG,
+dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
+    dtdt_prpg_H,
+    dtst_prpg_H,
+    stst_prpg_H,
+    dtdt_prpg_BG,
+    dtst_prpg_BG,
+    stst_prpg_BG,
     time_proj,
     pcc_scaling,
     lumi_scaling_h,
@@ -340,13 +360,13 @@ dtdt_prpg_mc_pcc, dtst_prpg_mc_pcc, stst_prpg_mc_pcc = get_mc_lumis(
     cross_sec,
 )
 
-dtdt_prpg_mc_ramses, dtst_prpg_mc_ramses, stst_prpg_mc_ramses = get_mc_lumis(
-    dtdt_prpg_mc_H,
-    dtst_prpg_mc_H,
-    stst_prpg_mc_H,
-    dtdt_prpg_mc_BG,
-    dtst_prpg_mc_BG,
-    stst_prpg_mc_BG,
+dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
+    dtdt_prpg_H,
+    dtst_prpg_H,
+    stst_prpg_H,
+    dtdt_prpg_BG,
+    dtst_prpg_BG,
+    stst_prpg_BG,
     time_proj,
     ramses_scaling,
     lumi_scaling_h,
@@ -369,13 +389,13 @@ sbil_ramses_fit = addHists(sbil_ramses_fit, sbil_ones)
 sbil_ramses_fit = multiplyHists(sbil_ramses_fit, lumi_scaling)
 
 
-dtdt_prpg_mc_sbil_hfoc, dtst_prpg_mc_sbil_hfoc, stst_prpg_mc_sbil_hfoc = get_mc_lumis(
-    dtdt_prpg_mc_H,
-    dtst_prpg_mc_H,
-    stst_prpg_mc_H,
-    dtdt_prpg_mc_BG,
-    dtst_prpg_mc_BG,
-    stst_prpg_mc_BG,
+dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = get_mc_lumis(
+    dtdt_prpg_H,
+    dtst_prpg_H,
+    stst_prpg_H,
+    dtdt_prpg_BG,
+    dtst_prpg_BG,
+    stst_prpg_BG,
     time_proj,
     sbil_hfoc_fit,
     lumi_scaling_h,
@@ -385,31 +405,29 @@ dtdt_prpg_mc_sbil_hfoc, dtst_prpg_mc_sbil_hfoc, stst_prpg_mc_sbil_hfoc = get_mc_
     cross_sec,
 )
 
-dtdt_prpg_mc_sbil_ramses, dtst_prpg_mc_sbil_ramses, stst_prpg_mc_sbil_ramses = (
-    get_mc_lumis(
-        dtdt_prpg_mc_H,
-        dtst_prpg_mc_H,
-        stst_prpg_mc_H,
-        dtdt_prpg_mc_BG,
-        dtst_prpg_mc_BG,
-        stst_prpg_mc_BG,
-        time_proj,
-        sbil_ramses_fit,
-        lumi_scaling_h,
-        lumi_scaling_bg,
-        lumi_scaling,
-        weightsum,
-        cross_sec,
-    )
+dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ramses = get_mc_lumis(
+    dtdt_prpg_H,
+    dtst_prpg_H,
+    stst_prpg_H,
+    dtdt_prpg_BG,
+    dtst_prpg_BG,
+    stst_prpg_BG,
+    time_proj,
+    sbil_ramses_fit,
+    lumi_scaling_h,
+    lumi_scaling_bg,
+    lumi_scaling,
+    weightsum,
+    cross_sec,
 )
 
-dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = get_mc_lumis(
-    dtdt_prpg_mc_H,
-    dtst_prpg_mc_H,
-    stst_prpg_mc_H,
-    dtdt_prpg_mc_BG,
-    dtst_prpg_mc_BG,
-    stst_prpg_mc_BG,
+dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
+    dtdt_prpg_H,
+    dtst_prpg_H,
+    stst_prpg_H,
+    dtdt_prpg_BG,
+    dtst_prpg_BG,
+    stst_prpg_BG,
     time_proj,
     lumi_scaling,
     lumi_scaling_h,
@@ -419,16 +437,16 @@ dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = get_mc_lumis(
     cross_sec,
 )
 (
-    dtdt_prpg_mc_prefiring_syst,
-    dtst_prpg_mc_prefiring_syst,
-    stst_prpg_mc_prefiring_syst,
+    dtdt_prpg_prefiring_syst,
+    dtst_prpg_prefiring_syst,
+    stst_prpg_prefiring_syst,
 ) = get_mc_lumis(
-    dtdt_prpg_mc_H_syst[{"downUpVar": 0}],
-    dtst_prpg_mc_H_syst[{"downUpVar": 0}],
-    stst_prpg_mc_H_syst[{"downUpVar": 0}],
-    dtdt_prpg_mc_BG_syst[{"downUpVar": 0}],
-    dtst_prpg_mc_BG_syst[{"downUpVar": 0}],
-    stst_prpg_mc_BG_syst[{"downUpVar": 0}],
+    dtdt_prpg_H_syst[{"downUpVar": 0}],
+    dtst_prpg_H_syst[{"downUpVar": 0}],
+    stst_prpg_H_syst[{"downUpVar": 0}],
+    dtdt_prpg_BG_syst[{"downUpVar": 0}],
+    dtst_prpg_BG_syst[{"downUpVar": 0}],
+    stst_prpg_BG_syst[{"downUpVar": 0}],
     time_proj,
     lumi_scaling,
     lumi_scaling_h,
@@ -438,15 +456,26 @@ dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = get_mc_lumis(
     cross_sec,
 )
 
+# pdb.set_trace()
+dtdt_prfg = all_mc_corrections(
+    dtdt_prfg_true, time_proj, lumi_scaling, weightsum, cross_sec
+)
+dtst_prfg = all_mc_corrections(
+    dtst_prfg_true, time_proj, lumi_scaling, weightsum, cross_sec
+)
+stst_prfg = all_mc_corrections(
+    stst_prfg_true, time_proj, lumi_scaling, weightsum, cross_sec
+)
+
 
 pass_gen = all_mc_corrections(
     pass_gen, time_proj_gen_mll, lumi_scaling, weightsum, cross_sec
 )
 
-### efficiencies
-h2 = dtdt_prpg_mc.project("time", "mll")
-h1 = dtst_prpg_mc.project("time", "mll")
-h0 = stst_prpg_mc.project("time", "mll")
+### efficiencies0
+h2 = dtdt_prpg.project("time", "mll")
+h1 = dtst_prpg.project("time", "mll")
+h0 = stst_prpg.project("time", "mll")
 
 efficiency_ones = make_ones_hist(h1)
 
@@ -503,9 +532,9 @@ writer.add_data(reco_stst_data, "ch_stst")
 writer.add_process(h0, "prpg", "ch_stst", signal=False)
 ### adding axes as appropriate to make everything 4 dimensional
 
-dtdt_prpg_mc = expand_hist_by_duplicate_axis(dtdt_prpg_mc, "time", "gen_time")
-dtst_prpg_mc = expand_hist_by_duplicate_axis(dtst_prpg_mc, "time", "gen_time")
-stst_prpg_mc = expand_hist_by_duplicate_axis(stst_prpg_mc, "time", "gen_time")
+dtdt_prpg = expand_hist_by_duplicate_axis(dtdt_prpg, "time", "gen_time")
+dtst_prpg = expand_hist_by_duplicate_axis(dtst_prpg, "time", "gen_time")
+stst_prpg = expand_hist_by_duplicate_axis(stst_prpg, "time", "gen_time")
 
 pass_gen_expanded = expand_hist_by_duplicate_axes(
     pass_gen, ["time", "gen_mll"], ["gen_time", "gen_mll_0"]
@@ -517,13 +546,16 @@ h0_var_id_ALL = []
 h2_var_hlt_ALL = []
 h1_var_hlt_ALL = []
 h0_var_hlt_ALL = []
-# pdb.set_trace()
 
 for i in range(3, 6):  # just select two mass bins in the center
     for j in range(nbins_time):
         ### be more consistent about ordering of time and mll
         ### fitting for the number of events
-        v2 = dtdt_prpg_mc[{"gen_mll": i, "gen_time": j}]  ## equivalent to n2
+
+        ### MAKE NAMING LESS STUPID
+        v2 = dtdt_prpg[{"gen_mll": i, "gen_time": j}]  ## equivalent to n2
+        # v2_1 = dtdt_prfg[{"gen_mll": i, "gen_time": j}]
+        # var2 = addHists(v2 * 0.1, v2_1 * 0.01)
         var2 = addHists(v2 * 0.1, h2)
         writer.add_systematic(
             var2,
@@ -534,7 +566,9 @@ for i in range(3, 6):  # just select two mass bins in the center
             groups=["nz"],
         )
 
-        v1 = dtst_prpg_mc[{"gen_mll": i, "gen_time": j}]  ## equivalent to n1
+        v1 = dtst_prpg[{"gen_mll": i, "gen_time": j}]  ## equivalent to n1
+        # v1_1 = dtst_prfg[{"gen_mll": i, "gen_time": j}]
+        # var1 = addHists(v1 * 0.1, v1_1*0.01)
         var1 = addHists(v1 * 0.1, h1)
         writer.add_systematic(
             var1,
@@ -544,7 +578,9 @@ for i in range(3, 6):  # just select two mass bins in the center
             constrained=False,
             groups=["nz"],
         )
-        v0 = stst_prpg_mc[{"gen_mll": i, "gen_time": j}]  ## equivalent to n1
+        v0 = stst_prpg[{"gen_mll": i, "gen_time": j}]  ## equivalent to n1
+        # v0_1= stst_prfg[{"gen_mll": i, "gen_time": j}]
+        # var0 = addHists(v0 * 0.1, v0_1* 0.01)
         var0 = addHists(v0 * 0.1, h0)
         writer.add_systematic(
             var0,
@@ -640,7 +676,7 @@ for i in range(3, 6):  # just select two mass bins in the center
 
 
 writer.add_systematic(
-    dtdt_prpg_mc_prefiring_syst.project("time", "mll"),
+    dtdt_prpg_prefiring_syst.project("time", "mll"),
     f"prefiring_syst",
     "prpg",
     "ch_dtdt",
@@ -648,7 +684,7 @@ writer.add_systematic(
     groups=["prefiring_syst"],
 )
 writer.add_systematic(
-    dtst_prpg_mc_prefiring_syst.project("time", "mll"),
+    dtst_prpg_prefiring_syst.project("time", "mll"),
     f"prefiring_syst",
     "prpg",
     "ch_dtst",
@@ -656,24 +692,23 @@ writer.add_systematic(
     groups=["prefiring_syst"],
 )
 writer.add_systematic(
-    stst_prpg_mc_prefiring_syst.project("time", "mll"),
+    stst_prpg_prefiring_syst.project("time", "mll"),
     f"prefiring_syst",
     "prpg",
     "ch_stst",
     constrained=True,
     groups=["prefiring_syst"],
 )
-pdb.set_trace()
-num_etaphi = len(dtdt_prpg_mc_H_stat.project("etaPhiRegion").values())
+num_etaphi = len(dtdt_prpg_H_stat.project("etaPhiRegion").values())
 for i in range(num_etaphi):
     eta_phi_systematic(
         writer,
-        dtdt_prpg_mc_H_stat[{"etaPhiRegion": i}],
-        dtst_prpg_mc_H_stat[{"etaPhiRegion": i}],
-        stst_prpg_mc_H_stat[{"etaPhiRegion": i}],
-        dtdt_prpg_mc_BG_stat[{"etaPhiRegion": i}],
-        dtst_prpg_mc_BG_stat[{"etaPhiRegion": i}],
-        stst_prpg_mc_BG_stat[{"etaPhiRegion": i}],
+        dtdt_prpg_H_stat[{"etaPhiRegion": i}],
+        dtst_prpg_H_stat[{"etaPhiRegion": i}],
+        stst_prpg_H_stat[{"etaPhiRegion": i}],
+        dtdt_prpg_BG_stat[{"etaPhiRegion": i}],
+        dtst_prpg_BG_stat[{"etaPhiRegion": i}],
+        stst_prpg_BG_stat[{"etaPhiRegion": i}],
         time_proj,
         lumi_scaling,
         lumi_scaling_h,
@@ -685,134 +720,34 @@ for i in range(num_etaphi):
 
 ##### MAKE LESS STUPID
 #### PCC cross detector
-writer.add_systematic(
-    dtdt_prpg_mc_pcc.project("time", "mll"),
-    "pcc_stability",
-    "prpg",
-    "ch_dtdt",
-    constrained=True,
-    groups=["cross_detector_stability"],
-)
-writer.add_systematic(
-    dtst_prpg_mc_pcc.project("time", "mll"),
-    "pcc_stability",
-    "prpg",
-    "ch_dtst",
-    constrained=True,
-    groups=["cross_detector_stability"],
-)
-writer.add_systematic(
-    stst_prpg_mc_pcc.project("time", "mll"),
-    "pcc_stability",
-    "prpg",
-    "ch_stst",
-    constrained=True,
-    groups=["cross_detector_stability"],
-)
-## HFOC cross detector
-writer.add_systematic(
-    dtdt_prpg_mc_hfoc.project("time", "mll"),
-    "hfoc_stability",
-    "prpg",
-    "ch_dtdt",
-    constrained=True,
-    groups=["cross_detector_stability"],
-)
-writer.add_systematic(
-    dtst_prpg_mc_hfoc.project("time", "mll"),
-    "hfoc_stability",
-    "prpg",
-    "ch_dtst",
-    constrained=True,
-    groups=["cross_detector_stability"],
-)
-writer.add_systematic(
-    stst_prpg_mc_hfoc.project("time", "mll"),
-    "hfoc_stability",
-    "prpg",
-    "ch_stst",
-    constrained=True,
-    groups=["cross_detector_stability"],
-)
-
-#### RAMSES cross detector
-writer.add_systematic(
-    dtdt_prpg_mc_ramses.project("time", "mll"),
-    "ramses_stability",
-    "prpg",
-    "ch_dtdt",
-    constrained=True,
-    groups=["cross_detector_stability"],
-)
-writer.add_systematic(
-    dtst_prpg_mc_ramses.project("time", "mll"),
-    "ramses_stability",
-    "prpg",
-    "ch_dtst",
-    constrained=True,
-    groups=["cross_detector_stability"],
-)
-writer.add_systematic(
-    stst_prpg_mc_ramses.project("time", "mll"),
-    "ramses_stability",
-    "prpg",
-    "ch_stst",
-    constrained=True,
-    groups=["cross_detector_stability"],
-)
 
 
-#### HFOC linearity
-writer.add_systematic(
-    dtdt_prpg_mc_sbil_hfoc.project("time", "mll"),
-    "hfoc_linearity",
-    "prpg",
-    "ch_dtdt",
-    constrained=True,
-    groups=["linearity"],
-)
-writer.add_systematic(
-    dtst_prpg_mc_sbil_hfoc.project("time", "mll"),
-    "hfoc_linearity",
-    "prpg",
-    "ch_dtst",
-    constrained=True,
-    groups=["linearity"],
-)
-writer.add_systematic(
-    stst_prpg_mc_sbil_hfoc.project("time", "mll"),
-    "hfoc_linearity",
-    "prpg",
-    "ch_stst",
-    constrained=True,
-    groups=["linearity"],
+luminometer_syst(
+    writer, "pcc", dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc, "stability"
 )
 
+luminometer_syst(
+    writer, "ramses", dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses, "stability"
+)
+luminometer_syst(
+    writer,
+    "ramses",
+    dtdt_prpg_sbil_ramses,
+    dtst_prpg_sbil_ramses,
+    stst_prpg_sbil_ramses,
+    "linearity",
+)
 
-#### RAMSES linearity
-writer.add_systematic(
-    dtdt_prpg_mc_sbil_ramses.project("time", "mll"),
-    "ramses_linearity",
-    "prpg",
-    "ch_dtdt",
-    constrained=True,
-    groups=["linearity"],
+luminometer_syst(
+    writer, "hfoc", dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc, "stability"
 )
-writer.add_systematic(
-    dtst_prpg_mc_sbil_ramses.project("time", "mll"),
-    "ramses_linearity",
-    "prpg",
-    "ch_dtst",
-    constrained=True,
-    groups=["linearity"],
-)
-writer.add_systematic(
-    stst_prpg_mc_sbil_ramses.project("time", "mll"),
-    "ramses_linearity",
-    "prpg",
-    "ch_stst",
-    constrained=True,
-    groups=["linearity"],
+luminometer_syst(
+    writer,
+    "hfoc",
+    dtdt_prpg_sbil_hfoc,
+    dtst_prpg_sbil_hfoc,
+    stst_prpg_sbil_hfoc,
+    "linearity",
 )
 
 writer.write(outfolder="./", outfilename="liv")

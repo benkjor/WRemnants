@@ -28,6 +28,7 @@ def make_plot(
     ylabel="",
     colors=[],
     linestyles=[],
+    file_out_modifier="",
 ):
     plt.clf()
     plt.tight_layout()
@@ -51,7 +52,7 @@ def make_plot(
     plt.xlabel("Sidereal Time [hrs]", fontsize=12)
     # plt.title(plotname)
     plt.legend(legend_all)
-    plt.savefig(file_out + plotname + ".png")
+    plt.savefig(file_out + file_out_modifier + plotname + ".png")
 
 
 def mc_scaling(mc_results, weightsum, cross_sec):
@@ -62,11 +63,69 @@ def mc_scaling(mc_results, weightsum, cross_sec):
     return temp
 
 
-def all_mc_corrections(hist_in, hist_proj, weightsum, cross_sec):
-    hist_in = mc_scaling(hist_in, weightsum, cross_sec)
-    hist_in_2d = broadcastSystHist(hist_in, hist_proj)
+def all_mc_corrections(hist_in, hist_proj, lumi_scaling, weightsum, cross_sec):
+    hist_in_new = hist_in.copy()
+    hist_in_new = mc_scaling(hist_in_new, weightsum, cross_sec)
+    hist_in_2d = broadcastSystHist(hist_in_new, hist_proj)
     hist_in_2d = multiplyHists(hist_in_2d, lumi_scaling)
     return hist_in_2d
+
+
+def mc_corrections_all_cases(
+    dtdt_mc, dtst_mc, stst_mc, hist_proj, lumi_scaling, weightsum, cross_sec
+):
+
+    dtdt = all_mc_corrections(
+        dtdt_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
+    )
+    dtst = all_mc_corrections(
+        dtst_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
+    )
+    stst = all_mc_corrections(
+        stst_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
+    )
+    return dtdt, dtst, stst
+
+
+def get_mc_lumis(
+    dtdt_pre,
+    dtst_pre,
+    stst_pre,
+    dtdt_post,
+    dtst_post,
+    stst_post,
+    time_proj,
+    scaling,
+    lumi_pre,
+    lumi_post,
+    lumi_nom,
+    weightsum,
+    cross_sec,
+):
+    dtdt_pre, dtst_pre, stst_pre = mc_corrections_all_cases(
+        dtdt_pre,
+        dtst_pre,
+        stst_pre,
+        time_proj,
+        multiplyHists(scaling, divideHists(lumi_pre, lumi_nom)),
+        weightsum,
+        cross_sec,
+    )
+    dtdt_post, dtst_post, stst_post = mc_corrections_all_cases(
+        dtdt_post,
+        dtst_post,
+        stst_post,
+        time_proj,
+        multiplyHists(scaling, divideHists(lumi_post, lumi_nom)),
+        weightsum,
+        cross_sec,
+    )
+
+    dtdt = addHists(dtdt_pre, dtdt_post)
+    dtst = addHists(dtst_pre, dtst_post)
+    stst = addHists(stst_pre, stst_post)
+
+    return dtdt, dtst, stst
 
 
 h5file = h5py.File(file_in_name, "r")
@@ -80,6 +139,7 @@ dtst_data = results["dataPostVFP"]["output"]["time_mll_dtst"].get()
 dtdt_mc = results["ZmumuPostVFP"]["output"]["mll_dtdt_prpg"].get().project("mll")
 stst_mc = results["ZmumuPostVFP"]["output"]["mll_stst_prpg"].get().project("mll")
 dtst_mc = results["ZmumuPostVFP"]["output"]["mll_dtst_prpg"].get().project("mll")
+
 
 generator = results["ZmumuPostVFP"]["output"]["pass_gen"].get()
 
@@ -98,6 +158,38 @@ sbil_pcc = results["dataPostVFP"]["lumi_outout"]["sbil_pcc"].get()
 mll_data = dtdt_data.project("mll")
 time_data = dtdt_data.project("time")
 dtdt_data = expand_hist_by_duplicate_axis(dtdt_data, "mll", "gen_mll")
+MC_Zmumu = results["ZmumuPostVFP"]["output"]
+
+dtdt_prpg_mc_prevfp = MC_Zmumu["dtdt_prpg_prevfp"].get()
+dtst_prpg_mc_prevfp = MC_Zmumu["dtst_prpg_prevfp"].get()
+stst_prpg_mc_prevfp = MC_Zmumu["stst_prpg_prevfp"].get()
+
+dtdt_prpg_mc_postvfp = MC_Zmumu["dtst_prpg_postvfp"].get()
+dtst_prpg_mc_postvfp = MC_Zmumu["dtst_prpg_postvfp"].get()
+stst_prpg_mc_postvfp = MC_Zmumu["stst_prpg_postvfp"].get()
+lumi_output = results["dataPostVFP"]["lumi_outout"]
+
+lumi_scaling_pre = lumi_output["lumi_pre"].get()
+lumi_scaling_post = lumi_output["lumi_post"].get()
+data_output = results["dataPostVFP"]["output"]
+
+time_proj = data_output["time_proj"].get()
+
+dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = get_mc_lumis(
+    dtdt_prpg_mc_prevfp,
+    dtst_prpg_mc_prevfp,
+    stst_prpg_mc_prevfp,
+    dtdt_prpg_mc_postvfp,
+    dtst_prpg_mc_postvfp,
+    stst_prpg_mc_postvfp,
+    time_proj,
+    lumi_scaling,
+    lumi_scaling_pre,
+    lumi_scaling_post,
+    lumi_scaling,
+    wsum,
+    xsec,
+)
 
 
 ### lumi
@@ -105,11 +197,17 @@ hfoc_scaling = divideHists(lumi_hfoc, lumi_hfoc_nom)
 pcc_scaling = divideHists(lumi_pcc, lumi_pcc_nom)
 ramses_scaling = divideHists(lumi_ramses, lumi_ramses_nom)
 ## add the time axis to mc data
-dtdt_mc_2d = all_mc_corrections(dtdt_mc, dtdt_data.project("mll", "time"), wsum, xsec)
-stst_mc_2d = all_mc_corrections(stst_mc, dtdt_data.project("mll", "time"), wsum, xsec)
-dtst_mc_2d = all_mc_corrections(dtst_mc, dtdt_data.project("mll", "time"), wsum, xsec)
+dtdt_mc_2d = all_mc_corrections(
+    dtdt_mc, dtdt_data.project("mll", "time"), lumi_scaling, wsum, xsec
+)
+stst_mc_2d = all_mc_corrections(
+    stst_mc, dtdt_data.project("mll", "time"), lumi_scaling, wsum, xsec
+)
+dtst_mc_2d = all_mc_corrections(
+    dtst_mc, dtdt_data.project("mll", "time"), lumi_scaling, wsum, xsec
+)
 generator_2d = all_mc_corrections(
-    generator, dtdt_data.project("gen_mll", "time"), wsum, xsec
+    generator, dtdt_data.project("gen_mll", "time"), lumi_scaling, wsum, xsec
 )
 
 #### should look into whether i need these
@@ -156,7 +254,11 @@ for i in range(len(mll_data.values())):
     sum_dtst_data = addHists(sum_dtst_data, dtst_data_proj)
     sum_generator = addHists(sum_generator, generator_proj)
 
-    make_plot([time_mc_proj, time_data_proj], "mass_bin_" + str(i))
+    make_plot(
+        [time_mc_proj, time_data_proj],
+        "mass_bin_" + str(i),
+        file_out_modifier="liv_uncert/efficiency/mass_binning/",
+    )
 
 make_plot(
     [
@@ -181,6 +283,7 @@ make_plot(
     ylabel="Events",
     colors=["red", "red", "blue", "blue", "orange", "orange", "black"],
     linestyles=["-", "--", "-", "--", "-", "--", "-"],
+    file_out_modifier="liv_uncert/efficiency/mass_binning/",
 )
 
 
@@ -192,6 +295,7 @@ make_plot(
     False,
     "ratio of inst. lumi to PHYSICS",
     colors=["black", "red", "blue"],
+    file_out_modifier="liv_uncert/lumi/",
 )
 
 # make_plot([hfoc_scaling], "lumi_ratios", ["HFOC/nominal"], [0.9, 1.1])
@@ -199,6 +303,16 @@ make_plot(
 # make_plot([ramses_scaling], "lumi_ratios", ["RAMSES/nominal"], [0.9, 1.1])
 # make_plot([sum_generator], "generator", legend_all=["Generator"])
 
-make_plot([sum_mc, sum_data], "sum_new")
+make_plot(
+    [sum_mc, sum_data],
+    "sum_new",
+    file_out_modifier="liv_uncert/efficiency/mass_binning/",
+)
 ratio_sum = divideHists(sum_mc, sum_data)
-make_plot([ratio_sum], "sum_ratio", ["MC/Data"], [1, 1.5])
+make_plot(
+    [ratio_sum],
+    "sum_ratio",
+    ["MC/Data"],
+    [1, 1.5],
+    file_out_modifier="liv_uncert/efficiency/mass_binning/",
+)

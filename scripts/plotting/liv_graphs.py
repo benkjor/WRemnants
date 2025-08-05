@@ -1,14 +1,13 @@
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+from uncertainty_tools import all_mc_corrections, get_mc_lumis
 
 from utilities.io_tools import input_tools
 from wums.boostHistHelpers import (
     addHists,
-    broadcastSystHist,
     divideHists,
     expand_hist_by_duplicate_axis,
-    multiplyHists,
 )
 
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
@@ -53,79 +52,6 @@ def make_plot(
     # plt.title(plotname)
     plt.legend(legend_all)
     plt.savefig(file_out + file_out_modifier + plotname + ".png")
-
-
-def mc_scaling(mc_results, weightsum, cross_sec):
-    temp = mc_results.copy()
-    temp /= weightsum
-    temp *= cross_sec
-    temp *= 1000
-    return temp
-
-
-def all_mc_corrections(hist_in, hist_proj, lumi_scaling, weightsum, cross_sec):
-    hist_in_new = hist_in.copy()
-    hist_in_new = mc_scaling(hist_in_new, weightsum, cross_sec)
-    hist_in_2d = broadcastSystHist(hist_in_new, hist_proj)
-    hist_in_2d = multiplyHists(hist_in_2d, lumi_scaling)
-    return hist_in_2d
-
-
-def mc_corrections_all_cases(
-    dtdt_mc, dtst_mc, stst_mc, hist_proj, lumi_scaling, weightsum, cross_sec
-):
-
-    dtdt = all_mc_corrections(
-        dtdt_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
-    )
-    dtst = all_mc_corrections(
-        dtst_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
-    )
-    stst = all_mc_corrections(
-        stst_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
-    )
-    return dtdt, dtst, stst
-
-
-def get_mc_lumis(
-    dtdt_pre,
-    dtst_pre,
-    stst_pre,
-    dtdt_post,
-    dtst_post,
-    stst_post,
-    time_proj,
-    scaling,
-    lumi_pre,
-    lumi_post,
-    lumi_nom,
-    weightsum,
-    cross_sec,
-):
-    dtdt_pre, dtst_pre, stst_pre = mc_corrections_all_cases(
-        dtdt_pre,
-        dtst_pre,
-        stst_pre,
-        time_proj,
-        multiplyHists(scaling, divideHists(lumi_pre, lumi_nom)),
-        weightsum,
-        cross_sec,
-    )
-    dtdt_post, dtst_post, stst_post = mc_corrections_all_cases(
-        dtdt_post,
-        dtst_post,
-        stst_post,
-        time_proj,
-        multiplyHists(scaling, divideHists(lumi_post, lumi_nom)),
-        weightsum,
-        cross_sec,
-    )
-
-    dtdt = addHists(dtdt_pre, dtdt_post)
-    dtst = addHists(dtst_pre, dtst_post)
-    stst = addHists(stst_pre, stst_post)
-
-    return dtdt, dtst, stst
 
 
 h5file = h5py.File(file_in_name, "r")

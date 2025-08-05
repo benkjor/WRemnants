@@ -1,13 +1,24 @@
 import argparse
 
 import h5py
-import numpy as np
+from uncertainty_tools import (
+    all_mc_corrections,
+    background_syst,
+    eta_phi_systematic,
+    get_eff_hist,
+    get_era_vals,
+    get_h0var,
+    get_h1var,
+    get_h2var,
+    get_mc_lumis,
+    luminometer_syst,
+    make_ones_hist,
+)
 
 from rabbit import tensorwriter
 from utilities.io_tools import input_tools
 from wums.boostHistHelpers import (
     addHists,
-    broadcastSystHist,
     divideHists,
     expand_hist_by_duplicate_axes,
     expand_hist_by_duplicate_axis,
@@ -22,222 +33,6 @@ slope_ramses = 0.0006
 slope_hfoc = 0.0007
 
 
-def get_h2var(eps_id, eps_hlt, heff):
-    #  h2var = heff * (eps_prime * eps)
-    h2var = multiplyHists(heff, multiplyHists(eps_id, eps_id))
-    h2var = multiplyHists(h2var, multiplyHists(eps_hlt, eps_hlt))
-    return h2var
-
-
-def get_h1var(eps_id, eps_hlt, heff, hist_ones):
-    # h = 2*heff*(eps_hlt * hlt_prime)*(1-(eps_hlt * hlt_prime))
-    h1var = addHists(hist_ones, scaleHist(eps_hlt, -1))
-    h1var = multiplyHists(h1var, eps_hlt)
-    h1var = multiplyHists(h1var, heff)
-    h1var = scaleHist(h1var, 2)
-    h1var = multiplyHists(h1var, multiplyHists(eps_id, eps_id))
-    return h1var
-
-
-def get_h0var(eps_id, eps_hlt, heff, hist_ones):
-    # h = 2*heff*(eps_id * eps_id_prime)*(1-(eps_id * eps_id_prime))
-    h0var = addHists(hist_ones, scaleHist(eps_id, -1))
-    h0var = multiplyHists(h0var, eps_id)
-    h0var = multiplyHists(h0var, eps_hlt)
-    h0var = multiplyHists(h0var, heff)
-    h0var = scaleHist(h0var, 2)
-    return h0var
-
-
-def get_eff_hist(eps_hist, ref_hist, i, j):
-    hist_copy = ref_hist.copy()
-    hist_values = hist_copy.values()
-    try:
-        hist_values[j, i] = eps_hist[{"time": j, "mll": i}].value
-    except:
-        hist_values[j, i] = eps_hist[{"time": j, "mll": i}]
-
-    hist_copy.values()[...] = hist_values
-    return hist_copy
-
-
-def mc_scaling(mc_results, weightsum, cross_sec):
-    temp = mc_results.copy()
-    temp /= weightsum
-    temp *= cross_sec
-    temp *= 1000
-    return temp
-
-
-def all_mc_corrections(hist_in, hist_proj, lumi_scaling, weightsum, cross_sec):
-    hist_in_new = hist_in.copy()
-    hist_in_new = mc_scaling(hist_in_new, weightsum, cross_sec)
-    hist_in_2d = broadcastSystHist(hist_in_new, hist_proj)
-    hist_in_2d = multiplyHists(hist_in_2d, lumi_scaling)
-    return hist_in_2d
-
-
-def mc_corrections_all_cases(
-    dtdt_mc, dtst_mc, stst_mc, hist_proj, lumi_scaling, weightsum, cross_sec
-):
-
-    dtdt = all_mc_corrections(
-        dtdt_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
-    )
-    dtst = all_mc_corrections(
-        dtst_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
-    )
-    stst = all_mc_corrections(
-        stst_mc.copy(), hist_proj, lumi_scaling, weightsum, cross_sec
-    )
-    return dtdt, dtst, stst
-
-
-def make_ones_hist(hist_ref):
-    ones = np.ones_like(hist_ref.values())
-    h_ones = hist_ref.copy()
-    h_ones.values()[...] = ones
-    return h_ones
-
-
-def get_mc_lumis(
-    dtdt_h,
-    dtst_h,
-    stst_h,
-    dtdt_bg,
-    dtst_bg,
-    stst_bg,
-    time_proj,
-    scaling,
-    lumi_h,
-    lumi_bg,
-    lumi_nom,
-    weightsum,
-    cross_sec,
-):
-    sum_lumis = addHists(lumi_bg, lumi_h)
-    lumi_scaling_h = divideHists(lumi_h, sum_lumis)
-    lumi_scaling_bg = divideHists(lumi_bg, sum_lumis)
-    dtdt_h, dtst_h, stst_h = mc_corrections_all_cases(
-        dtdt_h,
-        dtst_h,
-        stst_h,
-        time_proj,
-        multiplyHists(lumi_scaling_h, scaling),
-        weightsum,
-        cross_sec,
-    )
-
-    dtdt_bg, dtst_bg, stst_bg = mc_corrections_all_cases(
-        dtdt_bg,
-        dtst_bg,
-        stst_bg,
-        time_proj,
-        multiplyHists(lumi_scaling_bg, scaling),
-        weightsum,
-        cross_sec,
-    )
-
-    dtdt = addHists(dtdt_bg, dtdt_h)
-    dtst = addHists(dtst_bg, dtst_h)
-    stst = addHists(stst_bg, stst_h)
-
-    return dtdt, dtst, stst
-
-
-### i need to get good at coding so i dont need to pass in all these variables
-def eta_phi_systematic(
-    writer,
-    dtdt_H,
-    dtst_H,
-    stst_H,
-    dtdt_BG,
-    dtst_BG,
-    stst_BG,
-    time_proj,
-    lumi_scaling,
-    lumi_scaling_h,
-    lumi_scaling_bg,
-    weightsum,
-    cross_sec,
-    etaphi_num,
-):
-    dtdt_stat, dtst_stat, stst_stat = get_mc_lumis(
-        dtdt_H[{"downUpVar": 0}],
-        dtst_H[{"downUpVar": 0}],
-        stst_H[{"downUpVar": 0}],
-        dtdt_BG[{"downUpVar": 0}],
-        dtst_BG[{"downUpVar": 0}],
-        stst_BG[{"downUpVar": 0}],
-        time_proj,
-        lumi_scaling,
-        lumi_scaling_h,
-        lumi_scaling_bg,
-        lumi_scaling,
-        weightsum,
-        cross_sec,
-    )
-    writer.add_systematic(
-        dtdt_stat.project("time", "mll"),
-        f"prefiring_stat_etaphi_{etaphi_num}",
-        "prpg",
-        "ch_dtdt",
-        constrained=True,
-        groups=["prefiring_stat"],
-    )
-    writer.add_systematic(
-        dtst_stat.project("time", "mll"),
-        f"prefiring_stat_etaphi_{etaphi_num}",
-        "prpg",
-        "ch_dtst",
-        constrained=True,
-        groups=["prefiring_stat"],
-    )
-    writer.add_systematic(
-        stst_stat.project("time", "mll"),
-        f"prefiring_stat_etaphi_{etaphi_num}",
-        "prpg",
-        "ch_stst",
-        constrained=True,
-        groups=["prefiring_stat"],
-    )
-
-
-def get_era_vals(mc, trigger_cut, era):
-    return (
-        mc[f"{trigger_cut}_prpg_{era}"].get(),
-        mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireSyst"].get(),
-        mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireStat"].get(),
-    )
-
-
-def luminometer_syst(writer, luminometer, dtdt, dtst, stst, syst):
-    writer.add_systematic(
-        dtdt.project("time", "mll"),
-        f"{luminometer}_{syst}",
-        "prpg",
-        "ch_dtdt",
-        constrained=True,
-        groups=[f"{syst}"],
-    )
-    writer.add_systematic(
-        dtst.project("time", "mll"),
-        f"{luminometer}_{syst}",
-        "prpg",
-        "ch_dtst",
-        constrained=True,
-        groups=[f"{syst}"],
-    )
-    writer.add_systematic(
-        stst.project("time", "mll"),
-        f"{luminometer}_{syst}",
-        "prpg",
-        "ch_stst",
-        constrained=True,
-        groups=[f"{syst}"],
-    )
-
-
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
 file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturboCorr.hdf5"
 h5file = h5py.File(file_in_name, "r")
@@ -246,11 +41,10 @@ results = input_tools.load_results_h5py(h5file)
 data_output = results["dataPostVFP"]["output"]
 lumi_output = results["dataPostVFP"]["lumi_outout"]
 MC_Zmumu = results["ZmumuPostVFP"]["output"]
+MC_QCD = results["QCDmuEnrichPt15PostVFP"]["output"]
+MC_Top = results["Top"]["output"]
+MC_Wmunu = results["WplusmunuPostVFP"]["output"]
 
-# ## for backgrounds do i want the other Z events or the other muon events
-# MC_QCD = results["QCDmuEnrichPt15PostVFP"]["output"]
-# ### i think i want other muon events? none of the other ones are labeled as dimuon so am quite confused
-# ##
 
 reco_dtdt_data = data_output["time_mll"].get()
 reco_dtst_data = data_output["time_mll_dtst"].get()
@@ -260,23 +54,45 @@ time_proj_gen_mll = data_output["time_proj"].get().project("time", "gen_mll")
 time_proj_mll = data_output["time_proj"].get().project("time", "mll")
 
 
-weightsum = results["ZmumuPostVFP"]["weight_sum"]
-cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
-
 ### pass reco, pass generator
 
 dtdt_prpg_true = MC_Zmumu["mll_dtdt_prpg"].get()
 dtst_prpg_true = MC_Zmumu["mll_dtst_prpg"].get()
 stst_prpg_true = MC_Zmumu["mll_stst_prpg"].get()
+weightsum = results["ZmumuPostVFP"]["weight_sum"]
+cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 
-dtdt_prfg_true = MC_Zmumu["mll_dtdt_prfg"].get()
-dtst_prfg_true = MC_Zmumu["mll_dtst_prfg"].get()
-stst_prfg_true = MC_Zmumu["mll_stst_prfg"].get()
+
+dtdt_prfg = MC_Zmumu["mll_dtdt_prfg"].get()
+dtst_prfg = MC_Zmumu["mll_dtst_prfg"].get()
+stst_prfg = MC_Zmumu["mll_stst_prfg"].get()
 
 # MC_GGToLL = results['GGToLLPostVFP']['output']
-# dtdt_gg_to_ll_bkg = MC_GGToLL["mll_dtdt_prpg"].get()
-# dtst_gg_to_ll_bkg = MC_GGToLL["mll_dtst_prpg"].get()
-# stst_gg_to_ll_bkg = MC_GGToLL["mll_stst_prpg"].get()
+dtdt_qcd_bkg = MC_QCD["mll_dtdt_prpg"].get()
+dtst_qcd_bkg = MC_QCD["mll_dtst_prpg"].get()
+stst_qcd_bkg = MC_QCD["mll_stst_prpg"].get()
+qcd_weightsum = results["QCDmuEnrichPt15PostVFP"]["weight_sum"]
+qcd_cross_sec = results["QCDmuEnrichPt15PostVFP"]["dataset"]["xsec"]
+
+dtdt_top_bkg = MC_Top["mll_dtdt_prpg"].get()
+dtst_top_bkg = MC_Top["mll_dtst_prpg"].get()
+stst_top_bkg = MC_Top["mll_stst_prpg"].get()
+top_weightsum = results["Top"]["weight_sum"]
+top_cross_sec = results["Top"]["dataset"]["xsec"]
+
+dtdt_w_bkg = MC_Wmunu["mll_dtdt_prpg"].get()
+dtst_w_bkg = MC_Wmunu["mll_dtst_prpg"].get()
+stst_w_bkg = MC_Wmunu["mll_stst_prpg"].get()
+w_weightsum = results["WplusmunuPostVFP"]["weight_sum"]
+w_cross_sec = results["WplusmunuPostVFP"]["dataset"]["xsec"]
+
+print(qcd_cross_sec)
+print(top_cross_sec)
+print(w_cross_sec)
+
+print(qcd_weightsum)
+print(top_weightsum)
+print(w_weightsum)
 
 
 ### should loop over these instead of calling them explicitly
@@ -460,28 +276,6 @@ dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
     )
 )
 
-# pdb.set_trace()
-dtdt_prfg = all_mc_corrections(
-    dtdt_prfg_true, time_proj, lumi_scaling, weightsum, cross_sec
-)
-dtst_prfg = all_mc_corrections(
-    dtst_prfg_true, time_proj, lumi_scaling, weightsum, cross_sec
-)
-stst_prfg = all_mc_corrections(
-    stst_prfg_true, time_proj, lumi_scaling, weightsum, cross_sec
-)
-
-
-# dtdt_gg_to_ll_bkg = all_mc_corrections(
-#     dtdt_gg_to_ll_bkg, time_proj, lumi_scaling, weightsum, cross_sec
-# )
-# dtst_gg_to_ll_bkg = all_mc_corrections(
-#     dtst_gg_to_ll_bkg, time_proj, lumi_scaling, weightsum, cross_sec
-# )
-# stst_gg_to_ll_bkg = all_mc_corrections(
-#     stst_gg_to_ll_bkg, time_proj, lumi_scaling, weightsum, cross_sec
-# )
-
 
 pass_gen = all_mc_corrections(
     pass_gen, time_proj_gen_mll, lumi_scaling, weightsum, cross_sec
@@ -491,15 +285,6 @@ pass_gen = all_mc_corrections(
 h2 = dtdt_prpg.project("time", "mll")
 h1 = dtst_prpg.project("time", "mll")
 h0 = stst_prpg.project("time", "mll")
-
-h2_fg = dtdt_prfg.project("time", "mll")
-h1_fg = dtst_prfg.project("time", "mll")
-h0_fg = stst_prfg.project("time", "mll")
-
-# h2_gg_to_ll_bkg = dtdt_gg_to_ll_bkg.project("time", "mll")
-# h1_gg_to_ll_bkg = dtst_gg_to_ll_bkg.project("time", "mll")
-# h0_gg_to_ll_bkg = stst_gg_to_ll_bkg.project("time", "mll")
-
 
 efficiency_ones = make_ones_hist(h1)
 
@@ -547,21 +332,15 @@ writer.add_process(
 writer.add_channel(reco_dtdt_data.axes, "ch_dtdt")
 writer.add_data(reco_dtdt_data, "ch_dtdt")
 writer.add_process(h2, "prpg", "ch_dtdt", signal=False)
-writer.add_process(h2_fg, "prfg", "ch_dtdt", signal=False)
-# writer.add_process(h2_gg_to_ll_bkg, "bkg", "ch_dtdt", signal=False)
 
 writer.add_channel(reco_dtst_data.axes, "ch_dtst")
 writer.add_data(reco_dtst_data, "ch_dtst")
 writer.add_process(h1, "prpg", "ch_dtst", signal=False)
-writer.add_process(h1_fg, "prfg", "ch_dtst", signal=False)
-# writer.add_process(h1_gg_to_ll_bkg, "bkg", "ch_dtst", signal=False)
 
 
 writer.add_channel(reco_stst_data.axes, "ch_stst")
 writer.add_data(reco_stst_data, "ch_stst")
 writer.add_process(h0, "prpg", "ch_stst", signal=False)
-writer.add_process(h0_fg, "prfg", "ch_stst", signal=False)
-# writer.add_process(h0_gg_to_ll_bkg, "bkg", "ch_stst", signal=False)
 
 ### adding axes as appropriate to make everything 4 dimensional
 
@@ -569,14 +348,55 @@ dtdt_prpg = expand_hist_by_duplicate_axis(dtdt_prpg, "time", "gen_time")
 dtst_prpg = expand_hist_by_duplicate_axis(dtst_prpg, "time", "gen_time")
 stst_prpg = expand_hist_by_duplicate_axis(stst_prpg, "time", "gen_time")
 
-dtdt_prfg = expand_hist_by_duplicate_axis(dtdt_prfg, "time", "gen_time")
-dtst_prfg = expand_hist_by_duplicate_axis(dtst_prfg, "time", "gen_time")
-stst_prfg = expand_hist_by_duplicate_axis(stst_prfg, "time", "gen_time")
 
-
-# dtdt_gg_to_ll_bkg = expand_hist_by_duplicate_axis(h2_gg_to_ll_bkg, "time", "gen_time")
-# dtst_gg_to_ll_bkg = expand_hist_by_duplicate_axis(dtst_gg_to_ll_bkg, "time", "gen_time")
-# stst_gg_to_ll_bkg = expand_hist_by_duplicate_axis(stst_gg_to_ll_bkg, "time", "gen_time")
+background_syst(
+    writer,
+    dtdt_qcd_bkg,
+    dtst_qcd_bkg,
+    stst_qcd_bkg,
+    time_proj,
+    lumi_scaling,
+    qcd_weightsum,
+    qcd_cross_sec,
+    "qcd",
+    "bkg_qcd",
+)
+background_syst(
+    writer,
+    dtdt_top_bkg,
+    dtst_top_bkg,
+    stst_top_bkg,
+    time_proj,
+    lumi_scaling,
+    top_weightsum,
+    top_cross_sec,
+    "top",
+    "bkg_top",
+)
+background_syst(
+    writer,
+    dtdt_w_bkg,
+    dtst_w_bkg,
+    stst_w_bkg,
+    time_proj,
+    lumi_scaling,
+    w_weightsum,
+    w_cross_sec,
+    "w",
+    "bkg_w",
+)  ### concerningly comes out as 1
+background_syst(
+    writer,
+    dtdt_prfg,
+    dtst_prfg,
+    stst_prfg,
+    time_proj,
+    lumi_scaling,
+    weightsum,
+    cross_sec,
+    "fail_gen",
+    "bkg_zmumu_gen",
+)
 
 
 pass_gen_expanded = expand_hist_by_duplicate_axes(
@@ -787,42 +607,6 @@ luminometer_syst(
     dtst_prpg_sbil_hfoc,
     stst_prpg_sbil_hfoc,
     "linearity",
-)
-
-
-v2_fg = dtdt_prfg.project("time", "mll")
-var2 = addHists(v2_fg * 0.1, h2_fg)
-writer.add_systematic(
-    var2,
-    f"z_bkg_gen",
-    "prfg",
-    "ch_dtdt",
-    constrained=False,
-    groups=["bkg"],
-)
-
-v1_fg = dtst_prfg.project("time", "mll")
-var1 = addHists(v1_fg * 0.1, h1_fg)
-
-writer.add_systematic(
-    var1,
-    f"z_bkg_gen",
-    "prfg",
-    "ch_dtst",
-    constrained=False,
-    groups=["bkg"],
-)
-
-v0_fg = stst_prfg.project("time", "mll")
-var0 = addHists(v0_fg * 0.1, h0_fg)
-
-writer.add_systematic(
-    var0,
-    f"z_bkg_gen",
-    "prfg",
-    "ch_stst",
-    constrained=False,
-    groups=["bkg"],
 )
 
 

@@ -41,10 +41,6 @@ results = input_tools.load_results_h5py(h5file)
 data_output = results["dataPostVFP"]["output"]
 lumi_output = results["dataPostVFP"]["lumi_outout"]
 MC_Zmumu = results["ZmumuPostVFP"]["output"]
-MC_QCD = results["QCDmuEnrichPt15PostVFP"]["output"]
-MC_Top = results["Top"]["output"]
-MC_Wmunu = results["WplusmunuPostVFP"]["output"]
-
 
 reco_dtdt_data = data_output["time_mll"].get()
 reco_dtst_data = data_output["time_mll_dtst"].get()
@@ -52,7 +48,6 @@ reco_stst_data = data_output["time_mll_stst"].get()
 time_proj = data_output["time_proj"].get()
 time_proj_gen_mll = data_output["time_proj"].get().project("time", "gen_mll")
 time_proj_mll = data_output["time_proj"].get().project("time", "mll")
-
 
 ### pass reco, pass generator
 
@@ -66,34 +61,6 @@ cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 dtdt_prfg = MC_Zmumu["mll_dtdt_prfg"].get()
 dtst_prfg = MC_Zmumu["mll_dtst_prfg"].get()
 stst_prfg = MC_Zmumu["mll_stst_prfg"].get()
-
-# MC_GGToLL = results['GGToLLPostVFP']['output']
-dtdt_qcd_bkg = MC_QCD["mll_dtdt_prpg"].get()
-dtst_qcd_bkg = MC_QCD["mll_dtst_prpg"].get()
-stst_qcd_bkg = MC_QCD["mll_stst_prpg"].get()
-qcd_weightsum = results["QCDmuEnrichPt15PostVFP"]["weight_sum"]
-qcd_cross_sec = results["QCDmuEnrichPt15PostVFP"]["dataset"]["xsec"]
-
-dtdt_top_bkg = MC_Top["mll_dtdt_prpg"].get()
-dtst_top_bkg = MC_Top["mll_dtst_prpg"].get()
-stst_top_bkg = MC_Top["mll_stst_prpg"].get()
-top_weightsum = results["Top"]["weight_sum"]
-top_cross_sec = results["Top"]["dataset"]["xsec"]
-
-dtdt_w_bkg = MC_Wmunu["mll_dtdt_prpg"].get()
-dtst_w_bkg = MC_Wmunu["mll_dtst_prpg"].get()
-stst_w_bkg = MC_Wmunu["mll_stst_prpg"].get()
-w_weightsum = results["WplusmunuPostVFP"]["weight_sum"]
-w_cross_sec = results["WplusmunuPostVFP"]["dataset"]["xsec"]
-
-print(qcd_cross_sec)
-print(top_cross_sec)
-print(w_cross_sec)
-
-print(qcd_weightsum)
-print(top_weightsum)
-print(w_weightsum)
-
 
 ### should loop over these instead of calling them explicitly
 
@@ -337,7 +304,6 @@ writer.add_channel(reco_dtst_data.axes, "ch_dtst")
 writer.add_data(reco_dtst_data, "ch_dtst")
 writer.add_process(h1, "prpg", "ch_dtst", signal=False)
 
-
 writer.add_channel(reco_stst_data.axes, "ch_stst")
 writer.add_data(reco_stst_data, "ch_stst")
 writer.add_process(h0, "prpg", "ch_stst", signal=False)
@@ -348,55 +314,48 @@ dtdt_prpg = expand_hist_by_duplicate_axis(dtdt_prpg, "time", "gen_time")
 dtst_prpg = expand_hist_by_duplicate_axis(dtst_prpg, "time", "gen_time")
 stst_prpg = expand_hist_by_duplicate_axis(stst_prpg, "time", "gen_time")
 
-
-background_syst(
-    writer,
-    dtdt_qcd_bkg,
-    dtst_qcd_bkg,
-    stst_qcd_bkg,
-    time_proj,
-    lumi_scaling,
-    qcd_weightsum,
-    qcd_cross_sec,
-    "qcd",
-    "bkg_qcd",
-)
-background_syst(
-    writer,
-    dtdt_top_bkg,
-    dtst_top_bkg,
-    stst_top_bkg,
-    time_proj,
-    lumi_scaling,
-    top_weightsum,
-    top_cross_sec,
+### all
+background_syst_names = [
+    "ZmumuPostVFP",
+    "Top",
+    "Diboson",
+    "GGToLLPostVFP",
+    "QCDmuEnrichPt15PostVFP",
+    "WplusmunuPostVFP",
+    "QGToDYQTo2LPostVFP",
+    "QGToWQToLNuPostVFP",
+]
+background_proc = [
+    "zmumu_fail_gen",
     "top",
-    "bkg_top",
-)
-background_syst(
-    writer,
-    dtdt_w_bkg,
-    dtst_w_bkg,
-    stst_w_bkg,
-    time_proj,
-    lumi_scaling,
-    w_weightsum,
-    w_cross_sec,
+    "diboson",
+    "gg",
+    "qcd",
     "w",
-    "bkg_w",
-)  ### concerningly comes out as 1
-background_syst(
-    writer,
-    dtdt_prfg,
-    dtst_prfg,
-    stst_prfg,
-    time_proj,
-    lumi_scaling,
-    weightsum,
-    cross_sec,
-    "fail_gen",
-    "bkg_zmumu_gen",
-)
+    "qcd_2l",
+    "qcd_lnu",
+]
+
+# ### large contributions
+# background_syst_names = ["ZmumuPostVFP", "Top",  'Diboson', "GGToLLPostVFP"]
+# background_proc = ["zmumu_fail_gen","top", 'diboson', 'gg']
+
+for i in range(len(background_syst_names)):
+    proc_name = background_proc[i]
+    if proc_name == "zmumu_fail_gen":
+        fgen = True
+    else:
+        fgen = False
+    background_syst(
+        writer,
+        results,
+        background_syst_names[i],
+        time_proj,
+        lumi_scaling,
+        proc_name,
+        f"bkg_{proc_name}",
+        fail_gen=fgen,
+    )
 
 
 pass_gen_expanded = expand_hist_by_duplicate_axes(
@@ -410,8 +369,8 @@ h2_var_hlt_ALL = []
 h1_var_hlt_ALL = []
 h0_var_hlt_ALL = []
 
-
-for i in range(3, 6):  # just select two mass bins in the center
+# for i in range(3, 6):  # just select two mass bins in the center
+for i in range(10):
     for j in range(nbins_time):
         ### be more consistent about ordering of time and mll
         ### fitting for the number of events

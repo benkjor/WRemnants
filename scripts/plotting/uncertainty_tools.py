@@ -8,9 +8,6 @@ from wums.boostHistHelpers import (
     scaleHist,
 )
 
-slope_ramses = 0.0006
-slope_hfoc = 0.0007
-
 
 def get_h2var(eps_id, eps_hlt, heff):
     #  h2var = heff * (eps_prime * eps)
@@ -230,16 +227,27 @@ def luminometer_syst(writer, luminometer, dtdt, dtst, stst, syst):
 
 def background_syst(
     writer,
-    dtdt,
-    dtst,
-    stst,
+    results,
+    res_str,
     time_proj,
     lumi_scaling,
-    weightsum,
-    cross_sec,
     proc_name,
     bkg_name,
+    fail_gen=False,
 ):
+
+    MC = results[res_str]["output"]
+    if fail_gen:
+        dtdt = MC["mll_dtdt_prfg"].get()
+        dtst = MC["mll_dtst_prfg"].get()
+        stst = MC["mll_stst_prfg"].get()
+    else:
+        dtdt = MC["mll_dtdt_prpg"].get()
+        dtst = MC["mll_dtst_prpg"].get()
+        stst = MC["mll_stst_prpg"].get()
+    weightsum = results["QGToDYQTo2LPostVFP"]["weight_sum"]
+    cross_sec = results["QGToDYQTo2LPostVFP"]["dataset"]["xsec"]
+
     dtdt, dtst, stst = mc_corrections_all_cases(
         dtdt, dtst, stst, time_proj, lumi_scaling, weightsum, cross_sec
     )

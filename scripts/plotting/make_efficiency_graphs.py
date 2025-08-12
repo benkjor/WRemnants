@@ -1,6 +1,9 @@
 import re
 
+import matplotlib
 import matplotlib.pyplot as plt
+
+matplotlib.rcParams.update({"font.size": 16})
 
 # Read your input from a text file
 with open("efficiency_graph_fit.txt", "r") as f:
@@ -53,12 +56,12 @@ plt.plot(low_mll_hlt, color="C0", label="m = 89.3 - 90.1 GeV")
 plt.plot(med_mll_hlt, color="C1", label="m = 90.1 - 90.8 GeV")
 plt.plot(high_mll_hlt, color="C2", label="m = 90.8 - 91.4 GeV")
 
-plt.xlabel("Sidereal time [hrs]")
+plt.xlabel("Sidereal time [hr]")
 plt.ylabel("HLT efficiency uncertainty")
 plt.legend(loc="center right")
-plt.savefig(
-    "/home/submit/jbenke/public_html/liv_model_fits/2025-07-28/hlt_efficiencies.png"
-)
+plt.tight_layout()
+
+plt.savefig("/home/submit/jbenke/public_html/liv_uncert/efficiency/hlt_efficencies.png")
 plt.clf()
 
 
@@ -83,12 +86,12 @@ plt.plot(low_mll_id, color="C0", label="m = 89.3 - 90.1 GeV")
 plt.plot(med_mll_id, color="C1", label="m = 90.1 - 90.8 GeV")
 plt.plot(high_mll_id, color="C2", label="m = 90.8 - 91.4 GeV")
 
-plt.xlabel("Sidereal time [hrs]")
+plt.xlabel("Sidereal time [hr]")
 plt.ylabel("ID efficiency uncertainty")
 plt.legend(loc="center right")
-plt.savefig(
-    "/home/submit/jbenke/public_html/liv_model_fits/2025-07-28/id_efficiencies.png"
-)
+plt.tight_layout()
+
+plt.savefig("/home/submit/jbenke/public_html/liv_uncert/efficiency/id_efficencies.png")
 
 
 # pdb.set_trace()

@@ -12,6 +12,7 @@ from wums.boostHistHelpers import (
 )
 
 coeff_num = 0
+coeff_name = ["c^xx", "c^xy", "c^xz", "c^yz"]
 channel_name = f"1d_coeff_{coeff_num}_norm"
 
 parser = argparse.ArgumentParser()
@@ -44,7 +45,7 @@ vals = np.load(infile_liv_model)  # (SM+LV)/SM = 1 + LV/SM
 writer = tensorwriter.TensorWriter()
 
 num_mass_bins = len(data[0, :].values())
-## structure is mass bin, coeff #, u/d, value
+## structure is mass bin, coeff #, u/d, l/r, value
 amplitudes_in = np.load(
     "/work/submit/jbenke/WRemnants/scripts/corrections/liv_fit_final_amplitudes.npy"
 )
@@ -79,7 +80,7 @@ for j in range(num_mass_bins):
     up_variation = up_quark_var_scaled
     writer.add_systematic(
         addHists(flat_line, up_variation),
-        f"coeff_{coeff_num+1}_u",
+        f"{coeff_name[coeff_num]}_l,u",
         process,
         channel,
         constrained=False,
@@ -89,7 +90,7 @@ for j in range(num_mass_bins):
     down_variation = down_quark_var_scaled
     writer.add_systematic(
         addHists(flat_line, down_variation),
-        f"coeff_{coeff_num+1}_d",
+        f"{coeff_name[coeff_num]}_l,d",
         process,
         channel,
         constrained=False,

@@ -12,7 +12,7 @@ from wums.boostHistHelpers import (
 )
 
 fit_type = 4  ### number of dimensions
-
+coeff_name = ["c^xx", "c^xy", "c^xz", "c^yz"]
 if fit_type == 4:
     start_range = 0
     end_range = 4
@@ -66,7 +66,7 @@ for i in range(start_range, end_range):
 
     writer.add_systematic(
         addHists(flat_line, var),
-        f"coeff_{i+1}",
+        f"{coeff_name[i]}",
         "liv_fit",
         f"ch{channel_name}",
         constrained=False,

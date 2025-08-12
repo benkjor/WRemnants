@@ -51,9 +51,9 @@ time_proj_mll = data_output["time_proj"].get().project("time", "mll")
 
 ### pass reco, pass generator
 
-dtdt_prpg_true = MC_Zmumu["mll_dtdt_prpg"].get()
-dtst_prpg_true = MC_Zmumu["mll_dtst_prpg"].get()
-stst_prpg_true = MC_Zmumu["mll_stst_prpg"].get()
+dtdt_prpg = MC_Zmumu["mll_dtdt_prpg"].get()
+dtst_prpg = MC_Zmumu["mll_dtst_prpg"].get()
+stst_prpg = MC_Zmumu["mll_stst_prpg"].get()
 weightsum = results["ZmumuPostVFP"]["weight_sum"]
 cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 
@@ -101,8 +101,12 @@ sbil_pcc = lumi_output["sbil_pcc"].get()
 count_pcc = lumi_output["count_pcc"].get()
 
 
-nbins_mll = len(dtdt_prpg_true.axes["mll"])
+weightsum = results["ZmumuPostVFP"]["weight_sum"]
+cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
+
+nbins_mll = len(dtdt_prfg.axes["mll"])
 nbins_time = len(reco_dtst_data.axes["time"])
+
 
 ### cross-detector uncertainties
 
@@ -115,9 +119,6 @@ pcc_scaling = multiplyHists(pcc_scaling, lumi_scaling)
 ramses_scaling = divideHists(lumi_ramses, lumi_ramses_nom)
 ramses_scaling = multiplyHists(ramses_scaling, lumi_scaling)
 
-
-############################# CURRENTLY WORKING ON ##########################################
-### i should prabably do this for each of the 3 cases. but for now will just implement one
 dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
     dtdt_prpg_H,
     dtst_prpg_H,
@@ -133,6 +134,7 @@ dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
     weightsum,
     cross_sec,
 )
+
 dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
     dtdt_prpg_H,
     dtst_prpg_H,
@@ -148,7 +150,6 @@ dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
     weightsum,
     cross_sec,
 )
-
 dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
     dtdt_prpg_H,
     dtst_prpg_H,
@@ -194,6 +195,7 @@ dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = get_mc_lumis(
     cross_sec,
 )
 
+
 dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ramses = get_mc_lumis(
     dtdt_prpg_H,
     dtst_prpg_H,
@@ -210,6 +212,8 @@ dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ramses = get_mc_lum
     cross_sec,
 )
 
+
+#### normal
 dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
     dtdt_prpg_H,
     dtst_prpg_H,
@@ -243,17 +247,17 @@ dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
     )
 )
 
-
 pass_gen = all_mc_corrections(
     pass_gen, time_proj_gen_mll, lumi_scaling, weightsum, cross_sec
 )
 
-### efficiencies0
+### efficiencies
 h2 = dtdt_prpg.project("time", "mll")
 h1 = dtst_prpg.project("time", "mll")
 h0 = stst_prpg.project("time", "mll")
 
 efficiency_ones = make_ones_hist(h1)
+
 
 ## e2 = 2*h2/(h1 + 2*h1)
 eps_hlt = addHists(h1, scaleHist(h2, 2))
@@ -284,6 +288,7 @@ h1var_hlt = get_h1var(eps_id, eps_hlt_var, heff, efficiency_ones)
 h2var_id = get_h2var(eps_id_var, eps_hlt, heff)
 h2var_hlt = get_h2var(eps_id, eps_hlt_var, heff)
 
+# pdb.set_trace()
 n_masked = pass_gen.project("time", "gen_mll")
 
 ## create the tensor
@@ -292,29 +297,26 @@ writer = tensorwriter.TensorWriter()
 ##g# enerator channel
 writer.add_channel(pass_gen.axes, "ch_masked", masked=True)
 writer.add_process(
-    divideHists(pass_gen, lumi_scaling), "prpg", "ch_masked", signal=False
+    divideHists(pass_gen, lumi_scaling), "Zmumu pass gen", "ch_masked", signal=False
 )
-
 ### efficiency channels
 writer.add_channel(reco_dtdt_data.axes, "ch_dtdt")
 writer.add_data(reco_dtdt_data, "ch_dtdt")
-writer.add_process(h2, "prpg", "ch_dtdt", signal=False)
+writer.add_process(h2, "Zmumu pass gen", "ch_dtdt", signal=False)
 
 writer.add_channel(reco_dtst_data.axes, "ch_dtst")
 writer.add_data(reco_dtst_data, "ch_dtst")
-writer.add_process(h1, "prpg", "ch_dtst", signal=False)
+writer.add_process(h1, "Zmumu pass gen", "ch_dtst", signal=False)
 
 writer.add_channel(reco_stst_data.axes, "ch_stst")
 writer.add_data(reco_stst_data, "ch_stst")
-writer.add_process(h0, "prpg", "ch_stst", signal=False)
-
+writer.add_process(h0, "Zmumu pass gen", "ch_stst", signal=False)
 ### adding axes as appropriate to make everything 4 dimensional
-
 dtdt_prpg = expand_hist_by_duplicate_axis(dtdt_prpg, "time", "gen_time")
 dtst_prpg = expand_hist_by_duplicate_axis(dtst_prpg, "time", "gen_time")
 stst_prpg = expand_hist_by_duplicate_axis(stst_prpg, "time", "gen_time")
 
-### all
+
 background_syst_names = [
     "ZmumuPostVFP",
     "Top",
@@ -326,23 +328,19 @@ background_syst_names = [
     "QGToWQToLNuPostVFP",
 ]
 background_proc = [
-    "zmumu_fail_gen",
-    "top",
-    "diboson",
-    "gg",
-    "qcd",
-    "w",
-    "qcd_2l",
-    "qcd_lnu",
+    "Zmumu fail gen",
+    "Top",
+    "Diboson",
+    "GG",
+    "QCD",
+    "W",
+    "QG_2L",
+    "QG_Lnu",
 ]
-
-# ### large contributions
-# background_syst_names = ["ZmumuPostVFP", "Top",  'Diboson', "GGToLLPostVFP"]
-# background_proc = ["zmumu_fail_gen","top", 'diboson', 'gg']
 
 for i in range(len(background_syst_names)):
     proc_name = background_proc[i]
-    if proc_name == "zmumu_fail_gen":
+    if proc_name == "Zmumu fail gen":
         fgen = True
     else:
         fgen = False
@@ -361,7 +359,6 @@ for i in range(len(background_syst_names)):
 pass_gen_expanded = expand_hist_by_duplicate_axes(
     pass_gen, ["time", "gen_mll"], ["gen_time", "gen_mll_0"]
 )
-
 h2_var_id_ALL = []
 h1_var_id_ALL = []
 h0_var_id_ALL = []
@@ -369,19 +366,17 @@ h2_var_hlt_ALL = []
 h1_var_hlt_ALL = []
 h0_var_hlt_ALL = []
 
-# for i in range(3, 6):  # just select two mass bins in the center
-for i in range(10):
+for i in range(3, 6):  # just select two mass bins in the center
     for j in range(nbins_time):
+
         ### be more consistent about ordering of time and mll
         ### fitting for the number of events
-
-        ### MAKE NAMING LESS STUPID
         v2 = dtdt_prpg[{"gen_mll": i, "gen_time": j}]  ## equivalent to n2
         var2 = addHists(v2 * 0.1, h2)
         writer.add_systematic(
             var2,
             f"n_mll{i}_time{j}",
-            "prpg",
+            "Zmumu pass gen",
             "ch_dtdt",
             constrained=False,
             groups=["nz"],
@@ -392,7 +387,7 @@ for i in range(10):
         writer.add_systematic(
             var1,
             f"n_mll{i}_time{j}",
-            "prpg",
+            "Zmumu pass gen",
             "ch_dtst",
             constrained=False,
             groups=["nz"],
@@ -402,12 +397,11 @@ for i in range(10):
         writer.add_systematic(
             var0,
             f"n_mll{i}_time{j}",
-            "prpg",
+            "Zmumu pass gen",
             "ch_stst",
             constrained=False,
             groups=["nz"],
         )
-
         # for masked channel
         v_masked = pass_gen_expanded[{"gen_mll_0": i, "gen_time": j}]
         var_masked = addHists(v_masked * 0.1, n_masked)
@@ -415,7 +409,7 @@ for i in range(10):
         writer.add_systematic(
             cross_section_masked,
             f"n_mll{i}_time{j}",
-            "prpg",
+            "Zmumu pass gen",
             "ch_masked",
             constrained=False,
             groups=["nz"],
@@ -437,12 +431,13 @@ for i in range(10):
         h1_var_hlt_ALL.append(h1var_hlt_primed)
         h0_var_hlt_ALL.append(h0var_hlt_primed)
 
+        # import pdb
         #### ID EFFICIENCY
 
         writer.add_systematic(
             h2var_id_primed,
             f"id_prime_mll{i}_time{j}",
-            "prpg",
+            "Zmumu pass gen",
             "ch_dtdt",
             constrained=False,
             groups=["eff_1"],
@@ -450,7 +445,7 @@ for i in range(10):
         writer.add_systematic(
             h1var_id_primed,
             f"id_prime_mll{i}_time{j}",
-            "prpg",
+            "Zmumu pass gen",
             "ch_dtst",
             constrained=False,
             groups=["eff_1"],
@@ -459,7 +454,7 @@ for i in range(10):
         writer.add_systematic(
             h0var_id_primed,
             f"id_prime_mll{i}_time{j}",
-            "prpg",
+            "Zmumu pass gen",
             "ch_stst",
             constrained=False,
             groups=["eff_1"],
@@ -470,7 +465,7 @@ for i in range(10):
         writer.add_systematic(
             h2var_hlt_primed,
             f"hlt_prime_mll{i}_time{j}",
-            "prpg",
+            "Zmumu pass gen",
             "ch_dtdt",
             constrained=False,
             groups=["eff_2"],
@@ -478,7 +473,7 @@ for i in range(10):
         writer.add_systematic(
             h1var_hlt_primed,
             f"hlt_prime_mll{i}_time{j}",
-            "prpg",
+            "Zmumu pass gen",
             "ch_dtst",
             constrained=False,
             groups=["eff_2"],
@@ -486,37 +481,13 @@ for i in range(10):
         writer.add_systematic(
             h0var_hlt_primed,
             f"hlt_prime_mll{i}_time{j}",
-            "prpg",
+            "Zmumu pass gen",
             "ch_stst",
             constrained=False,
             groups=["eff_2"],
         )
 
 
-writer.add_systematic(
-    dtdt_prpg_prefiring_syst.project("time", "mll"),
-    f"prefiring_syst",
-    "prpg",
-    "ch_dtdt",
-    constrained=True,
-    groups=["prefiring_syst"],
-)
-writer.add_systematic(
-    dtst_prpg_prefiring_syst.project("time", "mll"),
-    f"prefiring_syst",
-    "prpg",
-    "ch_dtst",
-    constrained=True,
-    groups=["prefiring_syst"],
-)
-writer.add_systematic(
-    stst_prpg_prefiring_syst.project("time", "mll"),
-    f"prefiring_syst",
-    "prpg",
-    "ch_stst",
-    constrained=True,
-    groups=["prefiring_syst"],
-)
 num_etaphi = len(dtdt_prpg_H_stat.project("etaPhiRegion").values())
 for i in range(num_etaphi):
     eta_phi_systematic(
@@ -536,29 +507,50 @@ for i in range(num_etaphi):
         i,
     )
 
+
+writer.add_systematic(
+    dtdt_prpg_prefiring_syst.project("time", "mll"),
+    f"prefiring_syst",
+    "Zmumu pass gen",
+    "ch_dtdt",
+    constrained=True,
+    groups=["prefiring_syst"],
+)
+writer.add_systematic(
+    dtst_prpg_prefiring_syst.project("time", "mll"),
+    f"prefiring_syst",
+    "Zmumu pass gen",
+    "ch_dtst",
+    constrained=True,
+    groups=["prefiring_syst"],
+)
+writer.add_systematic(
+    stst_prpg_prefiring_syst.project("time", "mll"),
+    f"prefiring_syst",
+    "Zmumu pass gen",
+    "ch_stst",
+    constrained=True,
+    groups=["prefiring_syst"],
+)
+
+### HFOC
 ##### MAKE LESS STUPID
 #### PCC cross detector
-
-
 luminometer_syst(
     writer, "pcc", dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc, "stability"
 )
-
-luminometer_syst(
-    writer, "ramses", dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses, "stability"
-)
-luminometer_syst(
-    writer,
-    "ramses",
-    dtdt_prpg_sbil_ramses,
-    dtst_prpg_sbil_ramses,
-    stst_prpg_sbil_ramses,
-    "linearity",
-)
-
+## HFOC cross detector
 luminometer_syst(
     writer, "hfoc", dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc, "stability"
 )
+
+#### RAMSES cross detector
+luminometer_syst(
+    writer, "ramses", dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses, "stability"
+)
+
+
+#### HFOC linearity
 luminometer_syst(
     writer,
     "hfoc",
@@ -568,5 +560,15 @@ luminometer_syst(
     "linearity",
 )
 
+#### RAMSES linearity
+luminometer_syst(
+    writer,
+    "ramses",
+    dtdt_prpg_sbil_ramses,
+    dtst_prpg_sbil_ramses,
+    stst_prpg_sbil_ramses,
+    "linearity",
+)
 
+# pdb.set_trace()
 writer.write(outfolder="./", outfilename="liv")

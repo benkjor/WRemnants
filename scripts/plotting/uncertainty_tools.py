@@ -167,7 +167,7 @@ def eta_phi_systematic(
     writer.add_systematic(
         dtdt_stat.project("time", "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
-        "prpg",
+        "Zmumu pass gen",
         "ch_dtdt",
         constrained=True,
         groups=["prefiring_stat"],
@@ -175,7 +175,7 @@ def eta_phi_systematic(
     writer.add_systematic(
         dtst_stat.project("time", "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
-        "prpg",
+        "Zmumu pass gen",
         "ch_dtst",
         constrained=True,
         groups=["prefiring_stat"],
@@ -183,7 +183,7 @@ def eta_phi_systematic(
     writer.add_systematic(
         stst_stat.project("time", "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
-        "prpg",
+        "Zmumu pass gen",
         "ch_stst",
         constrained=True,
         groups=["prefiring_stat"],
@@ -202,7 +202,7 @@ def luminometer_syst(writer, luminometer, dtdt, dtst, stst, syst):
     writer.add_systematic(
         dtdt.project("time", "mll"),
         f"{luminometer}_{syst}",
-        "prpg",
+        "Zmumu pass gen",
         "ch_dtdt",
         constrained=True,
         groups=[f"{syst}"],
@@ -210,7 +210,7 @@ def luminometer_syst(writer, luminometer, dtdt, dtst, stst, syst):
     writer.add_systematic(
         dtst.project("time", "mll"),
         f"{luminometer}_{syst}",
-        "prpg",
+        "Zmumu pass gen",
         "ch_dtst",
         constrained=True,
         groups=[f"{syst}"],
@@ -218,7 +218,7 @@ def luminometer_syst(writer, luminometer, dtdt, dtst, stst, syst):
     writer.add_systematic(
         stst.project("time", "mll"),
         f"{luminometer}_{syst}",
-        "prpg",
+        "Zmumu pass gen",
         "ch_stst",
         constrained=True,
         groups=[f"{syst}"],

@@ -323,6 +323,10 @@ axis_mll_2 = hist.axis.Variable(
     ],
     name="gen_mll",
 )
+
+
+# axis_mll = hist.axis.Variable([37.3125, 80.7336, 85.2387, 87.0989, 88.1447, 88.8452, 89.37, 89.7984, 90.1649, 90.4981, 90.813, 91.12, 91.431, 91.7586, 92.1162, 92.5314, 93.0447, 93.7486, 94.9259, 97.7627, 120], name='mll')
+# axis_mll_2 = hist.axis.Variable([37.3125, 80.7336, 85.2387, 87.0989, 88.1447, 88.8452, 89.37, 89.7984, 90.1649, 90.4981, 90.813, 91.12, 91.431, 91.7586, 92.1162, 92.5314, 93.0447, 93.7486, 94.9259, 97.7627, 120], name='gen_mll')
 axis_pt = hist.axis.Regular(25, 25, 50)
 
 
@@ -463,7 +467,7 @@ def build_graph(df, dataset):
             "mll_stst_prpg", [axis_mll, axis_mll_2], ["mll", "gen_mll", "weight"]
         )
 
-        fine_bin_axis = hist.axis.Regular(200, 60, 120, name="mll_fine_bin")
+        fine_bin_axis = hist.axis.Regular(400, 15, 120, name="mll_fine_bin")
         fine_bin_mll = dtight_dtrig_df_21.HistoBoost(
             "fine_bin_axis_gen", [fine_bin_axis], ["mll", "weight"]
         )
@@ -501,7 +505,7 @@ def build_graph(df, dataset):
 
         dtight_dtrig, dtight_strig, stight_strig = trigger_tightID_sep(df)
 
-        fine_bin_axis = hist.axis.Regular(200, 60, 120, name="mll_fine_bin")
+        fine_bin_axis = hist.axis.Regular(400, 15, 120, name="mll_fine_bin")
         fine_bin_mll = df.HistoBoost(
             "fine_bin_axis_gen", [fine_bin_axis], ["mll", "weight"]
         )

@@ -18,7 +18,7 @@ channel_name = f"1d_coeff_{coeff_num}_norm"
 parser = argparse.ArgumentParser()
 args = parser.parse_args()
 quark_amp_scaling = np.load(
-    "/work/submit/jbenke/WRemnants/scripts/corrections/quark_liv_scalings.npy"
+    "/work/submit/jbenke/WRemnants/scripts/corrections/liv_amplitudes_lr.npy"
 )
 
 indir_data = "/work/submit/jbenke/WRemnants/scripts/plotting/"
@@ -49,7 +49,7 @@ num_mass_bins = len(data[0, :].values())
 amplitudes_in = np.load(
     "/work/submit/jbenke/WRemnants/scripts/corrections/liv_fit_final_amplitudes.npy"
 )
-# amplitudes_in = np.zeros([num_mass_bins, 4, 2])
+amplitudes_in = np.zeros([num_mass_bins, 4, 2, 2])
 
 for j in range(num_mass_bins):
     channel = f"ch{channel_name}_mass_{j}"
@@ -62,45 +62,84 @@ for j in range(num_mass_bins):
         data=np.ones(24) * data_int / 24,
     )
 
-    up_quark_var = hist.Hist(
+    up_quark_var_left = hist.Hist(
         hist.axis.Regular(24, 0, 24, metadata="time", underflow=False, overflow=False),
-        data=quark_amp_scaling[j, coeff_num, 0] - 1,
+        data=quark_amp_scaling[j + 1, coeff_num, 0, 0] - 1,
     )
 
-    down_quark_var = hist.Hist(
+    down_quark_var_left = hist.Hist(
         hist.axis.Regular(24, 0, 24, metadata="time", underflow=False, overflow=False),
-        data=quark_amp_scaling[j, coeff_num, 1] - 1,
+        data=quark_amp_scaling[j + 1, coeff_num, 1, 0] - 1,
     )
-    up_quark_var_scaled = scaleHist(up_quark_var, data_int / 24)  # LV
-    down_quark_var_scaled = scaleHist(down_quark_var, data_int / 24)  # LV
+
+    up_quark_var_right = hist.Hist(
+        hist.axis.Regular(24, 0, 24, metadata="time", underflow=False, overflow=False),
+        data=quark_amp_scaling[j + 1, coeff_num, 0, 1] - 1,
+    )
+
+    down_quark_var_right = hist.Hist(
+        hist.axis.Regular(24, 0, 24, metadata="time", underflow=False, overflow=False),
+        data=quark_amp_scaling[j + 1, coeff_num, 1, 1] - 1,
+    )
+
+    up_quark_left_scaled = scaleHist(up_quark_var_left, data_int / 24)  # LV
+    down_quark_left_scaled = scaleHist(down_quark_var_left, data_int / 24)  # LV
+    up_quark_right_scaled = scaleHist(up_quark_var_right, data_int / 24)  # LV
+    down_quark_right_scaled = scaleHist(down_quark_var_right, data_int / 24)  # LV
+    # pdb.set_trace()
 
     writer.add_channel(this_data.axes, channel)
     writer.add_data(this_data, channel)
     writer.add_process(flat_line, process, channel, signal=True)
-    up_variation = up_quark_var_scaled
+
+    # writer.add_process(flat_line, f"up_left_{process}", channel, signal=True)
+    # writer.add_process(flat_line, f"up_right_{process}", channel, signal=True)
+    # writer.add_process(flat_line, f"down_left_{process}", channel, signal=True)
+    # writer.add_process(flat_line, f"down_right_{process}", channel, signal=True)
+
     writer.add_systematic(
-        addHists(flat_line, up_variation),
+        addHists(flat_line, up_quark_left_scaled),
         f"{coeff_name[coeff_num]}_l,u",
         process,
         channel,
         constrained=False,
         noi=True,
     )
-
-    down_variation = down_quark_var_scaled
     writer.add_systematic(
-        addHists(flat_line, down_variation),
+        addHists(flat_line, up_quark_right_scaled),
+        f"{coeff_name[coeff_num]}_r,u",
+        process,
+        channel,
+        constrained=False,
+        noi=True,
+    )
+    writer.add_systematic(
+        addHists(flat_line, down_quark_left_scaled),
         f"{coeff_name[coeff_num]}_l,d",
         process,
         channel,
         constrained=False,
         noi=True,
     )
-    amplitudes_in[j, coeff_num, 0] = (
-        np.max(up_variation.values()) / flat_line.values()[0]
+    writer.add_systematic(
+        addHists(flat_line, down_quark_right_scaled),
+        f"{coeff_name[coeff_num]}_r,d",
+        process,
+        channel,
+        constrained=False,
+        noi=True,
     )
-    amplitudes_in[j, coeff_num, 1] = (
-        np.max(down_variation.values()) / flat_line.values()[0]
+    amplitudes_in[j, coeff_num, 0, 0] = (
+        np.max(up_quark_left_scaled.values()) / flat_line.values()[0]
+    )
+    amplitudes_in[j, coeff_num, 1, 0] = (
+        np.max(down_quark_left_scaled.values()) / flat_line.values()[0]
+    )
+    amplitudes_in[j, coeff_num, 0, 1] = (
+        np.max(up_quark_right_scaled.values()) / flat_line.values()[0]
+    )
+    amplitudes_in[j, coeff_num, 1, 1] = (
+        np.max(down_quark_right_scaled.values()) / flat_line.values()[0]
     )
 
 #### ONLY USED THIS ONCE, DON'T WANT TO OVERWRITE EVERY TIME SO

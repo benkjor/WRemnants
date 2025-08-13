@@ -17,7 +17,7 @@ def get_cdf(hist_in):
 
 
 indir_data = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
-infile_data = indir_data + "mz_dilepton_liv_scetlib_dyturboCorr_maxFiles_20.hdf5"
+infile_data = indir_data + "mz_dilepton_liv_scetlib_dyturboCorr.hdf5"
 
 h5file = h5py.File(infile_data, "r")
 results = input_tools.load_results_h5py(h5file)

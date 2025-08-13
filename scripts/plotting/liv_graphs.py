@@ -1,7 +1,8 @@
 import h5py
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from uncertainty_tools import all_mc_corrections, get_mc_lumis
+from uncertainty_tools import all_mc_corrections, get_era_vals, get_mc_lumis
 
 from utilities.io_tools import input_tools
 from wums.boostHistHelpers import (
@@ -9,6 +10,8 @@ from wums.boostHistHelpers import (
     divideHists,
     expand_hist_by_duplicate_axis,
 )
+
+matplotlib.rcParams.update({"font.size": 12})
 
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
 file_out = "/home/submit/jbenke/public_html/"
@@ -46,9 +49,9 @@ def make_plot(
     if len(ylim) != 0:
         plt.ylim(ylim)
     if len(ylabel) != 0:
-        plt.ylabel(ylabel, fontsize=12)
+        plt.ylabel(ylabel, fontsize=16)
 
-    plt.xlabel("Sidereal Time [hrs]", fontsize=12)
+    plt.xlabel("Sidereal Time [hr]", fontsize=16)
     # plt.title(plotname)
     plt.legend(legend_all)
     plt.savefig(file_out + file_out_modifier + plotname + ".png")
@@ -86,32 +89,39 @@ time_data = dtdt_data.project("time")
 dtdt_data = expand_hist_by_duplicate_axis(dtdt_data, "mll", "gen_mll")
 MC_Zmumu = results["ZmumuPostVFP"]["output"]
 
-dtdt_prpg_mc_prevfp = MC_Zmumu["dtdt_prpg_prevfp"].get()
-dtst_prpg_mc_prevfp = MC_Zmumu["dtst_prpg_prevfp"].get()
-stst_prpg_mc_prevfp = MC_Zmumu["stst_prpg_prevfp"].get()
+dtdt_prpg_BG, dtdt_prpg_BG_syst, dtdt_prpg_BG_stat = get_era_vals(
+    MC_Zmumu, "dtdt", "BG"
+)
+dtst_prpg_BG, dtst_prpg_BG_syst, dtst_prpg_BG_stat = get_era_vals(
+    MC_Zmumu, "dtst", "BG"
+)
+stst_prpg_BG, stst_prpg_BG_syst, stst_prpg_BG_stat = get_era_vals(
+    MC_Zmumu, "stst", "BG"
+)
 
-dtdt_prpg_mc_postvfp = MC_Zmumu["dtst_prpg_postvfp"].get()
-dtst_prpg_mc_postvfp = MC_Zmumu["dtst_prpg_postvfp"].get()
-stst_prpg_mc_postvfp = MC_Zmumu["stst_prpg_postvfp"].get()
+dtdt_prpg_H, dtdt_prpg_H_syst, dtdt_prpg_H_stat = get_era_vals(MC_Zmumu, "dtdt", "H")
+dtst_prpg_H, dtst_prpg_H_syst, dtst_prpg_H_stat = get_era_vals(MC_Zmumu, "dtst", "H")
+stst_prpg_H, stst_prpg_H_syst, stst_prpg_H_stat = get_era_vals(MC_Zmumu, "stst", "H")
+
 lumi_output = results["dataPostVFP"]["lumi_outout"]
+lumi_scaling_h = lumi_output["lumi_pre"].get()
+lumi_scaling_bg = lumi_output["lumi_post"].get()
 
-lumi_scaling_pre = lumi_output["lumi_pre"].get()
-lumi_scaling_post = lumi_output["lumi_post"].get()
 data_output = results["dataPostVFP"]["output"]
 
 time_proj = data_output["time_proj"].get()
-
+#### FIX TO MAKE VERSION THAT PRODUCES THE NO_LUMI PLOT
 dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = get_mc_lumis(
-    dtdt_prpg_mc_prevfp,
-    dtst_prpg_mc_prevfp,
-    stst_prpg_mc_prevfp,
-    dtdt_prpg_mc_postvfp,
-    dtst_prpg_mc_postvfp,
-    stst_prpg_mc_postvfp,
+    dtdt_prpg_H,
+    dtst_prpg_H,
+    stst_prpg_H,
+    dtdt_prpg_BG,
+    dtst_prpg_BG,
+    stst_prpg_BG,
     time_proj,
     lumi_scaling,
-    lumi_scaling_pre,
-    lumi_scaling_post,
+    lumi_scaling_h,
+    lumi_scaling_bg,
     lumi_scaling,
     wsum,
     xsec,

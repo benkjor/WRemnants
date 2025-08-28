@@ -1,5 +1,4 @@
 import argparse
-import pdb
 
 import h5py
 from uncertainty_tools import (
@@ -41,23 +40,28 @@ MC_Zmumu = results["ZmumuPostVFP"]["output"]
 
 
 reco_dtdt_data = data_output["time_mll"].get()
-reco_dtst_data = data_output["time_mll_dtst"].get()
-reco_stst_data = data_output["time_mll_stst"].get()
-time_proj_low = data_output["time_proj_2"].get()[{"mll": mass_bin, "gen_mll": mass_bin}]
-time_proj_hlt = data_output["time_proj"].get()[{"mll": mass_bin, "gen_mll": mass_bin}]
+reco_dtst_data = data_output["time_dtst"].get()
+reco_stst_data = data_output["time_stst"].get()
 time_proj_low_all = data_output["time_proj_2"].get()
 time_proj_hlt_all = data_output["time_proj"].get()
+
+time_proj_hlt_all = expand_hist_by_duplicate_axis(time_proj_hlt_all, "mll", "gen_mll")
+time_proj_low_all = expand_hist_by_duplicate_axis(time_proj_low_all, "mll", "gen_mll")
+
+time_proj_low = time_proj_low_all[{"mll": mass_bin, "gen_mll": mass_bin}]
+time_proj_hlt = time_proj_hlt_all[{"mll": mass_bin, "gen_mll": mass_bin}]
+
 ### pass reco, pass generator
 
-dtdt_prpg = MC_Zmumu["mll_dtdt_prpg"].get()
-dtst_prpg = MC_Zmumu["mll_dtst_prpg"].get()
-stst_prpg = MC_Zmumu["mll_stst_prpg"].get()
+dtdt_prpg = MC_Zmumu["dtdt_prpg"].get()
+dtst_prpg = MC_Zmumu["dtst_prpg"].get()
+stst_prpg = MC_Zmumu["stst_prpg"].get()
 weightsum = results["ZmumuPostVFP"]["weight_sum"]
 cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 
-dtdt_prfg = MC_Zmumu["mll_dtdt_prfg"].get()
-dtst_prfg = MC_Zmumu["mll_dtst_prfg"].get()
-stst_prfg = MC_Zmumu["mll_stst_prfg"].get()
+dtdt_prfg = MC_Zmumu["dtdt_prfg"].get()
+dtst_prfg = MC_Zmumu["dtst_prfg"].get()
+stst_prfg = MC_Zmumu["stst_prfg"].get()
 
 ### should loop over these instead of calling them explicitly
 
@@ -76,10 +80,7 @@ dtdt_prpg_H, dtdt_prpg_H_syst, dtdt_prpg_H_stat = get_era_vals(MC_Zmumu, "dtdt",
 dtst_prpg_H, dtst_prpg_H_syst, dtst_prpg_H_stat = get_era_vals(MC_Zmumu, "dtst", "H")
 stst_prpg_H, stst_prpg_H_syst, stst_prpg_H_stat = get_era_vals(MC_Zmumu, "stst", "H")
 
-
 pass_gen = MC_Zmumu["pass_gen"].get()
-
-# background_processes = ### NOT SURE WHAT GOES HERE YET
 
 ### probably need to pull these back'
 lumi_scaling = lumi_output["lumi_nom"].get()
@@ -125,51 +126,51 @@ dtst_prpg_BG = dtst_prpg_BG[{"mll": mass_bin, "gen_mll": mass_bin}]
 stst_prpg_BG = stst_prpg_BG[{"mll": mass_bin, "gen_mll": mass_bin}]
 
 
-dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
+prpg_all = [
     dtdt_prpg_H,
     dtst_prpg_H,
     stst_prpg_H,
     dtdt_prpg_BG,
     dtst_prpg_BG,
     stst_prpg_BG,
-    time_proj_hlt,
-    time_proj_low,
+]
+prpg_syst = [
+    dtdt_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+    dtst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+    stst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+    dtdt_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+    dtst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+    stst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+]
+
+
+time_hists = [time_proj_hlt, time_proj_low]
+lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
+
+
+dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
+    prpg_all,
+    time_hists,
     hfoc_scaling,
-    lumi_scaling_h,
-    lumi_scaling_bg,
+    lumi_hists,
     weightsum,
     cross_sec,
 )
 
 dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
-    dtdt_prpg_H,
-    dtst_prpg_H,
-    stst_prpg_H,
-    dtdt_prpg_BG,
-    dtst_prpg_BG,
-    stst_prpg_BG,
-    time_proj_hlt,
-    time_proj_low,
+    prpg_all,
+    time_hists,
     pcc_scaling,
-    lumi_scaling_h,
-    lumi_scaling_bg,
+    lumi_hists,
     weightsum,
     cross_sec,
 )
 
-
 dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
-    dtdt_prpg_H,
-    dtst_prpg_H,
-    stst_prpg_H,
-    dtdt_prpg_BG,
-    dtst_prpg_BG,
-    stst_prpg_BG,
-    time_proj_hlt,
-    time_proj_low,
+    prpg_all,
+    time_hists,
     ramses_scaling,
-    lumi_scaling_h,
-    lumi_scaling_bg,
+    lumi_hists,
     weightsum,
     cross_sec,
 )
@@ -187,69 +188,38 @@ sbil_ramses_fit = addHists(sbil_ramses_fit, sbil_ones)
 sbil_ramses_fit = multiplyHists(sbil_ramses_fit, lumi_scaling)
 
 dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = get_mc_lumis(
-    dtdt_prpg_H,
-    dtst_prpg_H,
-    stst_prpg_H,
-    dtdt_prpg_BG,
-    dtst_prpg_BG,
-    stst_prpg_BG,
-    time_proj_hlt,
-    time_proj_low,
+    prpg_all,
+    time_hists,
     sbil_hfoc_fit,
-    lumi_scaling_h,
-    lumi_scaling_bg,
+    lumi_hists,
     weightsum,
     cross_sec,
 )
-
-
 dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ramses = get_mc_lumis(
-    dtdt_prpg_H,
-    dtst_prpg_H,
-    stst_prpg_H,
-    dtdt_prpg_BG,
-    dtst_prpg_BG,
-    stst_prpg_BG,
-    time_proj_hlt,
-    time_proj_low,
+    prpg_all,
+    time_hists,
     sbil_ramses_fit,
-    lumi_scaling_h,
-    lumi_scaling_bg,
+    lumi_hists,
     weightsum,
     cross_sec,
 )
-
 
 #### normal
 dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
-    dtdt_prpg_H,
-    dtst_prpg_H,
-    stst_prpg_H,
-    dtdt_prpg_BG,
-    dtst_prpg_BG,
-    stst_prpg_BG,
-    time_proj_hlt,
-    time_proj_low,
+    prpg_all,
+    time_hists,
     lumi_scaling,
-    lumi_scaling_h,
-    lumi_scaling_bg,
+    lumi_hists,
     weightsum,
     cross_sec,
 )
 
 (dtdt_prpg_prefiring_syst, dtst_prpg_prefiring_syst, stst_prpg_prefiring_syst) = (
     get_mc_lumis(
-        dtdt_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-        dtst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-        stst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-        dtdt_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-        dtst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-        stst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-        time_proj_hlt,
-        time_proj_low,
+        prpg_syst,
+        time_hists,
         lumi_scaling,
-        lumi_scaling_h,
-        lumi_scaling_bg,
+        lumi_hists,
         weightsum,
         cross_sec,
     )
@@ -288,7 +258,6 @@ writer.add_channel(n_masked.axes, "ch_masked", masked=True)
 writer.add_process(
     divideHists(n_masked, lumi_scaling), "Zmumu pass gen", "ch_masked", signal=False
 )
-### efficiency channels
 
 
 writer.add_channel(
@@ -325,7 +294,6 @@ h0_second_var = expand_hist_by_duplicate_axes(
 )
 
 
-pdb.set_trace()
 pass_gen_expanded = expand_hist_by_duplicate_axes(pass_gen, ["time"], ["gen_time"])
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
 for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
@@ -333,13 +301,11 @@ for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
         for k in range(nbins_time):  #  time
             var_size = 0.01
 
-            # ### be more consistent about ordering of time and mll
             ## redo the naming convention
-            v21 = dtdt_prpg[{"pt_sublead": i, "eta_sublead": j, "gen_time": k}]
+            v21 = dtdt_prpg[{"gen_time": k, "pt_sublead": i, "eta_sublead": j}]
             var2 = addHists(v21 * var_size, h2_first)
-            v22 = h2_first_var_lead[{"pt_prime": i, "eta_prime": j, "gen_time": k}]
+            v22 = h2_first_var_lead[{"gen_time": k, "pt_prime": i, "eta_prime": j}]
             # below same as
-            # var2[{"pt_lead":i, "eta_lead":j, "time":k}] = var2[{"pt_lead":i, "eta_lead":j, "time":k}] + var_size + h2_first[{"pt_lead":i, "eta_lead":j, "time":k}]
             var2 = addHists(v22 * var_size, var2)
             writer.add_systematic(
                 var2,
@@ -368,9 +334,9 @@ for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
                 groups=["eff_1"],
             )
 
-            v11 = dtst_prpg[{"pt_lead": i, "eta_lead": j, "gen_time": k}]
+            v11 = dtst_prpg[{"gen_time": k, "pt_lead": i, "eta_lead": j}]
             var1 = addHists(v11 * var_size, h1_second)
-            v12 = h1_second_var[{"pt_prime": i, "eta_prime": j, "gen_time": k}]
+            v12 = h1_second_var[{"gen_time": k, "pt_prime": i, "eta_prime": j}]
             var1_hlt = addHists(v12 * (-var_size), var1.copy())
             var1_id = addHists(v12 * var_size, var1)
 
@@ -403,9 +369,9 @@ for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
                 groups=["eff_1"],
             )
 
-            v01 = stst_prpg[{"pt_lead": i, "eta_lead": j, "gen_time": k}]
+            v01 = stst_prpg[{"gen_time": k, "pt_lead": i, "eta_lead": j}]
             var0_hlt = addHists(v01 * var_size, h0_second)
-            v02 = h0_second_var[{"pt_prime": i, "eta_prime": j, "gen_time": k}]
+            v02 = h0_second_var[{"gen_time": k, "pt_prime": i, "eta_prime": j}]
             var0_id = addHists(v02 * (-var_size), var0_hlt.copy())
             var0 = addHists(v02 * var_size, var0_hlt)
             # pdb.set_trace()
@@ -439,7 +405,7 @@ for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
             # # for masked channel --- may need to change bc this has a different number of dimensions
 
             v_masked = pass_gen_expanded[
-                {"pt_sublead": i, "eta_sublead": j, "gen_time": k}
+                {"gen_time": k, "pt_sublead": i, "eta_sublead": j}
             ]
             var_masked = addHists(v_masked * var_size, n_masked)
             cross_section_masked = divideHists(var_masked, lumi_scaling)
@@ -456,19 +422,33 @@ for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
 ###### NONE OF THIS IS MASS DEPENDENT
 num_etaphi = len(dtdt_prpg_H_stat.project("etaPhiRegion").values())
 for i in range(num_etaphi):
+    prpg_stat = [
+        dtdt_prpg_H_stat[
+            {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
+        ],
+        dtst_prpg_H_stat[
+            {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
+        ],
+        stst_prpg_H_stat[
+            {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
+        ],
+        dtdt_prpg_BG_stat[
+            {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
+        ],
+        dtst_prpg_BG_stat[
+            {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
+        ],
+        stst_prpg_BG_stat[
+            {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
+        ],
+    ]
+
     eta_phi_systematic(
         writer,
-        dtdt_prpg_H_stat[{"etaPhiRegion": i, "mll": mass_bin, "gen_mll": mass_bin}],
-        dtst_prpg_H_stat[{"etaPhiRegion": i, "mll": mass_bin, "gen_mll": mass_bin}],
-        stst_prpg_H_stat[{"etaPhiRegion": i, "mll": mass_bin, "gen_mll": mass_bin}],
-        dtdt_prpg_BG_stat[{"etaPhiRegion": i, "mll": mass_bin, "gen_mll": mass_bin}],
-        dtst_prpg_BG_stat[{"etaPhiRegion": i, "mll": mass_bin, "gen_mll": mass_bin}],
-        stst_prpg_BG_stat[{"etaPhiRegion": i, "mll": mass_bin, "gen_mll": mass_bin}],
-        time_proj_hlt,
-        time_proj_low,
+        prpg_stat,
+        time_hists,
         lumi_scaling,
-        lumi_scaling_h,
-        lumi_scaling_bg,
+        lumi_hists,
         weightsum,
         cross_sec,
         i,

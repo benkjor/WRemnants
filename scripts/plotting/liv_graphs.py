@@ -62,12 +62,12 @@ results = input_tools.load_results_h5py(h5file)
 
 ### accessing the necessary data
 dtdt_data = results["dataPostVFP"]["output"]["time_mll"].get()
-stst_data = results["dataPostVFP"]["output"]["time_mll_stst"].get()
-dtst_data = results["dataPostVFP"]["output"]["time_mll_dtst"].get()
+stst_data = results["dataPostVFP"]["output"]["time_stst"].get()
+dtst_data = results["dataPostVFP"]["output"]["time_dtst"].get()
 
-dtdt_mc = results["ZmumuPostVFP"]["output"]["mll_dtdt_prpg"].get().project("mll")
-stst_mc = results["ZmumuPostVFP"]["output"]["mll_stst_prpg"].get().project("mll")
-dtst_mc = results["ZmumuPostVFP"]["output"]["mll_dtst_prpg"].get().project("mll")
+dtdt_mc = results["ZmumuPostVFP"]["output"]["dtdt_prpg"].get().project("mll")
+stst_mc = results["ZmumuPostVFP"]["output"]["stst_prpg"].get().project("mll")
+dtst_mc = results["ZmumuPostVFP"]["output"]["dtst_prpg"].get().project("mll")
 
 
 generator = results["ZmumuPostVFP"]["output"]["pass_gen"].get()

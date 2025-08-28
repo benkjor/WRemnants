@@ -133,19 +133,15 @@ def trigger_tightID_sep(dataframe):
     ### detects two muons but only one has the right momentum
     dtight = dataframe.Filter("Sum(Muon_tightId) == 2")
 
-    dtight_dtrig = dtight.Filter(
-        "subleading_muon_passTrigger && leading_muon_passTrigger"
-    )
+    dtdt = dtight.Filter("subleading_muon_passTrigger && leading_muon_passTrigger")
 
-    dtight_strig = dtight.Filter(
-        "subleading_muon_passTrigger != leading_muon_passTrigger"
-    )
+    dtst = dtight.Filter("subleading_muon_passTrigger != leading_muon_passTrigger")
 
-    stight_strig = dataframe.Filter(
+    stst = dataframe.Filter(
         "(subleading_muon_passTrigger && Muon_tightId[1]) != (leading_muon_passTrigger && Muon_tightId[0])"
     )
 
-    return dtight_dtrig, dtight_strig, stight_strig
+    return dtdt, dtst, stst
 
 
 def luminometer_filter(df, lumi_name, filter_helper, helper):
@@ -202,15 +198,15 @@ def make_prefire_hists(df, results, name, axes=2):
     )
 
     if axes == 1:
-        a1 = axis_pt_1
-        a2 = axis_pt_1_copy
+        a1 = axis_pt_high
+        a2 = axis_pt_high_copy
         pt_1 = "pt_first"
         pt_2 = "pt_second"
         eta_1 = "eta_first"
         eta_2 = "eta_second"
     elif axes == 2:
-        a1 = axis_pt_1
-        a2 = axis_pt_2
+        a1 = axis_pt_high
+        a2 = axis_pt_low
         pt_1 = "pt_leading"
         pt_2 = "pt_subleading"
         eta_1 = "eta_leading"
@@ -218,7 +214,7 @@ def make_prefire_hists(df, results, name, axes=2):
 
     h_weights = df_H.HistoBoost(
         f"{name}_H",
-        [axis_mll, axis_mll_2, a1, axis_eta_1, a2, axis_eta_2],
+        [axis_mll, axis_mll_copy, a1, axis_eta, a2, axis_eta_copy],
         [
             "mll",
             "gen_mll",
@@ -231,7 +227,7 @@ def make_prefire_hists(df, results, name, axes=2):
     )
     bg_weights = df_BG.HistoBoost(
         f"{name}_BG",
-        [axis_mll, axis_mll_2, a1, axis_eta_1, a2, axis_eta_2],
+        [axis_mll, axis_mll_copy, a1, axis_eta, a2, axis_eta_copy],
         [
             "mll",
             "gen_mll",
@@ -248,7 +244,7 @@ def make_prefire_hists(df, results, name, axes=2):
     syst_tools.add_L1Prefire_unc_hists(
         results,
         df_BG,
-        [axis_mll, axis_mll_2, a1, axis_eta_1, a2, axis_eta_2],
+        [axis_mll, axis_mll_copy, a1, axis_eta, a2, axis_eta_copy],
         [
             "mll",
             "gen_mll",
@@ -267,7 +263,7 @@ def make_prefire_hists(df, results, name, axes=2):
     syst_tools.add_L1Prefire_unc_hists(
         results,
         df_H,
-        [axis_mll, axis_mll_2, a1, axis_eta_1, a2, axis_eta_2],
+        [axis_mll, axis_mll_copy, a1, axis_eta, a2, axis_eta_copy],
         [
             "mll",
             "gen_mll",
@@ -286,6 +282,7 @@ def make_prefire_hists(df, results, name, axes=2):
     return bg_weights, h_weights
 
 
+redo_cdf = False
 args = parser.parse_args()
 logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
 era = args.era
@@ -338,18 +335,18 @@ axis_date = hist.axis.Regular(24, 0, 24, name="time", overflow=False, underflow=
 axis_sbil = hist.axis.Regular(24, 9e-7, 3e-8, name="sbil")
 axis_num_muons = hist.axis.Regular(3, -0.5, 2.5, name="num_muons")
 
-axis_eta_1 = hist.axis.Regular(6, -2.4, 2.4, name="eta_lead")
-axis_eta_2 = hist.axis.Regular(6, -2.4, 2.4, name="eta_sublead")
+axis_eta = hist.axis.Regular(6, -2.4, 2.4, name="eta_lead")
+axis_eta_copy = hist.axis.Regular(6, -2.4, 2.4, name="eta_sublead")
 
-axis_pt_1 = hist.axis.Regular(10, 25, 80, name="pt_lead")
-axis_pt_1_copy = hist.axis.Regular(10, 25, 80, name="pt_sublead")
-axis_pt_2 = hist.axis.Regular(12, 15, 80, name="pt_sublead")
-axis_pt_2_copy = hist.axis.Regular(12, 15, 80, name="pt_lead")
+axis_pt_high = hist.axis.Regular(10, 25, 80, name="pt_lead")
+axis_pt_high_copy = hist.axis.Regular(10, 25, 80, name="pt_sublead")
+axis_pt_low = hist.axis.Regular(12, 15, 80, name="pt_sublead")
+axis_pt_low_copy = hist.axis.Regular(12, 15, 80, name="pt_lead")
 
 axis_mll = hist.axis.Variable(
     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="mll"
 )
-axis_mll_2 = hist.axis.Variable(
+axis_mll_copy = hist.axis.Variable(
     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="gen_mll"
 )
 
@@ -419,21 +416,38 @@ def build_graph(df, dataset):
         "Muon_isGoodGlobal",
         "Muon_isGlobal && Muon_highPurity",
     )
-    df = df.Define(
-        "veto_muon",
-        "vetoMuonsPre && Muon_isGoodGlobal && Muon_pt>=25 && abs(Muon_eta) < 2.4",
-    )
+
     df = df.Define(
         "goodTrigObjs",
         f"wrem::goodMuonTriggerCandidate<wrem::Era::Era_2016PostVFP>(TrigObj_id,TrigObj_filterBits)",
     )
-    df = df.Define("sum_veto_muons", "Sum(veto_muon)")
+
+    df = df.Define(
+        "veto_muon",
+        "vetoMuonsPre && Muon_isGoodGlobal && Muon_pt>=25 && abs(Muon_eta) < 2.4",
+    )
 
     df = df.Define(
         "pt_loose_muon",
         f"vetoMuonsPre && Muon_isGoodGlobal && Muon_pt>=15 && abs(Muon_eta) < 2.4",
     )
-    df = df.Define("acc_muon", "veto_muon || pt_loose_muon")
+
+    df = df.Define("sum_veto_muons", "Sum(veto_muon)")
+    df = df.Define("sum_pt_loose_muons", "Sum(pt_loose_muon)")
+
+    df = mass_extraction(df, "", "Muon", "pt_loose_muon")
+
+    df = df.Define("pt_leading", "mu_mom4.pt()")
+    df = df.Define("pt_subleading", "smu_mom4.pt()")
+    df = df.Define("eta_leading", "mu_mom4.eta()")
+    df = df.Define("eta_subleading", "smu_mom4.eta()")
+
+    ## may need to change this later, technically if our sample is biased then we won't get 50/50 from subleading and leading muons
+    df = df.Define("n2_hist_def", "rand() % 2")
+    df = df.Define("pt_first", "n2_hist_def == 1 ? pt_leading : pt_subleading")
+    df = df.Define("eta_first", "n2_hist_def == 1 ? eta_leading : eta_subleading")
+    df = df.Define("pt_second", "n2_hist_def == 1 ? pt_subleading : pt_leading")
+    df = df.Define("eta_second", "n2_hist_def ==1 ? eta_subleading : eta_leading")
 
     if not dataset.is_data:
         df = theory_tools.define_postfsr_vars(df)
@@ -442,82 +456,45 @@ def build_graph(df, dataset):
             f"postfsrMuons && abs(GenPart_eta) < 2.4 && GenPart_pt > 25",
         )
         df = df.Define("sum_gen_muons", "Sum(postfsrMuons_inAcc)")
-        df = df.Define("sum_pt_loose_muons", "Sum(pt_loose_muon)")
-
         df = mass_extraction(df, "gen_", "GenPart", "postfsrMuons_inAcc")
 
         ### these are all for the case that there are two veto muons
-        ### this is for the case that there are two ve
-        ### ones that JUST pass the generator
-        df = mass_extraction(df, "", "Muon", "acc_muon")
-
-        df = df.Define("pt_leading", "mu_mom4.pt()")
-        df = df.Define("pt_subleading", "smu_mom4.pt()")
-        df = df.Define("eta_leading", "mu_mom4.eta()")
-        df = df.Define("eta_subleading", "smu_mom4.eta()")
-
-        df = df.Define("n2_hist_def", "rand() % 2")
-        df = df.Define("pt_first", "n2_hist_def == 1 ? pt_leading : pt_subleading")
-        df = df.Define("eta_first", "n2_hist_def == 1 ? eta_leading : eta_subleading")
-        df = df.Define("pt_second", "n2_hist_def == 1 ? pt_subleading : pt_leading")
-        df = df.Define("eta_second", "n2_hist_def ==1 ? eta_subleading : eta_leading")
 
         df_1 = df.Filter("gen_pass")
         df_2 = df.Filter("!gen_pass")
         # pass generator
-        df_21 = df_1.Filter("sum_veto_muons == 2")
+        df_pg = df_1.Filter("sum_veto_muons == 2")
 
         ### fail generator
-        df_22 = df_2.Filter("sum_veto_muons == 2")
-        df_pt_loose_21 = df_1.Filter(
+        df_fg = df_2.Filter("sum_veto_muons == 2")
+
+        df_pt_loose_pg = df_1.Filter(
             "(sum_veto_muons == 1 && sum_pt_loose_muons == 2) || (sum_veto_muons == 2)"
         )
-        df_pt_loose_22 = df_2.Filter(
+        df_pt_loose_fg = df_2.Filter(
             "(sum_veto_muons == 1 && sum_pt_loose_muons == 2) || (sum_veto_muons == 2)"
         )
 
-        dtight_dtrig_df_22, dtight_strig_df_22, stight_strig_df_22 = (
-            trigger_tightID_sep(df_22)
-        )
-
-        dtight_dtrig_df_21, dtight_strig_df_21, stight_strig_df_21 = (
-            trigger_tightID_sep(df_21)
-        )
+        ## double tight double trigger
+        df_dtdt_fg, _, _ = trigger_tightID_sep(df_fg)
+        df_dtdt_pg, _, _ = trigger_tightID_sep(df_pg)
 
         # # #### same extraction but using the more liberal dataset for muons
-        _, dtight_strig_df_21, stight_strig_df_21 = trigger_tightID_sep(df_pt_loose_21)
-        _, dtight_strig_df_22, stight_strig_df_22 = trigger_tightID_sep(df_pt_loose_22)
+        _, df_dtst_pg, df_stst_pg = trigger_tightID_sep(
+            df_pt_loose_pg
+        )  ## calculating single tight single trigger
+        _, df_dtst_fg, df_stst_fg = trigger_tightID_sep(df_pt_loose_fg)
 
         hist_pass_gen = df_1.HistoBoost(
             "pass_gen",
-            [axis_mll, axis_mll_2, axis_pt_1, axis_eta_1, axis_pt_1_copy, axis_eta_2],
             [
-                "mll",
-                "gen_mll",
-                "pt_first",
-                "eta_first",
-                "pt_second",
-                "eta_second",
-                "weight",
+                axis_mll,
+                axis_mll_copy,
+                axis_pt_high,
+                axis_eta,
+                axis_pt_high_copy,
+                axis_eta_copy,
             ],
-        )
-
-        hist_pass_reco_pass_gen = df_21.HistoBoost(
-            "pass_reco_pass_gen",
-            [axis_mll, axis_mll_2, axis_pt_1, axis_eta_1, axis_pt_1_copy, axis_eta_2],
-            [
-                "mll",
-                "gen_mll",
-                "pt_first",
-                "eta_first",
-                "pt_second",
-                "eta_second",
-                "weight",
-            ],
-        )
-        hist_pass_reco_fail_gen = df_22.HistoBoost(
-            "pass_reco_fail_gen",
-            [axis_mll, axis_mll_2, axis_pt_1, axis_eta_1, axis_pt_1_copy, axis_eta_2],
             [
                 "mll",
                 "gen_mll",
@@ -530,9 +507,16 @@ def build_graph(df, dataset):
         )
 
         ## was pt1copy
-        hist_mll_prfg = dtight_dtrig_df_22.HistoBoost(
-            "mll_dtdt_prfg",
-            [axis_mll, axis_mll_2, axis_pt_1, axis_eta_1, axis_pt_1_copy, axis_eta_2],
+        hist_prfg = df_dtdt_fg.HistoBoost(
+            "dtdt_prfg",
+            [
+                axis_mll,
+                axis_mll_copy,
+                axis_pt_high,
+                axis_eta,
+                axis_pt_high_copy,
+                axis_eta_copy,
+            ],
             [
                 "mll",
                 "gen_mll",
@@ -545,9 +529,16 @@ def build_graph(df, dataset):
         )
 
         ### this one needs to account for only one muon passing the momentum
-        hist_mll_dtight_strig_prfg = dtight_strig_df_22.HistoBoost(
-            "mll_dtst_prfg",
-            [axis_mll, axis_mll_2, axis_pt_1, axis_eta_1, axis_pt_2, axis_eta_2],
+        hist_dtst_prfg = df_dtst_fg.HistoBoost(
+            "dtst_prfg",
+            [
+                axis_mll,
+                axis_mll_copy,
+                axis_pt_high,
+                axis_eta,
+                axis_pt_low,
+                axis_eta_copy,
+            ],
             [
                 "mll",
                 "gen_mll",
@@ -559,9 +550,16 @@ def build_graph(df, dataset):
             ],  # double tight single trigger
         )
 
-        hist_mll_stight_strig_prfg = stight_strig_df_22.HistoBoost(
-            "mll_stst_prfg",
-            [axis_mll, axis_mll_2, axis_pt_1, axis_eta_1, axis_pt_2, axis_eta_2],
+        hist_stst_prfg = df_stst_fg.HistoBoost(
+            "stst_prfg",
+            [
+                axis_mll,
+                axis_mll_copy,
+                axis_pt_high,
+                axis_eta,
+                axis_pt_low,
+                axis_eta_copy,
+            ],
             [
                 "mll",
                 "gen_mll",
@@ -573,12 +571,17 @@ def build_graph(df, dataset):
             ],
         )
 
-        # hist_rand = dtight_dtrig_df_21("rand", [axis_binary], [""])
-
         ### was pt1 copy
-        hist_mll_prpg = dtight_dtrig_df_21.HistoBoost(
-            "mll_dtdt_prpg",
-            [axis_mll, axis_mll_2, axis_pt_1, axis_eta_1, axis_pt_1_copy, axis_eta_2],
+        hist_prpg = df_dtdt_pg.HistoBoost(
+            "dtdt_prpg",
+            [
+                axis_mll,
+                axis_mll_copy,
+                axis_pt_high,
+                axis_eta,
+                axis_pt_high_copy,
+                axis_eta_copy,
+            ],
             [
                 "mll",
                 "gen_mll",
@@ -591,9 +594,16 @@ def build_graph(df, dataset):
         )
 
         ### back to old
-        hist_mll_dtight_strig_prpg = dtight_strig_df_21.HistoBoost(
-            "mll_dtst_prpg",
-            [axis_mll, axis_mll_2, axis_pt_1, axis_eta_1, axis_pt_2, axis_eta_2],
+        hist_dtst_prpg = df_dtst_pg.HistoBoost(
+            "dtst_prpg",
+            [
+                axis_mll,
+                axis_mll_copy,
+                axis_pt_high,
+                axis_eta,
+                axis_pt_low,
+                axis_eta_copy,
+            ],
             [
                 "mll",
                 "gen_mll",
@@ -604,9 +614,16 @@ def build_graph(df, dataset):
                 "weight",
             ],  # double tight single trigger
         )
-        hist_mll_stight_strig_prpg = stight_strig_df_21.HistoBoost(
-            "mll_stst_prpg",
-            [axis_mll, axis_mll_2, axis_pt_1, axis_eta_1, axis_pt_2, axis_eta_2],
+        hist_stst_prpg = df_stst_pg.HistoBoost(
+            "stst_prpg",
+            [
+                axis_mll,
+                axis_mll_copy,
+                axis_pt_high,
+                axis_eta,
+                axis_pt_low,
+                axis_eta_copy,
+            ],
             [
                 "mll",
                 "gen_mll",
@@ -617,87 +634,54 @@ def build_graph(df, dataset):
                 "weight",
             ],
         )
+        if redo_cdf:
+            fine_bin_axis = hist.axis.Regular(400, 15, 120, name="mll_fine_bin")
+            fine_bin_mll = df_dtdt_pg.HistoBoost(
+                "fine_bin_axis_gen", [fine_bin_axis], ["mll", "weight"]
+            )
+            results.append(fine_bin_mll)
 
-        # fine_bin_axis = hist.axis.Regular(400, 15, 120, name="mll_fine_bin")
-        # fine_bin_mll = dtight_dtrig_df_21.HistoBoost(
-        #     "fine_bin_axis_gen", [fine_bin_axis], ["mll", "weight"]
-        # )
-
-        results.append(hist_pass_reco_pass_gen)
-        results.append(hist_pass_reco_fail_gen)
         results.append(hist_pass_gen)
-        results.append(hist_mll_prpg)
-        results.append(hist_mll_dtight_strig_prpg)
-        results.append(hist_mll_stight_strig_prpg)
-        results.append(hist_mll_prfg)
-        results.append(hist_mll_dtight_strig_prfg)
-        results.append(hist_mll_stight_strig_prfg)
-        # results.append(fine_bin_mll)
+        results.append(hist_prpg)
+        results.append(hist_dtst_prpg)
+        results.append(hist_stst_prpg)
+        results.append(hist_prfg)
+        results.append(hist_dtst_prfg)
+        results.append(hist_stst_prfg)
 
-        make_prefire_hists(dtight_dtrig_df_21, results, "dtdt_prpg", axes=1)
-        make_prefire_hists(dtight_strig_df_21, results, "dtst_prpg")
-        make_prefire_hists(stight_strig_df_21, results, "stst_prpg")
+        make_prefire_hists(df_dtdt_pg, results, "dtdt_prpg", axes=1)
+        make_prefire_hists(df_dtst_pg, results, "dtst_prpg")
+        make_prefire_hists(df_stst_pg, results, "stst_prpg")
 
     else:  ### this is for real data
 
-        # df = df.Define("sum_gen_muons", "Sum(postfsrMuons_inAcc)")
-        df = df.Define("sum_pt_loose_muons", "Sum(pt_loose_muon)")
-
-        df = mass_extraction(df, "", "Muon", "acc_muon")
-
-        df = df.Define("pt_leading", "mu_mom4.pt()")
-        df = df.Define("pt_subleading", "smu_mom4.pt()")
-        df = df.Define("eta_leading", "mu_mom4.eta()")
-        df = df.Define("eta_subleading", "smu_mom4.eta()")
-
         df_veto = df.Filter("sum_veto_muons == 2")
 
-        df_veto = df_veto.Define("n2_hist_def", "rand() % 2")
-        df_veto = df_veto.Define(
-            "pt_first", "n2_hist_def == 1 ? pt_leading : pt_subleading"
-        )
-        df_veto = df_veto.Define(
-            "eta_first", "n2_hist_def == 1 ? eta_leading : eta_subleading"
-        )
-        df_veto = df_veto.Define(
-            "pt_second", "n2_hist_def == 1 ? pt_subleading : pt_leading"
-        )
-        df_veto = df_veto.Define(
-            "eta_second", "n2_hist_def ==1 ? eta_subleading : eta_leading"
-        )
-
-        dtight_dtrig, _, _ = trigger_tightID_sep(df_veto)
+        dtdt, _, _ = trigger_tightID_sep(df_veto)
 
         df_pt_loose = df.Filter(
             "(sum_veto_muons == 1 && sum_pt_loose_muons == 2) || (sum_veto_muons == 2)"
         )
 
-        _, dtight_strig, stight_strig = trigger_tightID_sep(df_pt_loose)
-
-        # fine_bin_axis = hist.axis.Regular(400, 15, 120, name="mll_fine_bin")
-        # fine_bin_mll = df.HistoBoost(
-        #     "fine_bin_axis_gen", [fine_bin_axis], ["mll", "weight"]
-        # )
+        _, dtst, stst = trigger_tightID_sep(df_pt_loose)
 
         hist_time_proj = df.HistoBoost(
             "time_proj",
             [
                 axis_date,
                 axis_mll,
-                axis_mll_2,
-                axis_pt_1,
-                axis_eta_1,
-                axis_pt_1_copy,
-                axis_eta_2,
+                axis_pt_high,
+                axis_eta,
+                axis_pt_high_copy,
+                axis_eta_copy,
             ],
             [
                 "time",
                 "mll",
-                "mll",
-                "pt_first",
-                "eta_first",
-                "pt_second",
-                "eta_second",
+                "pt_leading",
+                "eta_leading",
+                "pt_subleading",
+                "eta_subleading",
             ],
         )
 
@@ -706,15 +690,50 @@ def build_graph(df, dataset):
             [
                 axis_date,
                 axis_mll,
-                axis_mll_2,
-                axis_pt_1,
-                axis_eta_1,
-                axis_pt_2,
-                axis_eta_2,
+                axis_pt_high,
+                axis_eta,
+                axis_pt_low,
+                axis_eta_copy,
             ],
             [
                 "time",
                 "mll",
+                "pt_leading",
+                "eta_leading",
+                "pt_subleading",
+                "eta_subleading",
+            ],
+        )
+
+        hist_time_mll = dtdt.HistoBoost(
+            "time_mll",
+            [
+                axis_date,
+                axis_mll,
+                axis_pt_high,
+                axis_eta,
+                axis_pt_high_copy,
+                axis_eta_copy,
+            ],
+            ["time", "mll", "pt_first", "eta_first", "pt_second", "eta_second"],
+        )
+        hist_time_dtst = dtst.HistoBoost(
+            "time_dtst",
+            [axis_date, axis_mll, axis_pt_high, axis_eta, axis_pt_low, axis_eta_copy],
+            [
+                "time",
+                "mll",
+                "pt_leading",
+                "eta_leading",
+                "pt_subleading",
+                "eta_subleading",
+            ],
+        )
+        hist_time_stst = stst.HistoBoost(
+            "time_stst",
+            [axis_date, axis_mll, axis_pt_high, axis_eta, axis_pt_low, axis_eta_copy],
+            [
+                "time",
                 "mll",
                 "pt_leading",
                 "eta_leading",
@@ -723,44 +742,19 @@ def build_graph(df, dataset):
             ],
         )
 
-        hist_time_mll = dtight_dtrig.HistoBoost(
-            "time_mll",
-            [axis_date, axis_mll, axis_pt_1, axis_eta_1, axis_pt_1_copy, axis_eta_2],
-            ["time", "mll", "pt_first", "eta_first", "pt_second", "eta_second"],
-        )
-        hist_time_mll_dtight_strig = dtight_strig.HistoBoost(
-            "time_mll_dtst",
-            [axis_date, axis_mll, axis_pt_1, axis_eta_1, axis_pt_2, axis_eta_2],
-            [
-                "time",
-                "mll",
-                "pt_leading",
-                "eta_leading",
-                "pt_subleading",
-                "eta_subleading",
-            ],
-        )
-        hist_time_mll_stight_strig = stight_strig.HistoBoost(
-            "time_mll_stst",
-            [axis_date, axis_mll, axis_pt_1, axis_eta_1, axis_pt_2, axis_eta_2],
-            [
-                "time",
-                "mll",
-                "pt_leading",
-                "eta_leading",
-                "pt_subleading",
-                "eta_subleading",
-            ],
-        )
+        if redo_cdf:
+            fine_bin_axis = hist.axis.Regular(400, 15, 120, name="mll_fine_bin")
+            fine_bin_mll = df.HistoBoost(
+                "fine_bin_axis_gen", [fine_bin_axis], ["mll", "weight"]
+            )
+            results.append(fine_bin_mll)
 
         results.append(hist_time_proj)
         results.append(hist_time_proj_2)
-
         results.append(hist_time)
         results.append(hist_time_mll)
-        results.append(hist_time_mll_dtight_strig)
-        results.append(hist_time_mll_stight_strig)
-        # results.append(fine_bin_mll)
+        results.append(hist_time_dtst)
+        results.append(hist_time_stst)
     return results, weightsum
 
 

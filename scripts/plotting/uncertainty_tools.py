@@ -104,20 +104,17 @@ def make_ones_hist(hist_ref):
 
 
 def get_mc_lumis(
-    dtdt_h,
-    dtst_h,
-    stst_h,
-    dtdt_bg,
-    dtst_bg,
-    stst_bg,
-    time_proj_hlt,
-    time_proj_low,
+    input_data,
+    time_hists,
     scaling,
-    lumi_h,
-    lumi_bg,
+    lumi_hists,
     weightsum,
     cross_sec,
 ):
+
+    dtdt_h, dtst_h, stst_h, dtdt_bg, dtst_bg, stst_bg = input_data
+    time_proj_hlt, time_proj_low = time_hists
+    lumi_h, lumi_bg = lumi_hists
     sum_lumis = addHists(lumi_bg, lumi_h)
     lumi_scaling_h = divideHists(lumi_h, sum_lumis)
     lumi_scaling_bg = divideHists(lumi_bg, sum_lumis)
@@ -153,33 +150,20 @@ def get_mc_lumis(
 ### i need to get good at coding so i dont need to pass in all these variables
 def eta_phi_systematic(
     writer,
-    dtdt_H,
-    dtst_H,
-    stst_H,
-    dtdt_BG,
-    dtst_BG,
-    stst_BG,
-    time_proj_hlt,
-    time_proj_low,
+    input_data,
+    time_hists,
     lumi_scaling,
-    lumi_scaling_h,
-    lumi_scaling_bg,
+    lumi_hists,
     weightsum,
     cross_sec,
     etaphi_num,
 ):
+
     dtdt_stat, dtst_stat, stst_stat = get_mc_lumis(
-        dtdt_H[{"downUpVar": 0}],
-        dtst_H[{"downUpVar": 0}],
-        stst_H[{"downUpVar": 0}],
-        dtdt_BG[{"downUpVar": 0}],
-        dtst_BG[{"downUpVar": 0}],
-        stst_BG[{"downUpVar": 0}],
-        time_proj_hlt,
-        time_proj_low,
+        input_data,
+        time_hists,
         lumi_scaling,
-        lumi_scaling_h,
-        lumi_scaling_bg,
+        lumi_hists,
         weightsum,
         cross_sec,
     )

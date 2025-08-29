@@ -3,6 +3,7 @@ import argparse
 import h5py
 from uncertainty_tools import (
     all_mc_corrections,
+    background_syst,
     eta_phi_systematic,
     get_era_vals,
     get_mc_lumis,
@@ -48,8 +49,16 @@ time_proj_hlt_all = data_output["time_proj"].get()
 time_proj_hlt_all = expand_hist_by_duplicate_axis(time_proj_hlt_all, "mll", "gen_mll")
 time_proj_low_all = expand_hist_by_duplicate_axis(time_proj_low_all, "mll", "gen_mll")
 
+time_proj_low_all = time_proj_low_all.project(
+    "time", "mll", "gen_mll", "pt_lead", "eta_lead", "pt_sublead", "eta_sublead"
+)
+time_proj_hlt_all = time_proj_hlt_all.project(
+    "time", "mll", "gen_mll", "pt_lead", "eta_lead", "pt_sublead", "eta_sublead"
+)
+
 time_proj_low = time_proj_low_all[{"mll": mass_bin, "gen_mll": mass_bin}]
 time_proj_hlt = time_proj_hlt_all[{"mll": mass_bin, "gen_mll": mass_bin}]
+
 
 ### pass reco, pass generator
 
@@ -296,10 +305,10 @@ h0_second_var = expand_hist_by_duplicate_axes(
 
 pass_gen_expanded = expand_hist_by_duplicate_axes(pass_gen, ["time"], ["gen_time"])
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
-for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
+for i in range(nbins_pt_leading):  # just select two mass bins in the center
     for j in range(nbins_eta_leading):  # eta
         for k in range(nbins_time):  #  time
-            var_size = 0.01
+            var_size = 0.1
 
             ## redo the naming convention
             v21 = dtdt_prpg[{"gen_time": k, "pt_sublead": i, "eta_sublead": j}]
@@ -307,6 +316,7 @@ for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
             v22 = h2_first_var_lead[{"gen_time": k, "pt_prime": i, "eta_prime": j}]
             # below same as
             var2 = addHists(v22 * var_size, var2)
+
             writer.add_systematic(
                 var2,
                 f"n_pt{i}_eta_{j}_time{k}",
@@ -315,7 +325,6 @@ for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
                 constrained=False,
                 groups=["nz"],
             )
-
             writer.add_systematic(
                 var2,
                 f"hlt_prime_pt{i}_eta_{j}_time{k}",
@@ -348,9 +357,8 @@ for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
                 constrained=False,
                 groups=["nz"],
             )
-            if (
-                i > 1
-            ):  ### need to check pt bins, if i choose a pt bin above 1, this doesn't matter. it poses a problem
+            if i > 1:
+                ## need to check pt bins, if i choose a pt bin above 1, this doesn't matter. it poses a problem
                 writer.add_systematic(
                     var1_hlt * 2,
                     f"hlt_prime_pt{i}_eta_{j}_time{k}",
@@ -360,21 +368,40 @@ for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
                     groups=["eff_2"],
                 )
 
-            writer.add_systematic(
-                var1_id * 2,
-                f"id_prime_pt{i}_eta_{j}_time{k}",
-                "Zmumu pass gen",
-                "ch_dtst",
-                constrained=False,
-                groups=["eff_1"],
-            )
+                writer.add_systematic(
+                    var1_id * 2,
+                    f"id_prime_pt{i}_eta_{j}_time{k}",
+                    "Zmumu pass gen",
+                    "ch_dtst",
+                    constrained=False,
+                    groups=["eff_1"],
+                )
+
+            else:
+                writer.add_systematic(
+                    var1,
+                    f"hlt_prime_pt{i}_eta_{j}_time{k}",
+                    "Zmumu pass gen",
+                    "ch_dtst",
+                    constrained=False,
+                    groups=["eff_2"],
+                )
+
+                writer.add_systematic(
+                    var1_id,
+                    f"id_prime_pt{i}_eta_{j}_time{k}",
+                    "Zmumu pass gen",
+                    "ch_dtst",
+                    constrained=False,
+                    groups=["eff_1"],
+                )
 
             v01 = stst_prpg[{"gen_time": k, "pt_lead": i, "eta_lead": j}]
             var0_hlt = addHists(v01 * var_size, h0_second)
             v02 = h0_second_var[{"gen_time": k, "pt_prime": i, "eta_prime": j}]
             var0_id = addHists(v02 * (-var_size), var0_hlt.copy())
             var0 = addHists(v02 * var_size, var0_hlt)
-            # pdb.set_trace()
+
             writer.add_systematic(
                 var0,
                 f"n_pt{i}_eta_{j}_time{k}",
@@ -383,25 +410,42 @@ for i in range(0, nbins_pt_leading):  # just select two mass bins in the center
                 constrained=False,
                 groups=["nz"],
             )
+            if i > 1:
+                writer.add_systematic(
+                    var0_hlt * 2,
+                    f"hlt_prime_pt{i}_eta_{j}_time{k}",
+                    "Zmumu pass gen",
+                    "ch_stst",
+                    constrained=False,
+                    groups=["eff_2"],
+                )
 
-            writer.add_systematic(
-                var0_hlt * 2,
-                f"hlt_prime_pt{i}_eta_{j}_time{k}",
-                "Zmumu pass gen",
-                "ch_stst",
-                constrained=False,
-                groups=["eff_2"],
-            )
+                writer.add_systematic(
+                    var0_id * 2,
+                    f"id_prime_pt{i}_eta_{j}_time{k}",
+                    "Zmumu pass gen",
+                    "ch_stst",
+                    constrained=False,
+                    groups=["eff_1"],
+                )
+            else:
+                writer.add_systematic(
+                    var0_hlt,
+                    f"hlt_prime_pt{i}_eta_{j}_time{k}",
+                    "Zmumu pass gen",
+                    "ch_stst",
+                    constrained=False,
+                    groups=["eff_2"],
+                )
 
-            writer.add_systematic(
-                var0_id * 2,
-                f"id_prime_pt{i}_eta_{j}_time{k}",
-                "Zmumu pass gen",
-                "ch_stst",
-                constrained=False,
-                groups=["eff_1"],
-            )
-
+                writer.add_systematic(
+                    var0_id,
+                    f"id_prime_pt{i}_eta_{j}_time{k}",
+                    "Zmumu pass gen",
+                    "ch_stst",
+                    constrained=False,
+                    groups=["eff_1"],
+                )
             # # for masked channel --- may need to change bc this has a different number of dimensions
 
             v_masked = pass_gen_expanded[
@@ -479,58 +523,82 @@ writer.add_systematic(
     groups=["prefiring_syst"],
 )
 
-# background_syst_names = [
-#     "ZmumuPostVFP",
-#     "Top",
-#     "Diboson",
-#     "GGToLLPostVFP",
-#     "QCDmuEnrichPt15PostVFP",
-#     "WplusmunuPostVFP",
-#     "QGToDYQTo2LPostVFP",
-#     "QGToWQToLNuPostVFP",
-# ]
-# background_proc = [
-#     "Zmumu fail gen",
-#     "Top",
-#     "Diboson",
-#     "GG",
-#     "QCD",
-#     "W",
-#     "QG_2L",
-#     "QG_Lnu",
-# ]
-# for i in range(len(background_syst_names)):
-#     proc_name = background_proc[i]
-#     if proc_name == "Zmumu fail gen":
-#         fgen = True
-#     else:
-#         fgen = False
-#     background_syst(
-#         writer,
-#         results,
-#         background_syst_names[i],
-#         time_proj_hlt_all,
-#         time_proj_low_all,
-#         lumi_scaling,
-#         proc_name,
-#         f"bkg_{proc_name}",
-#         fail_gen=fgen,
-#     )
+background_syst_names = [
+    "ZmumuPostVFP",
+    "Top",
+    "Diboson",
+    "GGToLLPostVFP",
+    "QCDmuEnrichPt15PostVFP",
+    "WplusmunuPostVFP",
+    "QGToDYQTo2LPostVFP",
+    "QGToWQToLNuPostVFP",
+]
+background_proc = [
+    "Zmumu fail gen",
+    "Top",
+    "Diboson",
+    "GG",
+    "QCD",
+    "W",
+    "QG_2L",
+    "QG_Lnu",
+]
 
+background_syst_names = [
+    "ZmumuPostVFP",
+    "Top",
+    "Diboson",
+    "GGToLLPostVFP",
+    # "QCDmuEnrichPt15PostVFP",
+    # "WplusmunuPostVFP",
+    # "QGToDYQTo2LPostVFP",
+    # "QGToWQToLNuPostVFP",
+]
+background_proc = [
+    "Zmumu fail gen",
+    "Top",
+    "Diboson",
+    "GG",
+    # "QCD",
+    # "W",
+    # "QG_2L",
+    # "QG_Lnu",
+]
+
+
+for i in range(len(background_syst_names)):
+    proc_name = background_proc[i]
+    if proc_name == "Zmumu fail gen":
+        fgen = True
+    else:
+        fgen = False
+    print("proc_name: %s" % proc_name)
+    background_syst(
+        writer,
+        results,
+        background_syst_names[i],
+        time_proj_hlt_all,
+        time_proj_low_all,
+        lumi_scaling,
+        proc_name,
+        f"bkg_{proc_name}",
+        fail_gen=fgen,
+    )
+# # pdb.set_trace()
 
 ### PCC cross detector
-luminometer_syst(
-    writer, "pcc", dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc, "stability"
-)
-## HFOC cross detector
-luminometer_syst(
-    writer, "hfoc", dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc, "stability"
-)
+# luminometer_syst(
+#     writer, "pcc", dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc, "stability"
+# )
+# ## HFOC cross detector
+# luminometer_syst(
+#     writer, "hfoc", dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc, "stability"
+# )
 
-#### RAMSES cross detector
-luminometer_syst(
-    writer, "ramses", dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses, "stability"
-)
+# #### RAMSES cross detector
+# luminometer_syst(
+#     writer, "ramses", dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses, "stability"
+# )
 
 
 #### HFOC linearity

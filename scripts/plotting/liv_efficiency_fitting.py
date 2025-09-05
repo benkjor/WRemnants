@@ -1,6 +1,8 @@
 import argparse
+import pickle
 
 import h5py
+import numpy as np
 from uncertainty_tools import (
     all_mc_corrections,
     background_syst,
@@ -114,7 +116,9 @@ cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 
 nbins_mll = len(dtdt_prfg.axes["mll"])
 nbins_time = len(reco_dtst_data.axes["time"])
+nbins_pt_subleading = len(reco_dtst_data.axes["pt_sublead"])
 nbins_pt_leading = len(reco_dtst_data.axes["pt_lead"])
+
 nbins_eta_leading = len(reco_dtdt_data.axes["eta_lead"])
 
 
@@ -133,7 +137,6 @@ stst_prpg_H = stst_prpg_H[{"mll": mass_bin, "gen_mll": mass_bin}]
 dtdt_prpg_BG = dtdt_prpg_BG[{"mll": mass_bin, "gen_mll": mass_bin}]
 dtst_prpg_BG = dtst_prpg_BG[{"mll": mass_bin, "gen_mll": mass_bin}]
 stst_prpg_BG = stst_prpg_BG[{"mll": mass_bin, "gen_mll": mass_bin}]
-
 
 prpg_all = [
     dtdt_prpg_H,
@@ -154,8 +157,8 @@ prpg_syst = [
 
 
 time_hists = [time_proj_hlt, time_proj_low]
-lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
+lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
 dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
     prpg_all,
@@ -237,7 +240,7 @@ dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
 
 pass_gen = all_mc_corrections(
     pass_gen[{"mll": mass_bin, "gen_mll": mass_bin}],
-    time_proj_hlt,
+    time_proj_low,
     lumi_scaling,
     weightsum,
     cross_sec,
@@ -283,6 +286,7 @@ writer.add_channel(reco_stst_data.axes, "ch_stst")
 writer.add_data(reco_stst_data, "ch_stst")
 writer.add_process(h0_second, "Zmumu pass gen", "ch_stst", signal=False)
 
+
 ### adding axes as appropriate to make everything 4 dimensional
 dtdt_prpg = expand_hist_by_duplicate_axis(dtdt_prpg, "time", "gen_time")
 dtst_prpg = expand_hist_by_duplicate_axis(dtst_prpg, "time", "gen_time")
@@ -302,165 +306,262 @@ h0_second_var = expand_hist_by_duplicate_axes(
     ["gen_time", "pt_prime", "eta_prime"],
 )
 
-
 pass_gen_expanded = expand_hist_by_duplicate_axes(pass_gen, ["time"], ["gen_time"])
+
+
+N_eff = True
+ID_eff = True
+Trig_eff = True
+
+if N_eff:
+    dtdt_n = np.zeros([nbins_pt_subleading, nbins_eta_leading, nbins_time])
+    dtst_n = np.zeros([nbins_pt_subleading, nbins_eta_leading, nbins_time])
+    stst_n = np.zeros([nbins_pt_subleading, nbins_eta_leading, nbins_time])
+
+if ID_eff:
+    dtdt_id = np.zeros([nbins_pt_subleading, nbins_eta_leading, nbins_time])
+    dtst_id = np.zeros([nbins_pt_subleading, nbins_eta_leading, nbins_time])
+    stst_id = np.zeros([nbins_pt_subleading, nbins_eta_leading, nbins_time])
+
+if Trig_eff:
+    dtdt_trig = np.zeros([nbins_pt_subleading, nbins_eta_leading, nbins_time])
+    dtst_trig = np.zeros([nbins_pt_subleading, nbins_eta_leading, nbins_time])
+    stst_trig = np.zeros([nbins_pt_subleading, nbins_eta_leading, nbins_time])
+
+
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
-for i in range(nbins_pt_leading):  # just select two mass bins in the center
+for i in range(nbins_pt_subleading):  # just select two pt bins in the center
     for j in range(nbins_eta_leading):  # eta
         for k in range(nbins_time):  #  time
             var_size = 0.1
 
-            ## redo the naming convention
-            v21 = dtdt_prpg[{"gen_time": k, "pt_sublead": i, "eta_sublead": j}]
-            var2 = addHists(v21 * var_size, h2_first)
-            v22 = h2_first_var_lead[{"gen_time": k, "pt_prime": i, "eta_prime": j}]
-            # below same as
-            var2 = addHists(v22 * var_size, var2)
+            if i > 1:  ## redo the naming convention
+                eps_1 = dtdt_prpg[
+                    {"gen_time": k, "pt_sublead": i - 2, "eta_sublead": j}
+                ]
+                eps_2 = h2_first_var_lead[
+                    {"gen_time": k, "pt_prime": i - 2, "eta_prime": j}
+                ]
+                pass1_pass2 = addHists(
+                    h2_first, addHists(eps_2 * var_size, eps_1 * var_size)
+                )
 
-            writer.add_systematic(
-                var2,
-                f"n_pt{i}_eta_{j}_time{k}",
-                "Zmumu pass gen",
-                "ch_dtdt",
-                constrained=False,
-                groups=["nz"],
-            )
-            writer.add_systematic(
-                var2,
-                f"hlt_prime_pt{i}_eta_{j}_time{k}",
-                "Zmumu pass gen",
-                "ch_dtdt",
-                constrained=False,
-                groups=["eff_2"],
-            )
+                proj_2 = h2_first.project("pt_lead", "eta_lead")
+                ### to allow eps to vary, i think this stays for all
+                if N_eff:
+                    writer.add_systematic(
+                        pass1_pass2,
+                        f"n_pt{i}_eta{j}_time{k}",
+                        "Zmumu pass gen",
+                        "ch_dtdt",
+                        constrained=False,
+                        groups=["nz"],
+                    )
+                    dtdt_n[i, j, k] = (
+                        divideHists(
+                            pass1_pass2.project("time"), h2_first.project("time")
+                        ).values()
+                    )[k]
+                if Trig_eff:
+                    writer.add_systematic(
+                        pass1_pass2,
+                        f"hlt_pt{i}_eta{j}_time{k}",
+                        "Zmumu pass gen",
+                        "ch_dtdt",
+                        constrained=False,
+                        groups=["eff_2"],
+                    )
+                    dtdt_trig[i, j, k] = (
+                        divideHists(
+                            pass1_pass2.project("time"), h2_first.project("time")
+                        ).values()
+                    )[k]
+                if ID_eff:
+                    writer.add_systematic(
+                        pass1_pass2,
+                        f"id_pt{i}_eta{j}_time{k}",
+                        "Zmumu pass gen",
+                        "ch_dtdt",
+                        constrained=False,
+                        groups=["eff_1"],
+                    )
+                    dtdt_id[i, j, k] = (
+                        divideHists(
+                            pass1_pass2.project("time"), h2_first.project("time")
+                        ).values()
+                    )[k]
 
-            writer.add_systematic(
-                var2,
-                f"id_prime_pt{i}_eta_{j}_time{k}",
-                "Zmumu pass gen",
-                "ch_dtdt",
-                constrained=False,
-                groups=["eff_1"],
-            )
+            #### for double tight single trigger
+            eps_2 = h1_second_var[{"gen_time": k, "pt_prime": i, "eta_prime": j}]
+            proj_1 = h1_second.project("pt_sublead", "eta_sublead")
 
-            v11 = dtst_prpg[{"gen_time": k, "pt_lead": i, "eta_lead": j}]
-            var1 = addHists(v11 * var_size, h1_second)
-            v12 = h1_second_var[{"gen_time": k, "pt_prime": i, "eta_prime": j}]
-            var1_hlt = addHists(v12 * (-var_size), var1.copy())
-            var1_id = addHists(v12 * var_size, var1)
-
-            writer.add_systematic(
-                var1_id,
-                f"n_pt{i}_eta_{j}_time{k}",
-                "Zmumu pass gen",
-                "ch_dtst",
-                constrained=False,
-                groups=["nz"],
-            )
             if i > 1:
-                ## need to check pt bins, if i choose a pt bin above 1, this doesn't matter. it poses a problem
-                writer.add_systematic(
-                    var1_hlt * 2,
-                    f"hlt_prime_pt{i}_eta_{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_dtst",
-                    constrained=False,
-                    groups=["eff_2"],
-                )
 
-                writer.add_systematic(
-                    var1_id * 2,
-                    f"id_prime_pt{i}_eta_{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_dtst",
-                    constrained=False,
-                    groups=["eff_1"],
-                )
+                eps_1 = dtst_prpg[{"gen_time": k, "pt_lead": i - 2, "eta_lead": j}]
 
-            else:
-                writer.add_systematic(
-                    var1,
-                    f"hlt_prime_pt{i}_eta_{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_dtst",
-                    constrained=False,
-                    groups=["eff_2"],
-                )
+                pass1_fail2 = addHists(eps_2.copy() * (-var_size), eps_1 * var_size)
+                pass1_pass2 = addHists(eps_2.copy() * var_size, eps_1 * var_size)
+                pass1_pass2_id = addHists(2 * pass1_pass2, h1_second)
 
-                writer.add_systematic(
-                    var1_id,
-                    f"id_prime_pt{i}_eta_{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_dtst",
-                    constrained=False,
-                    groups=["eff_1"],
-                )
+                pass1_pass2 = addHists(pass1_pass2, h1_second)
+                pass1_fail2 = addHists(2 * pass1_fail2, h1_second)
 
-            v01 = stst_prpg[{"gen_time": k, "pt_lead": i, "eta_lead": j}]
-            var0_hlt = addHists(v01 * var_size, h0_second)
-            v02 = h0_second_var[{"gen_time": k, "pt_prime": i, "eta_prime": j}]
-            var0_id = addHists(v02 * (-var_size), var0_hlt.copy())
-            var0 = addHists(v02 * var_size, var0_hlt)
+                if N_eff:
+                    writer.add_systematic(
+                        pass1_pass2,
+                        f"n_pt{i}_eta{j}_time{k}",
+                        "Zmumu pass gen",
+                        "ch_dtst",
+                        constrained=False,
+                        groups=["nz"],
+                    )
+                    dtst_n[i, j, k] = (
+                        divideHists(
+                            pass1_pass2.project("time"), h1_second.project("time")
+                        ).values()
+                    )[k]
 
-            writer.add_systematic(
-                var0,
-                f"n_pt{i}_eta_{j}_time{k}",
-                "Zmumu pass gen",
-                "ch_stst",
-                constrained=False,
-                groups=["nz"],
-            )
+                if Trig_eff:
+                    writer.add_systematic(
+                        pass1_fail2,
+                        f"hlt_pt{i}_eta{j}_time{k}",
+                        "Zmumu pass gen",
+                        "ch_dtst",
+                        constrained=False,
+                        groups=["eff_2"],
+                    )
+                    dtst_trig[i, j, k] = (
+                        divideHists(
+                            pass1_fail2.project("time"), h1_second.project("time")
+                        ).values()
+                    )[k]
+
+            if ID_eff:
+                if i > 1:
+                    writer.add_systematic(
+                        pass1_pass2_id,
+                        f"id_pt{i}_eta{j}_time{k}",
+                        "Zmumu pass gen",
+                        "ch_dtst",
+                        constrained=False,
+                        groups=["eff_1"],
+                    )
+                    dtst_id[i, j, k] = (
+                        divideHists(
+                            pass1_pass2_id.project("time"), h1_second.project("time")
+                        ).values()
+                    )[k]
+
+                else:
+                    pass2 = addHists(eps_2 * var_size, h1_second)
+                    writer.add_systematic(
+                        pass2,
+                        f"id_pt{i}_eta{j}_time{k}",
+                        "Zmumu pass gen",
+                        "ch_dtst",
+                        constrained=False,
+                        groups=["eff_1"],
+                    )
+                    dtst_id[i, j, k] = (
+                        divideHists(
+                            pass2.project("time"), h1_second.project("time")
+                        ).values()
+                    )[k]
+
+            #### for single tight single trigger
+
+            eps_2 = h0_second_var[{"gen_time": k, "pt_prime": i, "eta_prime": j}]
+            proj_0 = h0_second.project("pt_sublead", "eta_sublead")
+
             if i > 1:
-                writer.add_systematic(
-                    var0_hlt * 2,
-                    f"hlt_prime_pt{i}_eta_{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_stst",
-                    constrained=False,
-                    groups=["eff_2"],
-                )
+                eps_1 = stst_prpg[{"gen_time": k, "pt_lead": i - 2, "eta_lead": j}]
 
-                writer.add_systematic(
-                    var0_id * 2,
-                    f"id_prime_pt{i}_eta_{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_stst",
-                    constrained=False,
-                    groups=["eff_1"],
-                )
-            else:
-                writer.add_systematic(
-                    var0_hlt,
-                    f"hlt_prime_pt{i}_eta_{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_stst",
-                    constrained=False,
-                    groups=["eff_2"],
-                )
+                pass1 = addHists(eps_1 * var_size, h0_second.copy())
+                pass1_fail2 = addHists(eps_2.copy() * (-var_size), eps_1 * var_size)
+                pass1_pass2 = addHists(eps_2.copy() * var_size, eps_1 * var_size)
 
-                writer.add_systematic(
-                    var0_id,
-                    f"id_prime_pt{i}_eta_{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_stst",
-                    constrained=False,
-                    groups=["eff_1"],
-                )
-            # # for masked channel --- may need to change bc this has a different number of dimensions
+                pass1_pass2 = addHists(pass1_pass2, h0_second)
 
-            v_masked = pass_gen_expanded[
-                {"gen_time": k, "pt_sublead": i, "eta_sublead": j}
-            ]
-            var_masked = addHists(v_masked * var_size, n_masked)
-            cross_section_masked = divideHists(var_masked, lumi_scaling)
-            writer.add_systematic(
-                cross_section_masked,
-                f"n_pt{i}_eta_{j}_time{k}",
-                "Zmumu pass gen",
-                "ch_masked",
-                constrained=False,
-                groups=["nz"],
-            )
+                pass1_fail2 = addHists(2 * pass1_fail2, h0_second)
+                if N_eff:
+                    writer.add_systematic(
+                        pass1_pass2,
+                        f"n_pt{i}_eta{j}_time{k}",
+                        "Zmumu pass gen",
+                        "ch_stst",
+                        constrained=False,
+                        groups=["nz"],
+                    )
+
+                    stst_n[i, j, k] = (
+                        divideHists(
+                            pass1_pass2.project("time"), h0_second.project("time")
+                        ).values()
+                    )[k]
+                if Trig_eff:
+                    writer.add_systematic(
+                        pass1_fail2,
+                        f"hlt_pt{i}_eta{j}_time{k}",
+                        "Zmumu pass gen",
+                        "ch_stst",
+                        constrained=False,
+                        groups=["eff_2"],
+                    )
+                    stst_trig[i, j, k] = (
+                        divideHists(
+                            pass1_fail2.project("time"), h0_second.project("time")
+                        ).values()
+                    )[k]
+
+            if ID_eff:
+                if i > 1:
+
+                    writer.add_systematic(
+                        pass1_fail2,
+                        f"id_pt{i}_eta{j}_time{k}",
+                        "Zmumu pass gen",
+                        "ch_stst",
+                        constrained=False,
+                        groups=["eff_1"],
+                    )
+                    stst_id[i, j, k] = (
+                        divideHists(
+                            pass1_fail2.project("time"), h0_second.project("time")
+                        ).values()
+                    )[k]
+                else:
+                    fail2 = addHists(eps_2 * (-var_size), h0_second)
+
+                    writer.add_systematic(
+                        fail2,
+                        f"id_pt{i}_eta{j}_time{k}",
+                        "Zmumu pass gen",
+                        "ch_stst",
+                        constrained=False,
+                        groups=["eff_1"],
+                    )
+                    stst_id[i, j, k] = (
+                        divideHists(
+                            fail2.project("time"), h0_second.project("time")
+                        ).values()
+                    )[k]
+
+            # # # for masked channel --- may need to change bc this has a different number of dimensions
+
+            if i > 1:
+                v_masked = pass_gen_expanded[
+                    {"gen_time": k, "pt_sublead": i, "eta_sublead": j}
+                ]
+                var_masked = addHists(v_masked * var_size, n_masked)
+                cross_section_masked = divideHists(var_masked, lumi_scaling)
+                writer.add_systematic(
+                    cross_section_masked,
+                    f"n_pt{i}_eta{j}_time{k}",
+                    "Zmumu pass gen",
+                    "ch_masked",
+                    constrained=False,
+                    groups=["nz"],
+                )
 
 
 ###### NONE OF THIS IS MASS DEPENDENT
@@ -523,26 +624,26 @@ writer.add_systematic(
     groups=["prefiring_syst"],
 )
 
-background_syst_names = [
-    "ZmumuPostVFP",
-    "Top",
-    "Diboson",
-    "GGToLLPostVFP",
-    "QCDmuEnrichPt15PostVFP",
-    "WplusmunuPostVFP",
-    "QGToDYQTo2LPostVFP",
-    "QGToWQToLNuPostVFP",
-]
-background_proc = [
-    "Zmumu fail gen",
-    "Top",
-    "Diboson",
-    "GG",
-    "QCD",
-    "W",
-    "QG_2L",
-    "QG_Lnu",
-]
+# background_syst_names = [
+#     "ZmumuPostVFP",
+#     "Top",
+#     "Diboson",
+#     "GGToLLPostVFP",
+#     "QCDmuEnrichPt15PostVFP",
+#     "WplusmunuPostVFP",
+#     "QGToDYQTo2LPostVFP",
+#     "QGToWQToLNuPostVFP",
+# ]
+# background_proc = [
+#     "Zmumu fail gen",
+#     "Top",
+#     "Diboson",
+#     "GG",
+#     "QCD",
+#     "W",
+#     "QG_2L",
+#     "QG_Lnu",
+# ]
 
 background_syst_names = [
     "ZmumuPostVFP",
@@ -584,21 +685,20 @@ for i in range(len(background_syst_names)):
         f"bkg_{proc_name}",
         fail_gen=fgen,
     )
-# # pdb.set_trace()
 
-### PCC cross detector
-# luminometer_syst(
-#     writer, "pcc", dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc, "stability"
-# )
-# ## HFOC cross detector
-# luminometer_syst(
-#     writer, "hfoc", dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc, "stability"
-# )
+## PCC cross detector
+luminometer_syst(
+    writer, "pcc", dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc, "stability"
+)
+## HFOC cross detector
+luminometer_syst(
+    writer, "hfoc", dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc, "stability"
+)
 
-# #### RAMSES cross detector
-# luminometer_syst(
-#     writer, "ramses", dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses, "stability"
-# )
+#### RAMSES cross detector
+luminometer_syst(
+    writer, "ramses", dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses, "stability"
+)
 
 
 #### HFOC linearity
@@ -622,3 +722,26 @@ luminometer_syst(
 )
 
 writer.write(outfolder="./", outfilename="liv")
+
+dict_out = {}
+
+if N_eff:
+    dict_out["dtdt_n"] = dtdt_n
+    dict_out["dtst_n"] = dtst_n
+    dict_out["stst_n"] = stst_n
+
+if ID_eff:
+    dict_out["dtdt_id"] = dtdt_id
+    dict_out["dtst_id"] = dtst_id
+    dict_out["stst_id"] = stst_id
+
+if Trig_eff:
+    dict_out["dtdt_trig"] = dtdt_trig
+    dict_out["dtst_trig"] = dtst_trig
+    dict_out["stst_trig"] = stst_trig
+
+# for name in [dtdt_n, dtdt_trig, dtdt_id,  dtst_n, dtdt_id, dtst_n, dtst_trig, dtst_id, stst_n, stst_trig]
+# dict_out = {'dtdt_n': dtdt_n, 'dtdt_trig': dtdt_trig, 'dtdt_id': dtdt_id, 'dtst_n': dtst_n, 'dtst_trig': dtst_trig, 'dtst_id': dtst_id, 'stst_n': stst_n, 'stst_trig': stst_trig, 'stst_id': stst_id}
+
+with open("efficiency_dict.pkl", "wb") as f:
+    pickle.dump(dict_out, f)

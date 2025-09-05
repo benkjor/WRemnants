@@ -45,12 +45,11 @@ def make_quantiles(hist_in, n_quantiles, axis_name):
         cdf_vals_in = np.linspace(0, 1, n_quantiles + 1)
         x_vals = hist_in.axes[0].edges[1:]
         new_edges = np.interp(cdf_vals_in, cdf_output, x_vals)
-        new_edges = [*new_edges]
-
-        new_axis = hist.axis.Variable(new_edges, name=axis_name)
         pdb.set_trace()
+        new_edges = [*new_edges]
+        new_axis = hist.axis.Variable(new_edges, name=axis_name)
         return new_axis
 
 
-k = make_quantiles(hist_in, 10, "mll")
+k = make_quantiles(hist_in, 10, "eta_sublead")
 print(k)

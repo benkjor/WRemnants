@@ -335,29 +335,27 @@ axis_date = hist.axis.Regular(24, 0, 24, name="time", overflow=False, underflow=
 axis_sbil = hist.axis.Regular(24, 9e-7, 3e-8, name="sbil")
 axis_num_muons = hist.axis.Regular(3, -0.5, 2.5, name="num_muons")
 
-axis_eta = hist.axis.Regular(12, -2.4, 2.4, name="eta_lead")
-axis_eta_copy = hist.axis.Regular(12, -2.4, 2.4, name="eta_sublead")
+axis_eta = hist.axis.Regular(6, -2.4, 2.4, name="eta_lead")
+axis_eta_copy = hist.axis.Regular(6, -2.4, 2.4, name="eta_sublead")
 
-# axis_pt_high = hist.axis.Regular(12, 25, 80, name="pt_lead")
-# # axis_pt_high_copy = hist.axis.Regular(12, 25, 80, name="pt_sublead")
-# axis_pt_high_copy = hist.axis.Regular(14, 15, 80, name="pt_sublead")
-
-# axis_pt_low = hist.axis.Regular(14, 15, 80, name="pt_sublead")
-# axis_pt_low_copy = hist.axis.Regular(14, 15, 80, name="pt_lead")
+# axis_eta = hist.axis.Variable([-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name = "eta_lead")
+# axis_eta_copy = hist.axis.Variable([-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name = "eta_sublead")
 
 
 axis_pt_high = hist.axis.Variable(
     [
-        24.9125,
-        34.9961,
-        38.9813,
-        41.8262,
-        43.9753,
-        45.6349,
-        47.1672,
-        49.1107,
-        52.1681,
-        58.071,
+        15,
+        # 21,
+        25,
+        32.35393,
+        35.70991,
+        38.30856,
+        40.43642,
+        42.22635,
+        43.92092,
+        45.87573,
+        48.56281,
+        53.1789,
         80,
     ],
     name="pt_lead",
@@ -365,16 +363,18 @@ axis_pt_high = hist.axis.Variable(
 
 axis_pt_high_copy = hist.axis.Variable(
     [
-        24.9125,
-        34.9961,
-        38.9813,
-        41.8262,
-        43.9753,
-        45.6349,
-        47.1672,
-        49.1107,
-        52.1681,
-        58.071,
+        15,
+        # 21,
+        25,
+        32.35393,
+        35.70991,
+        38.30856,
+        40.43642,
+        42.22635,
+        43.92092,
+        45.87573,
+        48.56281,
+        53.1789,
         80,
     ],
     name="pt_sublead",
@@ -383,17 +383,17 @@ axis_pt_high_copy = hist.axis.Variable(
 axis_pt_low = hist.axis.Variable(
     [
         15,
-        21,
-        24.9125,
-        34.9961,
-        38.9813,
-        41.8262,
-        43.9753,
-        45.6349,
-        47.1672,
-        49.1107,
-        52.1681,
-        58.071,
+        # 21,
+        25,
+        32.35393,
+        35.70991,
+        38.30856,
+        40.43642,
+        42.22635,
+        43.92092,
+        45.87573,
+        48.56281,
+        53.1789,
         80,
     ],
     name="pt_sublead",
@@ -402,17 +402,17 @@ axis_pt_low = hist.axis.Variable(
 axis_pt_low_copy = hist.axis.Variable(
     [
         15,
-        21,
-        24.9125,
-        34.9961,
-        38.9813,
-        41.8262,
-        43.9753,
-        45.6349,
-        47.1672,
-        49.1107,
-        52.1681,
-        58.071,
+        # 21,
+        25,
+        32.35393,
+        35.70991,
+        38.30856,
+        40.43642,
+        42.22635,
+        43.92092,
+        45.87573,
+        48.56281,
+        53.1789,
         80,
     ],
     name="pt_lead",
@@ -709,11 +709,11 @@ def build_graph(df, dataset):
 
         if redo_cdf:
             # fine_bin_axis = hist.axis.Regular(400, 15, 120, name="mll_fine_bin")
-            fine_bin_axis = hist.axis.Regular(400, 15, 80, name="pt_fine_bin")
-            # fine_bin_axis = hist.axis.Regular(400, -2.4, 2.4, name="eta_fine_bin")
+            # fine_bin_axis = hist.axis.Regular(400, 25, 80, name="pt_fine_bin")
+            fine_bin_axis = hist.axis.Regular(600, -2.4, 2.4, name="eta_fine_bin")
 
             fine_bin_mll = df_dtdt_pg.HistoBoost(
-                "fine_bin_axis_gen", [fine_bin_axis], ["pt_leading", "weight"]
+                "fine_bin_axis_gen", [fine_bin_axis], ["eta_leading", "weight"]
             )
             results.append(fine_bin_mll)
 
@@ -818,15 +818,15 @@ def build_graph(df, dataset):
             ],
         )
 
-        if redo_cdf:
-            # fine_bin_axis = hist.axis.Regular(400, 15, 120, name="mll_fine_bin")
-            fine_bin_axis = hist.axis.Regular(400, 15, 80, name="pt_fine_bin")
-            # fine_bin_axis = hist.axis.Regular(400, -2.4, 2.4, name="eta_fine_bin")
+        # if redo_cdf:
+        #     # fine_bin_axis = hist.axis.Regular(400, 15, 120, name="mll_fine_bin")
+        #     # fine_bin_axis = hist.axis.Regular(400, 25, 80, name="pt_fine_bin")
+        #     fine_bin_axis = hist.axis.Regular(400, -2.4, 2.4, name="eta_fine_bin")
 
-            fine_bin_mll = df.HistoBoost(
-                "fine_bin_axis_gen", [fine_bin_axis], ["pt_leading", "weight"]
-            )
-            results.append(fine_bin_mll)
+        #     fine_bin_mll = df.HistoBoost(
+        #         "fine_bin_axis_gen", [fine_bin_axis], ["eta_subleading", "weight"]
+        #     )
+        #     results.append(fine_bin_mll)
 
         results.append(hist_time_proj)
         results.append(hist_time_proj_2)

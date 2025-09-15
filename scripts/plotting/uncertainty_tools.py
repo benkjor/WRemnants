@@ -1,3 +1,4 @@
+import hist
 import numpy as np
 
 from wums.boostHistHelpers import (
@@ -20,9 +21,21 @@ def get_h1var(eps_id, eps_hlt, heff, hist_ones):
     # h = 2*heff*(eps_hlt * hlt_prime)*(1-(eps_hlt * hlt_prime))
     h1var = addHists(hist_ones, scaleHist(eps_hlt, -1))
     h1var = multiplyHists(h1var, eps_hlt)
-    h1var = multiplyHists(h1var, heff)
     h1var = scaleHist(h1var, 2)
     h1var = multiplyHists(h1var, multiplyHists(eps_id, eps_id))
+    h1var = multiplyHists(h1var, heff)
+
+    return h1var
+
+
+def get_h1var_low(eps_id, eps_hlt, heff, hist_ones):
+    # h = heff*(eps_hlt * hlt_prime)*(1-(eps_hlt * hlt_prime))
+    # h1var = addHists(hist_ones, scaleHist(eps_hlt, -1))
+    # h1var = multiplyHists(h1var, )
+
+    h1var = multiplyHists(eps_id, eps_id)
+    # h1var = multiplyHists(eps_hlt, multiplyHists(eps_id, eps_id))
+    h1var = multiplyHists(h1var, heff)
     return h1var
 
 
@@ -31,8 +44,17 @@ def get_h0var(eps_id, eps_hlt, heff, hist_ones):
     h0var = addHists(hist_ones, scaleHist(eps_id, -1))
     h0var = multiplyHists(h0var, eps_id)
     h0var = multiplyHists(h0var, eps_hlt)
-    h0var = multiplyHists(h0var, heff)
     h0var = scaleHist(h0var, 2)
+    h0var = multiplyHists(h0var, heff)
+    return h0var
+
+
+def get_h0var_low(eps_id, eps_hlt, heff, hist_ones):
+    # h = heff*(eps_id * eps_id_prime)*(1-(eps_id * eps_id_prime))
+    h0var = addHists(hist_ones, scaleHist(eps_id, -1))
+    h0var = multiplyHists(h0var, eps_id)
+    # h0var = multiplyHists(h0var, eps_hlt)
+    h0var = multiplyHists(h0var, heff)
     return h0var
 
 
@@ -242,13 +264,13 @@ def background_syst(
 
     MC = results[res_str]["output"]
     if fail_gen:
-        dtdt = MC["mll_dtdt_prfg"].get()
-        dtst = MC["mll_dtst_prfg"].get()
-        stst = MC["mll_stst_prfg"].get()
+        dtdt = MC["dtdt_prfg"].get()
+        dtst = MC["dtst_prfg"].get()
+        stst = MC["stst_prfg"].get()
     else:
-        dtdt = MC["mll_dtdt_prpg"].get()
-        dtst = MC["mll_dtst_prpg"].get()
-        stst = MC["mll_stst_prpg"].get()
+        dtdt = MC["dtdt_prpg"].get()
+        dtst = MC["dtst_prpg"].get()
+        stst = MC["stst_prpg"].get()
     try:
         weightsum = results[proc_name]["weight_sum"]
         cross_sec = results[proc_name]["dataset"]["xsec"]
@@ -256,6 +278,10 @@ def background_syst(
         weightsum = results["ZmumuPostVFP"]["weight_sum"]
         cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 
+    # dtdt = dtdt.project("gen_mll", 'mll', 'pt_lead', 'eta_lead', 'pt_sublead', 'eta_sublead')
+    # dtst = dtdt.project("gen_mll", 'mll', 'pt_lead', 'eta_lead', 'pt_sublead', 'eta_sublead')
+    # stst = dtdt.project("gen_mll", 'mll', 'pt_lead', 'eta_lead', 'pt_sublead', 'eta_sublead')
+    # pdb.set_trace()
     dtdt, dtst, stst = mc_corrections_all_cases(
         dtdt,
         dtst,
@@ -274,17 +300,18 @@ def background_syst(
     writer.add_process(stst_proc, f"{proc_name}", "ch_stst", signal=False)
 
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_dtdt", 1.1, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_dtdt", 1.01, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_dtst", 1.1, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_dtst", 1.01, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_stst", 1.1, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_stst", 1.01, groups=["bkg"]
     )
 
 
 def get_eff_variations(h1_leading, h2_leading, h0_leading, eps_id_prime, eps_hlt_prime):
+    ### no longer used
     efficiency_ones = make_ones_hist(h1_leading)
 
     #### okay need to make versions of this for
@@ -312,3 +339,30 @@ def get_eff_variations(h1_leading, h2_leading, h0_leading, eps_id_prime, eps_hlt
     h2var_id = get_h2var(eps_id_var, eps_hlt, heff)
     h2var_hlt = get_h2var(eps_id, eps_hlt_var, heff)
     return h0var_id, h0var_hlt, h1var_id, h1var_hlt, h2var_id, h2var_hlt
+
+
+def remove_low_bins(old_hist, ax_name="pt_lead"):
+    org_pt_axis = old_hist.axes[1]
+    edges = org_pt_axis.edges
+    new_pt_edges = edges[2:]
+    # eta_edges =
+    new_pt_axis = hist.axis.Variable(new_pt_edges, name=ax_name)
+    new_pt_axis_2 = hist.axis.Variable(new_pt_edges, name="pt_sublead")
+    new_eta_axis = hist.axis.Variable(
+        old_hist.axes[2].edges, name="eta_lead"
+    )  ## actually a regular axis but whatever
+    if len(old_hist.axes) == 3:
+        new_hist = hist.Hist(old_hist.axes[0], new_pt_axis, new_eta_axis)
+        new_hist.values()[...] = old_hist.values()[:, 2:, :]
+
+    elif len(old_hist.axes) == 5:
+        new_hist = hist.Hist(
+            old_hist.axes[0],
+            new_pt_axis,
+            old_hist.axes[2],
+            new_pt_axis_2,
+            old_hist.axes[4],
+        )
+        new_hist.values()[...] = old_hist.values()[:, 2:, :, 2:, :]
+
+    return new_hist

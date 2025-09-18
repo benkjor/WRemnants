@@ -189,6 +189,9 @@ def eta_phi_systematic(
         weightsum,
         cross_sec,
     )
+
+    dtdt_stat = remove_low_bins(dtdt_stat.copy())
+
     writer.add_systematic(
         dtdt_stat.project("time", "pt_lead", "eta_lead"),
         f"prefiring_stat_etaphi_{etaphi_num}",
@@ -224,6 +227,8 @@ def get_era_vals(mc, trigger_cut, era):
 
 
 def luminometer_syst(writer, luminometer, dtdt, dtst, stst, syst):
+    dtdt = remove_low_bins(dtdt.copy())
+
     writer.add_systematic(
         dtdt.project("time", "pt_lead", "eta_lead"),
         f"{luminometer}_{syst}",
@@ -293,6 +298,8 @@ def background_syst(
         cross_sec,
     )
     dtdt_proc = dtdt.project("time", "pt_lead", "eta_lead")
+    dtdt_proc = remove_low_bins(dtdt_proc.copy())
+
     dtst_proc = dtst.project("time", "pt_sublead", "eta_sublead")
     stst_proc = stst.project("time", "pt_sublead", "eta_sublead")
     writer.add_process(dtdt_proc, f"{proc_name}", "ch_dtdt", signal=False)

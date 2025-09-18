@@ -1,5 +1,4 @@
 import argparse
-import pdb
 import pickle
 
 import h5py
@@ -68,6 +67,10 @@ time_proj_low = time_proj_low_all[{"mll": mass_bin, "gen_mll": mass_bin}]
 time_proj_hlt = time_proj_hlt_all[{"mll": mass_bin, "gen_mll": mass_bin}]
 
 
+time_proj_true = time_proj_low_all.project(
+    "time", "pt_lead", "eta_lead", "pt_sublead", "eta_sublead"
+)
+
 ### pass reco, pass generator
 
 dtdt_prpg = MC_Zmumu["dtdt_prpg"].get()
@@ -79,6 +82,10 @@ cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 dtdt_prfg = MC_Zmumu["dtdt_prfg"].get()
 dtst_prfg = MC_Zmumu["dtst_prfg"].get()
 stst_prfg = MC_Zmumu["stst_prfg"].get()
+
+tight = MC_Zmumu["tight"].get()
+loose = MC_Zmumu["loose"].get()
+trigger = MC_Zmumu["trigger"].get()
 
 
 ### should loop over these instead of calling them explicitly
@@ -114,7 +121,6 @@ lumi_hfoc_nom = lumi_output["lumi_in_hfoc"].get()
 lumi_pcc_nom = lumi_output["lumi_in_pcc"].get()
 lumi_ramses_nom = lumi_output["lumi_in_ramses"].get()
 ## pulling for linearity
-# pdb.set_trace()
 sbil_pcc = lumi_output["sbil_pcc"].get()
 count_pcc = lumi_output["count_pcc"].get()
 
@@ -260,6 +266,60 @@ h2 = dtdt_prpg.project("time", "pt_lead", "eta_lead")
 h1 = dtst_prpg.project("time", "pt_sublead", "eta_sublead")
 h0 = stst_prpg.project("time", "pt_sublead", "eta_sublead")
 
+h2_alt = dtdt_prpg.project("time", "pt_sublead", "eta_sublead")
+h1_alt = dtst_prpg.project("time", "pt_lead", "eta_lead")
+h0_alt = stst_prpg.project("time", "pt_lead", "eta_lead")
+
+# eps_hlt_true_sublead = divideHists(h2_alt*2, addHists(h1, 2*h2_alt))
+# eps_hlt_true_lead = divideHists(h2*2, addHists(h1_alt, h2*2))
+
+# eps_id_true_lead = divideHists(addHists(h1_alt, h2*2), addHists(h1_alt, addHists(h0_alt, h2)))
+# eps_id_true_sublead = divideHists(addHists(h1, h2), addHists(h1, addHists(h0, h2_alt)))
+
+# eps_id_avg = scaleHist(addHists(eps_id_true_lead, eps_id_true_sublead), 1/2)
+# eps_hlt_avg = scaleHist(addHists(eps_hlt_true_lead, eps_hlt_true_sublead), 1/2)
+
+
+tight = all_mc_corrections(tight, time_proj_true, lumi_scaling, weightsum, cross_sec)
+loose = all_mc_corrections(loose, time_proj_true, lumi_scaling, weightsum, cross_sec)
+trigger = all_mc_corrections(
+    trigger, time_proj_true, lumi_scaling, weightsum, cross_sec
+)
+
+
+trig_all = addHists(
+    trigger.project("time", "pt_lead", "eta_lead"),
+    trigger.project("time", "pt_sublead", "eta_sublead"),
+)
+tight_all = addHists(
+    tight.project("time", "pt_lead", "eta_lead"),
+    tight.project("time", "pt_sublead", "eta_sublead"),
+)
+loose_all = addHists(
+    loose.project("time", "pt_lead", "eta_lead"),
+    loose.project("time", "pt_sublead", "eta_sublead"),
+)
+
+eps_hlt_true = divideHists(trig_all, tight_all)
+eps_id_true = divideHists(tight_all, loose_all)
+
+eps_hlt_true_lead = divideHists(
+    trigger.project("time", "pt_lead", "eta_lead"),
+    tight.project("time", "pt_lead", "eta_lead"),
+)
+eps_hlt_true_sublead = divideHists(
+    trigger.project("time", "pt_sublead", "eta_sublead"),
+    tight.project("time", "pt_sublead", "eta_sublead"),
+)
+eps_id_true_lead = divideHists(
+    tight.project("time", "pt_lead", "eta_lead"),
+    loose.project("time", "pt_lead", "eta_lead"),
+)
+eps_id_true_sublead = divideHists(
+    tight.project("time", "pt_sublead", "eta_sublead"),
+    loose.project("time", "pt_sublead", "eta_sublead"),
+)
+
 
 efficiency_ones = make_ones_hist(h1)
 
@@ -267,7 +327,6 @@ efficiency_ones = make_ones_hist(h1)
 
 eps_id_prime = 1.01
 eps_hlt_prime = 1.01
-
 
 ### greater than 25 GeV
 ## e2 = 2*h2/(h1 + 2*h1)
@@ -313,23 +372,58 @@ eps_hlt_var_low = scaleHist(eps_hlt_low.copy(), eps_hlt_prime)
 h0var_id_low = get_h0var_low(eps_id_var_low, eps_hlt_low, heff_low, efficiency_ones)
 h1var_id_low = get_h1var_low(eps_id_var_low, eps_hlt_low, heff_low, efficiency_ones)
 h2var_id_low = get_h2var(eps_id_var_low, eps_hlt_low, heff_low)
+
+
 # h2var_id_low = remove_low_bins(h2var_id_low) ## this might already be projected on the wrong direction which isnt great
+
+h2_data = reco_dtdt_data.project("time", "pt_lead", "eta_lead")
+h1_data = reco_dtst_data.project("time", "pt_sublead", "eta_sublead")
+h0_data = reco_stst_data.project("time", "pt_sublead", "eta_sublead")
+
+
+eps_hlt_data = addHists(h1_data, scaleHist(h2_data, 2))
+eps_hlt_data = divideHists(h2_data, eps_hlt_data)
+eps_hlt_high_data = scaleHist(eps_hlt_data, 2)
+
+eps_id_data = addHists(efficiency_ones, scaleHist(eps_hlt_high_data, -1))
+eps_id_data = multiplyHists(h0_data, eps_id_data)
+eps_id_data = addHists(eps_id_data, h1_data)
+eps_id_high_data = divideHists(h1_data, eps_id_data)
+
+
+eps_hlt_low = scaleHist(h2_data, 0)
+eps_hlt_low_data = eps_hlt_high_data
+
+##e1 = h1/(h0 + h1)
+eps_id_data = addHists(h0_data, scaleHist(h1_data, 1))
+eps_id_data = divideHists(h1_data, eps_id_data)
+eps_id_low_data = scaleHist(eps_id_data, 1)
 
 
 efficiencies = {
-    "h2_id_high": divideHists(h2var_id_high, heff_high).values(),
-    "h2_id_low": divideHists(h2var_id_low, heff_low).values(),
-    "h1_id_high": divideHists(h1var_id_high, heff_high).values(),
-    "h1_id_low": divideHists(h1var_id_low, heff_low).values(),
-    "h0_id_high": divideHists(h0var_id_high, heff_high).values(),
-    "h0_id_low": divideHists(h0var_id_low, heff_low).values(),
-    "h2_hlt_high": divideHists(h2var_hlt_high, heff_high).values(),
-    "h1_hlt_high": divideHists(h1var_hlt_high, heff_high).values(),
-    "h0_hlt_high": divideHists(h0var_hlt_high, heff_high).values(),
-    "epsilon_hlt_high": eps_hlt_high.values(),
-    "epsilon_id_high": eps_id_high.values(),
-    "epsilon_hlt_low": eps_hlt_low.values(),
-    "epsilon_id_low": eps_id_low.values(),
+    # "h2_id_high": divideHists(h2var_id_high, heff_high).values(),
+    # "h2_id_low": divideHists(h2var_id_low, heff_low).values(),
+    # "h1_id_high": divideHists(h1var_id_high, heff_high).values(),
+    # "h1_id_low": divideHists(h1var_id_low, heff_low).values(),
+    # "h0_id_high": divideHists(h0var_id_high, heff_high).values(),
+    # "h0_id_low": divideHists(h0var_id_low, heff_low).values(),
+    # "h2_hlt_high": divideHists(h2var_hlt_high, heff_high).values(),
+    # "h1_hlt_high": divideHists(h1var_hlt_high, heff_high).values(),
+    # "h0_hlt_high": divideHists(h0var_hlt_high, heff_high).values(),
+    # "epsilon_hlt_high": eps_hlt_high.values(),
+    # "epsilon_id_high": eps_id_high.values(),
+    # "epsilon_hlt_low": eps_hlt_low.values(),
+    # "epsilon_id_low": eps_id_low.values(),
+    "eps_hlt_true": eps_hlt_true.values(),
+    "eps_id_true": eps_id_true.values(),
+    "eps_hlt_true_lead": eps_hlt_true_lead.values(),
+    "eps_id_true_lead": eps_id_true_lead.values(),
+    "eps_hlt_true_sublead": eps_hlt_true_sublead.values(),
+    "eps_id_true_sublead": eps_id_true_sublead.values(),
+    # "epsilon_hlt_high_data": eps_hlt_high_data.values(),
+    # "epsilon_id_high_data": eps_id_high_data.values(),
+    # "epsilon_hlt_low_data": eps_hlt_low_data.values(),
+    # "epsilon_id_low_data": eps_id_low_data.values(),
 }
 
 with open("efficiency_values.pkl", "wb") as f:
@@ -361,12 +455,6 @@ reco_dtdt_data = remove_low_bins(reco_dtdt_data)
 h2 = remove_low_bins(h2)
 dtdt_prpg = remove_low_bins(dtdt_prpg)
 
-dtdt_prpg_pcc = remove_low_bins(dtdt_prpg_pcc)
-dtdt_prpg_hfoc = remove_low_bins(dtdt_prpg_hfoc)
-dtdt_prpg_ramses = remove_low_bins(dtdt_prpg_ramses)
-
-dtdt_prpg_sbil_hfoc = remove_low_bins(dtdt_prpg_sbil_hfoc)
-dtdt_prpg_sbil_ramses = remove_low_bins(dtdt_prpg_sbil_ramses)
 h2var_id_low = remove_low_bins(h2var_id_low)
 
 
@@ -407,7 +495,7 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
                 ### be more consistent about ordering of time and mll
                 ### fitting for the number of events
                 v2 = dtdt_prpg[
-                    {"pt_sublead": i - 2, "eta_sublead": j, "gen_time": k}
+                    {"pt_sublead": i - 1, "eta_sublead": j, "gen_time": k}
                 ]  ## equivalent to n2
                 var2 = addHists(v2 * var_size, h2)
 
@@ -459,7 +547,7 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
                 groups=["nz"],
             )
 
-            if i > 1:
+            if i > 0:
                 # ## efficiency
                 h1var_id_primed = get_eff_hist(
                     h1var_id_high, h1, i, j, k, "pt_sublead", "eta_sublead"
@@ -477,10 +565,10 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
 
                 # #     ### ID EFFICIENCY
                 h2var_id_primed = get_eff_hist(
-                    h2var_id_high, h2, i - 2, j, k, "pt_lead", "eta_lead"
+                    h2var_id_high, h2, i - 1, j, k, "pt_lead", "eta_lead"
                 )
                 h2var_hlt_primed = get_eff_hist(
-                    h2var_hlt_high, h2, i - 2, j, k, "pt_lead", "eta_lead"
+                    h2var_hlt_high, h2, i - 1, j, k, "pt_lead", "eta_lead"
                 )
                 #     pdb.set_trace()
 
@@ -557,7 +645,8 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
             )
 
 
-###### NONE OF THIS IS MASS DEPENDENT
+# ##### NONE OF THIS IS MASS DEPENDENT ## may be linked to statistical uncertainty becuase the eta region? do i still need this or am i double counting
+# lowers stability uncetainty increase linearity uncertainty.
 # num_etaphi = len(dtdt_prpg_H_stat.project("etaPhiRegion").values())
 # for i in range(num_etaphi):
 #     prpg_stat = [
@@ -592,8 +681,11 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
 #         i,
 #     )
 
+
+### these slightly increase the statistical uncertainty but dont contribute to the stability/linearity
+# dtdt_prpg_prefiring_syst = dtdt_prpg_prefiring_syst.project("time", "pt_lead", "eta_lead")
 # writer.add_systematic(
-#     dtdt_prpg_prefiring_syst.project("time", "pt_lead", "eta_lead"),
+#     remove_low_bins(dtdt_prpg_prefiring_syst),
 #     f"prefiring_syst",
 #     "Zmumu pass gen",
 #     "ch_dtdt",
@@ -694,7 +786,6 @@ luminometer_syst(
     writer, "ramses", dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses, "stability"
 )
 
-pdb.set_trace()
 
 #### HFOC linearity
 luminometer_syst(

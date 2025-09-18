@@ -424,7 +424,7 @@ axis_mll = hist.axis.Variable(
 axis_mll_copy = hist.axis.Variable(
     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="gen_mll"
 )
-axis_num_muons = hist.axes.Variable([0, 1, 2], name="num_muons")
+axis_num_muons = hist.axis.Variable([0, 1, 2], name="num_muons")
 
 
 ########################################################
@@ -516,109 +516,66 @@ def build_graph(df, dataset):
     df = df.Define("eta_leading", "mu_mom4.eta()")
     df = df.Define("eta_subleading", "smu_mom4.eta()")
 
-    ## may need to change this later, technically if our sample is biased then we won't get 50/50 from subleading and leading muons
-    df = df.Define("n2_hist_def", "rand() % 2")
-    df = df.Define("pt_first", "n2_hist_def == 1 ? pt_leading : pt_subleading")
-    df = df.Define("eta_first", "n2_hist_def == 1 ? eta_leading : eta_subleading")
-    df = df.Define("pt_second", "n2_hist_def == 1 ? pt_subleading : pt_leading")
-    df = df.Define("eta_second", "n2_hist_def ==1 ? eta_subleading : eta_leading")
+    # df = df.Define("pt_first", "Muon_charge[0] == 1 ? pt_leading : pt_subleading") ### so now muon 0 will always have the charge be positive
+    # df = df.Define("eta_first", "Muon_charge[0] == 1 ? eta_leading : eta_subleading")
+    # df = df.Define("pt_second", "Muon_charge[0] == -1 ? pt_subleading : pt_leading")
+    # df = df.Define("eta_second", "Muon_charge[0] == -1 ? eta_subleading : eta_leading")
+    # df = df.Define("mu_sel", "Muon_charge[0] == 1 ? 0 : 1")
 
-    df_a = df.Filter(
-        "Muon_looseId[0] + Muon_looseId[1] > 0"
-    )  ## this is getting the that pass looseID
-    df_a = df_a.Filter("sum_pt_loose")
-    df_a = df_a.Define("pt_loose_lead", "Muon_looseId[0] == 1? pt_first : -10")
-    df_a = df_a.Define("eta_loose_lead", "Muon_looseId[0]== 1 ? eta_first : -5")
-    df_a = df_a.Define("pt_loose_sublead", "Muon_looseId[1]== 1? pt_second : -10")
-    df_a = df_a.Define("eta_loose_sublead", "Muon_looseId[1]== 1 ? eta_second : -5")
+    df = df.Define(
+        "pt_first", "Muon_charge[0] == -1 ? pt_leading : pt_subleading"
+    )  ### so now muon 0 will always have the charge be negative
+    df = df.Define("eta_first", "Muon_charge[0] == -1 ? eta_leading : eta_subleading")
+    df = df.Define("pt_second", "Muon_charge[0] == 1 ? pt_subleading : pt_leading")
+    df = df.Define("eta_second", "Muon_charge[0] == 1 ? eta_subleading : eta_leading")
+    df = df.Define("mu_sel", "Muon_charge[0] == -1 ? 0 : 1")
 
-    df_a = df_a.Define(
-        "leading_muon_passTrigger",
-        "wrem::hasTriggerMatch(mu_mom4.eta(),mu_mom4.phi(),TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])",
+    df_m = df.Filter("pt_loose_muon[mu_sel] == 1")
+    df_loose = df_m.Filter("Muon_looseId[mu_sel] == 1")
+    df_tight = df_loose.Filter("Muon_tightId[mu_sel] == 1")
+    df_tight = df_tight.Define(
+        "muon_passTrigger",
+        "wrem::hasTriggerMatch(Muon_eta[mu_sel],Muon_phi[mu_sel],TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])",
     )
-    df_a = df_a.Define(
-        "subleading_muon_passTrigger",
-        "wrem::hasTriggerMatch(smu_mom4.eta(),smu_mom4.phi(),TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])",
-    )
-
-    df_b = df_a.Filter(
-        "Muon_tightId[0] + Muon_tightId[1] > 0"
-    )  ## this is getting the that pass looseID
-    df_b = df_b.Define("pt_veto_lead", "Muon_tightId[0] == 1 ? pt_first : -10")
-    df_b = df_b.Define("eta_veto_lead", "Muon_tightId[0] == 1 ? eta_first : -5")
-    df_b = df_b.Define("pt_veto_sublead", "Muon_tightId[1] == 1 ? pt_second : -10")
-    df_b = df_b.Define("eta_veto_sublead", "Muon_tightId[1] == 1 ? eta_second : -5")
-
-    df_c = df_b.Filter(
-        "leading_muon_passTrigger || subleading_muon_passTrigger"
-    )  ## this is getting the that pass looseID
-    df_c = df_c.Define(
-        "pt_trigger_lead",
-        "leading_muon_passTrigger + Muon_tightId[0] == 2 ? pt_first : -10",
-    )
-    df_c = df_c.Define(
-        "eta_trigger_lead",
-        "leading_muon_passTrigger + Muon_tightId[0] == 2 ? eta_first : -5",
-    )
-    df_c = df_c.Define(
-        "pt_trigger_sublead",
-        "subleading_muon_passTrigger + Muon_tightId[1] == 2 ? pt_second : -10",
-    )
-    df_c = df_c.Define(
-        "eta_trigger_sublead",
-        "subleading_muon_passTrigger + Muon_tightId[1] == 2 ? eta_second : -5",
-    )
+    df_trig = df_tight.Filter("muon_passTrigger == 1")
 
     if not dataset.is_data:
 
-        hist_tight_muons = df_b.HistoBoost(
+        hist_tight_muons = df_tight.HistoBoost(
             "tight",
             [
                 axis_pt_high,
                 axis_eta,
-                axis_pt_high_copy,
-                axis_eta_copy,
-                # axis_num_muons
             ],
             [
-                "pt_veto_lead",
-                "eta_veto_lead",
-                "pt_veto_sublead",
-                "eta_veto_sublead",
+                "pt_first",
+                "eta_first",
                 "weight",
             ],
         )
 
-        hist_loose_muons = df_a.HistoBoost(
+        hist_loose_muons = df_loose.HistoBoost(
             "loose",
             [
                 axis_pt_high,
                 axis_eta,
-                axis_pt_high_copy,
-                axis_eta_copy,
             ],
             [
-                "pt_loose_lead",
-                "eta_loose_lead",
-                "pt_loose_sublead",
-                "eta_loose_sublead",
+                "pt_first",
+                "eta_first",
                 "weight",
             ],
         )
 
-        hist_trigger_muons = df_c.HistoBoost(
+        hist_trigger_muons = df_trig.HistoBoost(
             "trigger",
             [
                 axis_pt_high,
                 axis_eta,
-                axis_pt_high_copy,
-                axis_eta_copy,
             ],
             [
-                "pt_trigger_lead",
-                "eta_trigger_lead",
-                "pt_trigger_sublead",
-                "eta_trigger_sublead",
+                "pt_first",
+                "eta_first",
                 "weight",
             ],
         )

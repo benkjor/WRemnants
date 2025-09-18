@@ -287,38 +287,38 @@ trigger = all_mc_corrections(
 )
 
 
-trig_all = addHists(
-    trigger.project("time", "pt_lead", "eta_lead"),
-    trigger.project("time", "pt_sublead", "eta_sublead"),
-)
-tight_all = addHists(
-    tight.project("time", "pt_lead", "eta_lead"),
-    tight.project("time", "pt_sublead", "eta_sublead"),
-)
-loose_all = addHists(
-    loose.project("time", "pt_lead", "eta_lead"),
-    loose.project("time", "pt_sublead", "eta_sublead"),
-)
+# trig_all = addHists(
+#     trigger.project("time", "pt_lead", "eta_lead"),
+#     trigger.project("time", "pt_sublead", "eta_sublead"),
+# )
+# tight_all = addHists(
+#     tight.project("time", "pt_lead", "eta_lead"),
+#     tight.project("time", "pt_sublead", "eta_sublead"),
+# )
+# loose_all = addHists(
+#     loose.project("time", "pt_lead", "eta_lead"),
+#     loose.project("time", "pt_sublead", "eta_sublead"),
+# )
 
-eps_hlt_true = divideHists(trig_all, tight_all)
-eps_id_true = divideHists(tight_all, loose_all)
+eps_hlt_true = divideHists(trigger, tight)
+eps_id_true = divideHists(tight, loose)
 
-eps_hlt_true_lead = divideHists(
-    trigger.project("time", "pt_lead", "eta_lead"),
-    tight.project("time", "pt_lead", "eta_lead"),
-)
-eps_hlt_true_sublead = divideHists(
-    trigger.project("time", "pt_sublead", "eta_sublead"),
-    tight.project("time", "pt_sublead", "eta_sublead"),
-)
-eps_id_true_lead = divideHists(
-    tight.project("time", "pt_lead", "eta_lead"),
-    loose.project("time", "pt_lead", "eta_lead"),
-)
-eps_id_true_sublead = divideHists(
-    tight.project("time", "pt_sublead", "eta_sublead"),
-    loose.project("time", "pt_sublead", "eta_sublead"),
-)
+# eps_hlt_true_lead = divideHists(
+#     trigger.project("time", "pt_lead", "eta_lead"),
+#     tight.project("time", "pt_lead", "eta_lead"),
+# )
+# eps_hlt_true_sublead = divideHists(
+#     trigger.project("time", "pt_sublead", "eta_sublead"),
+#     tight.project("time", "pt_sublead", "eta_sublead"),
+# )
+# eps_id_true_lead = divideHists(
+#     tight.project("time", "pt_lead", "eta_lead"),
+#     loose.project("time", "pt_lead", "eta_lead"),
+# )
+# eps_id_true_sublead = divideHists(
+#     tight.project("time", "pt_sublead", "eta_sublead"),
+#     loose.project("time", "pt_sublead", "eta_sublead"),
+# )
 
 
 efficiency_ones = make_ones_hist(h1)
@@ -414,12 +414,14 @@ efficiencies = {
     # "epsilon_id_high": eps_id_high.values(),
     # "epsilon_hlt_low": eps_hlt_low.values(),
     # "epsilon_id_low": eps_id_low.values(),
-    "eps_hlt_true": eps_hlt_true.values(),
-    "eps_id_true": eps_id_true.values(),
-    "eps_hlt_true_lead": eps_hlt_true_lead.values(),
-    "eps_id_true_lead": eps_id_true_lead.values(),
-    "eps_hlt_true_sublead": eps_hlt_true_sublead.values(),
-    "eps_id_true_sublead": eps_id_true_sublead.values(),
+    # "eps_hlt_true": eps_hlt_true.values(),
+    # "eps_id_true": eps_id_true.values(),
+    # "eps_hlt_true_lead": eps_hlt_true_lead.values(),
+    # "eps_id_true_lead": eps_id_true_lead.values(),
+    # "eps_hlt_true_sublead": eps_hlt_true_sublead.values(),
+    # "eps_id_true_sublead": eps_id_true_sublead.values(),
+    "eps_hlt_true_neg": eps_hlt_true.values(),
+    "eps_id_true_neg": eps_id_true.values(),
     # "epsilon_hlt_high_data": eps_hlt_high_data.values(),
     # "epsilon_id_high_data": eps_id_high_data.values(),
     # "epsilon_hlt_low_data": eps_hlt_low_data.values(),

@@ -507,37 +507,55 @@ def build_graph(df, dataset):
     )
 
     df = df.Define("sum_veto_muons", "Sum(veto_muon)")
-    df = df.Define("sum_pt_loose_muons", "Sum(pt_loose_muon)")
+    df = df.Define("sum_loose_muons", "Sum(pt_loose_muon)")
+    df = df.Filter("sum_veto_muons == 2")  ## will later change to sum loose muons
+    df = df.Filter("(Muon_looseId[0] && Muon_looseId[1]) == 1")
 
-    df = mass_extraction(df, "", "Muon", "pt_loose_muon")
+    df = mass_extraction(df, "", "Muon", "veto_muon")
 
     df = df.Define("pt_leading", "mu_mom4.pt()")
     df = df.Define("pt_subleading", "smu_mom4.pt()")
     df = df.Define("eta_leading", "mu_mom4.eta()")
     df = df.Define("eta_subleading", "smu_mom4.eta()")
 
-    # df = df.Define("pt_first", "Muon_charge[0] == 1 ? pt_leading : pt_subleading") ### so now muon 0 will always have the charge be positive
-    # df = df.Define("eta_first", "Muon_charge[0] == 1 ? eta_leading : eta_subleading")
-    # df = df.Define("pt_second", "Muon_charge[0] == -1 ? pt_subleading : pt_leading")
-    # df = df.Define("eta_second", "Muon_charge[0] == -1 ? eta_subleading : eta_leading")
-    # df = df.Define("mu_sel", "Muon_charge[0] == 1 ? 0 : 1")
+    df = df.Define(
+        "muon_0_passTrigger",
+        "wrem::hasTriggerMatch(Muon_eta[0],Muon_phi[0],TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])",
+    )
 
     df = df.Define(
-        "pt_first", "Muon_charge[0] == -1 ? pt_leading : pt_subleading"
-    )  ### so now muon 0 will always have the charge be negative
-    df = df.Define("eta_first", "Muon_charge[0] == -1 ? eta_leading : eta_subleading")
-    df = df.Define("pt_second", "Muon_charge[0] == 1 ? pt_subleading : pt_leading")
-    df = df.Define("eta_second", "Muon_charge[0] == 1 ? eta_subleading : eta_leading")
-    df = df.Define("mu_sel", "Muon_charge[0] == -1 ? 0 : 1")
-
-    df_m = df.Filter("pt_loose_muon[mu_sel] == 1")
-    df_loose = df_m.Filter("Muon_looseId[mu_sel] == 1")
-    df_tight = df_loose.Filter("Muon_tightId[mu_sel] == 1")
-    df_tight = df_tight.Define(
-        "muon_passTrigger",
-        "wrem::hasTriggerMatch(Muon_eta[mu_sel],Muon_phi[mu_sel],TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])",
+        "muon_1_passTrigger",
+        "wrem::hasTriggerMatch(Muon_eta[1],Muon_phi[1],TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])",
     )
-    df_trig = df_tight.Filter("muon_passTrigger == 1")
+
+    #### filter to ensure that one muon passes both
+    df = df.Filter(
+        "((Muon_tightId[0] && muon_0_passTrigger) || (Muon_tightId[1] && muon_1_passTrigger)) == 1"
+    )
+
+    ## define the muon that does not pass as the probe
+    ##if muon0 passes trigger & tight id (if muon1 passes trigger and tight id: then randomly select 0 vs 1, if muon1 fails, make it the probe), if muon0 fails make it 0
+    df = df.Define(
+        "mu_probe",
+        "(muon_0_passTrigger && Muon_tightId[0])== 1 ? ((muon_1_passTrigger && Muon_tightId[1]) == 1 ? rand()%2 : 1) : 0",
+    )
+    ### ^ because ive already filtered that one of the muons must pass, knowing that one fails means i know the other one succeeds
+
+    df = df.Define("pt_first", "mu_probe == 0 ? pt_leading : pt_subleading")
+    df = df.Define("eta_first", "mu_probe == 0 ? eta_leading : eta_subleading")
+    df = df.Define("pt_second", "mu_probe == 0 ? pt_subleading : pt_leading")
+    df = df.Define("eta_second", "mu_probe == 0 ? eta_subleading : eta_leading")
+
+    df_loose = df
+
+    df_tight = df_loose.Filter(
+        "Muon_tightId[mu_probe] == 1"
+    )  ## have already defined that this passes the looseId
+    df_tight = df_tight.Define(
+        "probe_passTrigger", "mu_probe == 0 ? muon_0_passTrigger : muon_1_passTrigger"
+    )  ## have already defined that this passes the tight id
+
+    df_trig = df_tight.Filter("probe_passTrigger == 1")  ## filter for it.
 
     if not dataset.is_data:
 
@@ -602,10 +620,10 @@ def build_graph(df, dataset):
         df_fg = df_2.Filter("sum_veto_muons == 2")
 
         df_pt_loose_pg = df_1.Filter(
-            "(sum_veto_muons == 1 && sum_pt_loose_muons == 2) || (sum_veto_muons == 2)"
+            "(sum_veto_muons == 1 && sum_loose_muons == 2) || (sum_veto_muons == 2)"
         )
         df_pt_loose_fg = df_2.Filter(
-            "(sum_veto_muons == 1 && sum_pt_loose_muons == 2) || (sum_veto_muons == 2)"
+            "(sum_veto_muons == 1 && sum_loose_muons == 2) || (sum_veto_muons == 2)"
         )
 
         ## double tight double trigger
@@ -797,7 +815,7 @@ def build_graph(df, dataset):
         dtdt, _, _ = trigger_tightID_sep(df_veto)
 
         df_pt_loose = df.Filter(
-            "(sum_veto_muons == 1 && sum_pt_loose_muons == 2) || (sum_veto_muons == 2)"
+            "(sum_veto_muons == 1 && sum_loose_muons == 2) || (sum_veto_muons == 2)"
         )
 
         _, dtst, stst = trigger_tightID_sep(df_pt_loose)

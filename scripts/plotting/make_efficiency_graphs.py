@@ -12,9 +12,9 @@ with open("efficiency_values.pkl", "rb") as f:
     input_dict = pickle.load(f)
 ### so these get loaded in as pt, eta.
 
-date = "2025-09-18"
+date = "2025-09-24"
 postfit = False  ### I SHOULD DO THIS
-
+print(date)
 
 # Read your input from a text file
 with open("efficiency_graph_fit_9-5-25.txt", "r") as mult:
@@ -114,29 +114,30 @@ for efficiency in range(len(key_list)):
         #     )
         #     plt.clf()
 
-        # if "epsilon" in key:
-        #     for j in range(len(input_dict[key][0][0])):  # eta bin
-        #         temp = []
-        #         for i in range(len(input_dict[key][0])):  ## pt bin
-        #             temp.append(np.average(input_dict[key][:, i, j]))
-        #         if "high" in key:
-        #             plt.plot(
-        #                 pt_bins[2:], temp[2:], label=f"eta bin: {j}", color=f"C{j}"
-        #             )
-        #         if "low" in key:
-        #             plt.plot(
-        #                 pt_bins[:2], temp[:2], label=f"eta bin: {j}", color=f"C{j}"
-        #             )
-        #     plt.title(key + " prefit")
-        #     plt.legend()
-        #     # plt.ylim([0.99, 1.01])
-        #     plt.xlabel("pt bin lower edge [GeV]")
-        #     plt.ylabel("input efficiency")
-        #     plt.tight_layout()
-        #     plt.savefig(
-        #         f"/home/submit/jbenke/public_html/liv_uncert/efficiency/{date}/pt_projection/{key}.png"
-        #     )
-        #     plt.clf()
+        if "epsilon" in key:
+            for j in range(len(input_dict[key][0][0])):  # eta bin
+                temp = []
+                for i in range(len(input_dict[key][0])):  ## pt bin
+                    temp.append(np.average(input_dict[key][:, i, j]))
+                if "high" in key:
+                    plt.plot(
+                        pt_bins[2:], temp[2:], label=f"eta bin: {j}", color=f"C{j}"
+                    )
+                if "low" in key:
+                    plt.plot(
+                        pt_bins[:2], temp[:2], label=f"eta bin: {j}", color=f"C{j}"
+                    )
+            plt.title(key + " prefit")
+            plt.legend()
+            # plt.ylim([0.99, 1.01])
+            plt.xlabel("pt bin lower edge [GeV]")
+            plt.ylabel("input efficiency")
+            plt.tight_layout()
+            plt.savefig(
+                f"/home/submit/jbenke/public_html/liv_uncert/efficiency/{date}/pt_projection/{key}.png"
+            )
+            plt.clf()
+
         if "true" in key:
             print(key)
             # pdb.set_trace()
@@ -165,24 +166,22 @@ for efficiency in range(len(key_list)):
 
 for efficiency in range(len(key_list)):
     for key in [key_list[efficiency]]:
-        # if "epsilon" in key:
-        #     for i in range(len(input_dict[key][0])):  ## pt bin
-        #         temp = []
-        #         for j in range(len(input_dict[key][0][0])):  # eta bin
-        #             temp.append(np.average(input_dict[key][:, i, j]))
-        #         plt.plot(
-        #             eta_bins[:], temp[:], label=f"pt bin: {i}", color=f"C{i}"
-        #         )
-        #     plt.title(key + " prefit")
-        #     plt.legend()
-        #     # plt.ylim([0.99, 1.01])
-        #     plt.xlabel("eta bin lower edge")
-        #     plt.ylabel("input efficiency")
-        #     plt.tight_layout()
-        #     plt.savefig(
-        #         f"/home/submit/jbenke/public_html/liv_uncert/efficiency/{date}/eta_projection/{key}.png"
-        #     )
-        #     plt.clf()
+        if "epsilon" in key:
+            for i in range(len(input_dict[key][0])):  ## pt bin
+                temp = []
+                for j in range(len(input_dict[key][0][0])):  # eta bin
+                    temp.append(np.average(input_dict[key][:, i, j]))
+                plt.plot(eta_bins[:], temp[:], label=f"pt bin: {i}", color=f"C{i}")
+            plt.title(key + " prefit")
+            plt.legend()
+            # plt.ylim([0.99, 1.01])
+            plt.xlabel("eta bin lower edge")
+            plt.ylabel("input efficiency")
+            plt.tight_layout()
+            plt.savefig(
+                f"/home/submit/jbenke/public_html/liv_uncert/efficiency/{date}/eta_projection/{key}.png"
+            )
+            plt.clf()
         if "true" in key:
             for i in range(len(input_dict[key][0])):  ## pt bin
                 temp = []

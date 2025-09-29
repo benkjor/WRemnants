@@ -51,16 +51,9 @@ time_proj_hlt_all = data_output["time_proj"].get()
 time_proj_hlt_all = expand_hist_by_duplicate_axis(time_proj_hlt_all, "mll", "gen_mll")
 time_proj_low_all = expand_hist_by_duplicate_axis(time_proj_low_all, "mll", "gen_mll")
 
-time_proj_low_all = time_proj_low_all.project(
-    "time", "mll", "gen_mll", "pt_probe", "eta_probe", "pt_tag", "eta_tag"
-)
-time_proj_hlt_all = time_proj_hlt_all.project(
-    "time", "mll", "gen_mll", "pt_probe", "eta_probe", "pt_tag", "eta_tag"
-)
 
 time_proj_low = time_proj_low_all[{"mll": mass_bin, "gen_mll": mass_bin}]
 time_proj_hlt = time_proj_hlt_all[{"mll": mass_bin, "gen_mll": mass_bin}]
-
 
 time_proj_true = time_proj_low_all.project(
     "time", "pt_probe", "eta_probe", "pt_tag", "eta_tag"
@@ -77,11 +70,6 @@ cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 dtdt_prfg = MC_Zmumu["dtdt_prfg"].get()
 dtst_prfg = MC_Zmumu["dtst_prfg"].get()
 stst_prfg = MC_Zmumu["stst_prfg"].get()
-
-tight = MC_Zmumu["tight"].get()
-loose = MC_Zmumu["loose"].get()
-trigger = MC_Zmumu["trigger"].get()
-
 
 ### should loop over these instead of calling them explicitly
 
@@ -100,7 +88,7 @@ dtdt_prpg_H, dtdt_prpg_H_syst, dtdt_prpg_H_stat = get_era_vals(MC_Zmumu, "dtdt",
 dtst_prpg_H, dtst_prpg_H_syst, dtst_prpg_H_stat = get_era_vals(MC_Zmumu, "dtst", "H")
 stst_prpg_H, stst_prpg_H_syst, stst_prpg_H_stat = get_era_vals(MC_Zmumu, "stst", "H")
 
-pass_gen = MC_Zmumu["pass_gen"].get()
+pass_gen = MC_Zmumu["stst_prpg"].get()
 
 ### probably need to pull these back'
 lumi_scaling = lumi_output["lumi_nom"].get()
@@ -254,67 +242,24 @@ pass_gen = all_mc_corrections(
 
 n_masked = pass_gen.project("time", "pt_tag", "eta_tag")
 
-h2 = dtdt_prpg.project("time", "pt_probe", "eta_probe")
-h1 = dtst_prpg.project("time", "pt_probe", "eta_probe")
-h0 = stst_prpg.project("time", "pt_probe", "eta_probe")
-
-# h2_alt = dtdt_prpg.project("time", "pt_tag", "eta_tag")
-# h1_alt = dtst_prpg.project("time", "pt_probe", "eta_probe")
-# h0_alt = stst_prpg.project("time", "pt_probe", "eta_probe")
-
-# eps_hlt_true_sublead = divideHists(h2_alt*2, addHists(h1, 2*h2_alt))
-# eps_hlt_true_lead = divideHists(h2*2, addHists(h1_alt, h2*2))
-
-# eps_id_true_lead = divideHists(addHists(h1_alt, h2*2), addHists(h1_alt, addHists(h0_alt, h2)))
-# eps_id_true_sublead = divideHists(addHists(h1, h2), addHists(h1, addHists(h0, h2_alt)))
-
-# eps_id_avg = scaleHist(addHists(eps_id_true_lead, eps_id_true_sublead), 1/2)
-# # eps_hlt_avg = scaleHist(addHists(eps_hlt_true_lead, eps_hlt_true_sublead), 1/2)
-trigger = trigger[{"mll": mass_bin, "gen_mll": mass_bin}]
-tight = tight[{"mll": mass_bin, "gen_mll": mass_bin}]
-loose = loose[{"mll": mass_bin, "gen_mll": mass_bin}]
-
-tight = all_mc_corrections(tight, time_proj_true, lumi_scaling, weightsum, cross_sec)
-loose = all_mc_corrections(loose, time_proj_true, lumi_scaling, weightsum, cross_sec)
-trigger = all_mc_corrections(
-    trigger, time_proj_true, lumi_scaling, weightsum, cross_sec
-)
-
-trigger_proj = trigger.project("time", "pt_probe", "eta_probe")
-tight_proj = tight.project("time", "pt_probe", "eta_probe")
-loose_proj = loose.project("time", "pt_probe", "eta_probe")
+trigger_proj = dtdt_prpg.project("time", "pt_probe", "eta_probe")
+tight_proj = dtst_prpg.project("time", "pt_probe", "eta_probe")
+loose_proj = stst_prpg.project("time", "pt_probe", "eta_probe")
 
 eps_hlt_true = divideHists(trigger_proj, tight_proj)
 eps_id_true = divideHists(tight_proj, loose_proj)
 
 
-def extract_diagonal(hist_in):
-    ## assumes hist_in comes as time, pt1, eta1, pt2, eta2
-    values = hist_in.values()  ## assumes this comeas as
-    hist_out = hist_in.copy().project("time", "pt_probe", "eta_probe")
-    hist_out_values = hist_out.values()
-    for k in range(hist_in.shape[0]):  # should be time
-        for i in range(hist_in.shape[1]):  ## pt
-            for j in range(hist_in.shape[2]):  # eta
-                hist_out_values[k, i, j] = values[k, i, j, i, j]
-    return hist_out
-
-
-h2 = trigger.project("time", "pt_probe", "eta_probe")
+h2 = trigger_proj
 
 h1 = addHists(
-    tight.project("time", "pt_probe", "eta_probe"),
-    scaleHist(trigger.project("time", "pt_probe", "eta_probe"), -1),
+    tight_proj,
+    scaleHist(trigger_proj, -1),
 )
 h0 = addHists(
-    loose.project("time", "pt_probe", "eta_probe"),
-    scaleHist(tight.project("time", "pt_probe", "eta_probe"), -1),
+    loose_proj,
+    scaleHist(tight_proj, -1),
 )
-
-
-# h2 = extract_diagonal(trigger)
-# h1 = extract_diagonal(tight)
-# h0 = extract_diagonal(loose)
 
 
 efficiency_ones = make_ones_hist(h1)
@@ -325,7 +270,6 @@ eps_hlt_prime = 1.01
 
 ### greater than 25 GeV
 ## e2 = 2*h2/(h1 + 2*h1)
-
 eps_hlt = addHists(h1, scaleHist(h2, 2))
 eps_hlt_high = scaleHist(divideHists(h2, eps_hlt), 2)
 
@@ -352,7 +296,9 @@ h2var_hlt_high = get_h2var(eps_id_high, eps_hlt_var_high, heff_high)
 
 
 ##### below 25 GeV
-eps_hlt_low = eps_hlt_high
+eps_hlt_low = scaleHist(
+    h2, 0
+)  ### HERE I CHANGE IT, NOT SURE IF I SHOULD BE SETTING THIS TO 0
 
 ##e1 = h1/(h0 + h1)
 eps_id = addHists(h0, scaleHist(h1, 1))
@@ -372,9 +318,22 @@ h2var_id_low = get_h2var(eps_id_var_low, eps_hlt_low, heff_low)
 
 # h2var_id_low = remove_low_bins(h2var_id_low) ## this might already be projected on the wrong direction which isnt great
 
-h2_data = reco_dtdt_data.project("time", "pt_probe", "eta_probe")
-h1_data = reco_dtst_data.project("time", "pt_tag", "eta_tag")
-h0_data = reco_stst_data.project("time", "pt_tag", "eta_tag")
+
+trigger_proj_data = reco_dtdt_data.project("time", "pt_probe", "eta_probe")
+tight_proj_data = reco_dtst_data.project("time", "pt_probe", "eta_probe")
+loose_proj_data = reco_stst_data.project("time", "pt_probe", "eta_probe")
+
+
+h2_data = trigger_proj_data
+
+h1_data = addHists(
+    tight_proj_data,
+    scaleHist(trigger_proj_data, -1),
+)
+h0_data = addHists(
+    loose_proj_data,
+    scaleHist(tight_proj_data, -1),
+)
 
 eps_hlt_data = addHists(h1_data, scaleHist(h2_data, 2))
 eps_hlt_data = divideHists(h2_data, eps_hlt_data)
@@ -385,35 +344,40 @@ eps_id_data = multiplyHists(h0_data, eps_id_data)
 eps_id_data = addHists(eps_id_data, h1_data)
 eps_id_high_data = divideHists(h1_data, eps_id_data)
 
-
-eps_hlt_low = scaleHist(h2_data, 0)
-eps_hlt_low_data = eps_hlt_high_data
+# eps_hlt_low_data = eps_hlt_high_data
+eps_hlt_low_data = eps_hlt_low  #### SHOULD I BY DEFAULT BE SETTING THIS TO 0
 
 ##e1 = h1/(h0 + h1)
 eps_id_data = addHists(h0_data, scaleHist(h1_data, 1))
 eps_id_data = divideHists(h1_data, eps_id_data)
 eps_id_low_data = scaleHist(eps_id_data, 1)
 
+combined_eps_hlt_data = eps_hlt_high_data.values()
+combined_eps_hlt_data[:, :1, :] = eps_hlt_low_data.values()[:, :1, :]
+combined_eps_id_data = eps_id_high_data.values()
+combined_eps_id_data[:, :1, :] = eps_id_low_data.values()[:, :1, :]
+
+combined_epsilon_hlt = eps_hlt_high.values()
+combined_epsilon_hlt[:, :1, :] = eps_hlt_low.values()[:, :1, :]
+combined_epsilon_id = eps_id_high.values()
+combined_epsilon_id[:, :1, :] = eps_id_low.values()[:, :1, :]
+
+
 efficiencies = {
-    # "h2_id_high": divideHists(h2var_id_high, heff_high).values(),
-    # "h2_id_low": divideHists(h2var_id_low, heff_low).values(),
-    # "h1_id_high": divideHists(h1var_id_high, heff_high).values(),
-    # "h1_id_low": divideHists(h1var_id_low, heff_low).values(),
-    # "h0_id_high": divideHists(h0var_id_high, heff_high).values(),
-    # "h0_id_low": divideHists(h0var_id_low, heff_low).values(),
-    # "h2_hlt_high": divideHists(h2var_hlt_high, heff_high).values(),
-    # "h1_hlt_high": divideHists(h1var_hlt_high, heff_high).values(),
-    # "h0_hlt_high": divideHists(h0var_hlt_high, heff_high).values(),
     "epsilon_hlt_high": eps_hlt_high.values(),
     "epsilon_id_high": eps_id_high.values(),
-    # "epsilon_hlt_low": eps_hlt_low.values(),
-    # "epsilon_id_low": eps_id_low.values(),
-    "eps_hlt_true_neg": eps_hlt_true.values(),
-    "eps_id_true_neg": eps_id_true.values(),
-    # "epsilon_hlt_high_data": eps_hlt_high_data.values(),
-    # "epsilon_id_high_data": eps_id_high_data.values(),
-    # "epsilon_hlt_low_data": eps_hlt_low_data.values(),
-    # "epsilon_id_low_data": eps_id_low_data.values(),
+    "epsilon_hlt_low": eps_hlt_low.values(),
+    "epsilon_id_low": eps_id_low.values(),
+    "eps_hlt_true": eps_hlt_true.values(),
+    "eps_id_true": eps_id_true.values(),
+    "epsilon_hlt_high_data": eps_hlt_high_data.values(),
+    "epsilon_id_high_data": eps_id_high_data.values(),
+    "epsilon_hlt_low_data": eps_hlt_low_data.values(),
+    "epsilon_id_low_data": eps_id_low_data.values(),
+    "COMBINED_eps_hlt_data": combined_eps_hlt_data,
+    "COMBINED_eps_id_data": combined_eps_id_data,
+    "COMBINED_epsilon_hlt": combined_epsilon_hlt,
+    "COMBINED_epsilon_id": combined_epsilon_id,
 }
 
 with open("efficiency_values.pkl", "wb") as f:

@@ -121,14 +121,17 @@ for efficiency in range(len(key_list)):
                     temp.append(np.average(input_dict[key][:, i, j]))
                 # pdb.set_trace()
 
-                if "high" in key:
+                if (
+                    "high" in key
+                ):  ###SHOULD COME UP WITH A SMART WAY TO PLOT THESE SIMULTANEOUSLY
+
                     plt.plot(
                         pt_bins[2:], temp[2:], label=f"eta bin: {j}", color=f"C{j}"
                     )
-                # if "low" in key:
-                #     plt.plot(
-                #         pt_bins[:2], temp[:2], label=f"eta bin: {j}", color=f"C{j}"
-                #     )
+                if "low" in key:
+                    plt.plot(
+                        pt_bins[:2], temp[:2], label=f"eta bin: {j}", color=f"C{j}"
+                    )
             plt.title(key + " prefit")
             plt.legend()
             plt.xlabel("pt bin lower edge [GeV]")
@@ -139,12 +142,12 @@ for efficiency in range(len(key_list)):
             )
             plt.clf()
 
-        if "true" in key:
+        if "true" in key or "COMBINED" in key:
             for j in range(len(input_dict[key][0][0])):  # eta bin
                 temp = []
                 for i in range(len(input_dict[key][0])):  ## pt bin
                     temp.append(np.average(input_dict[key][:, i, j]))
-                plt.plot(pt_bins[2:], temp[2:], label=f"eta bin: {j}", color=f"C{j}")
+                plt.plot(pt_bins[:], temp[:], label=f"eta bin: {j}", color=f"C{j}")
 
             plt.title(key + " prefit")
             plt.legend()

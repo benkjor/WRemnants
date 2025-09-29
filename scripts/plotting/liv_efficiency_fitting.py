@@ -4,7 +4,6 @@ import pickle
 import h5py
 from uncertainty_tools import (
     all_mc_corrections,
-    get_eff_hist,
     get_era_vals,
     get_h0var,
     get_h0var_low,
@@ -12,17 +11,13 @@ from uncertainty_tools import (
     get_h1var_low,
     get_h2var,
     get_mc_lumis,
-    luminometer_syst,
     make_ones_hist,
-    remove_low_bins,
 )
 
-from rabbit import tensorwriter
 from utilities.io_tools import input_tools
 from wums.boostHistHelpers import (
     addHists,
     divideHists,
-    expand_hist_by_duplicate_axes,
     expand_hist_by_duplicate_axis,
     multiplyHists,
     scaleHist,
@@ -57,10 +52,10 @@ time_proj_hlt_all = expand_hist_by_duplicate_axis(time_proj_hlt_all, "mll", "gen
 time_proj_low_all = expand_hist_by_duplicate_axis(time_proj_low_all, "mll", "gen_mll")
 
 time_proj_low_all = time_proj_low_all.project(
-    "time", "mll", "gen_mll", "pt_lead", "eta_lead", "pt_sublead", "eta_sublead"
+    "time", "mll", "gen_mll", "pt_probe", "eta_probe", "pt_tag", "eta_tag"
 )
 time_proj_hlt_all = time_proj_hlt_all.project(
-    "time", "mll", "gen_mll", "pt_lead", "eta_lead", "pt_sublead", "eta_sublead"
+    "time", "mll", "gen_mll", "pt_probe", "eta_probe", "pt_tag", "eta_tag"
 )
 
 time_proj_low = time_proj_low_all[{"mll": mass_bin, "gen_mll": mass_bin}]
@@ -68,7 +63,7 @@ time_proj_hlt = time_proj_hlt_all[{"mll": mass_bin, "gen_mll": mass_bin}]
 
 
 time_proj_true = time_proj_low_all.project(
-    "time", "pt_lead", "eta_lead", "pt_sublead", "eta_sublead"
+    "time", "pt_probe", "eta_probe", "pt_tag", "eta_tag"
 )
 
 ### pass reco, pass generator
@@ -130,11 +125,10 @@ cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 
 nbins_mll = len(dtdt_prfg.axes["mll"])
 nbins_time = len(reco_dtst_data.axes["time"])
-nbins_pt_subleading = len(reco_dtst_data.axes["pt_sublead"])
-nbins_pt_leading = len(reco_dtst_data.axes["pt_lead"])
+nbins_pt_taging = len(reco_dtst_data.axes["pt_tag"])
+nbins_pt_probeing = len(reco_dtst_data.axes["pt_probe"])
 
-nbins_eta_leading = len(reco_dtdt_data.axes["eta_lead"])
-
+nbins_eta_probeing = len(reco_dtdt_data.axes["eta_probe"])
 
 hfoc_scaling = divideHists(lumi_hfoc, lumi_hfoc_nom)
 hfoc_scaling = multiplyHists(hfoc_scaling, lumi_scaling)
@@ -171,7 +165,6 @@ prpg_syst = [
 
 
 time_hists = [time_proj_hlt, time_proj_low]
-
 lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
 dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
@@ -259,16 +252,15 @@ pass_gen = all_mc_corrections(
     cross_sec,
 )
 
-n_masked = pass_gen.project("time", "pt_sublead", "eta_sublead")
+n_masked = pass_gen.project("time", "pt_tag", "eta_tag")
 
+h2 = dtdt_prpg.project("time", "pt_probe", "eta_probe")
+h1 = dtst_prpg.project("time", "pt_probe", "eta_probe")
+h0 = stst_prpg.project("time", "pt_probe", "eta_probe")
 
-h2 = dtdt_prpg.project("time", "pt_lead", "eta_lead")
-h1 = dtst_prpg.project("time", "pt_sublead", "eta_sublead")
-h0 = stst_prpg.project("time", "pt_sublead", "eta_sublead")
-
-h2_alt = dtdt_prpg.project("time", "pt_sublead", "eta_sublead")
-h1_alt = dtst_prpg.project("time", "pt_lead", "eta_lead")
-h0_alt = stst_prpg.project("time", "pt_lead", "eta_lead")
+# h2_alt = dtdt_prpg.project("time", "pt_tag", "eta_tag")
+# h1_alt = dtst_prpg.project("time", "pt_probe", "eta_probe")
+# h0_alt = stst_prpg.project("time", "pt_probe", "eta_probe")
 
 # eps_hlt_true_sublead = divideHists(h2_alt*2, addHists(h1, 2*h2_alt))
 # eps_hlt_true_lead = divideHists(h2*2, addHists(h1_alt, h2*2))
@@ -277,8 +269,10 @@ h0_alt = stst_prpg.project("time", "pt_lead", "eta_lead")
 # eps_id_true_sublead = divideHists(addHists(h1, h2), addHists(h1, addHists(h0, h2_alt)))
 
 # eps_id_avg = scaleHist(addHists(eps_id_true_lead, eps_id_true_sublead), 1/2)
-# eps_hlt_avg = scaleHist(addHists(eps_hlt_true_lead, eps_hlt_true_sublead), 1/2)
-
+# # eps_hlt_avg = scaleHist(addHists(eps_hlt_true_lead, eps_hlt_true_sublead), 1/2)
+trigger = trigger[{"mll": mass_bin, "gen_mll": mass_bin}]
+tight = tight[{"mll": mass_bin, "gen_mll": mass_bin}]
+loose = loose[{"mll": mass_bin, "gen_mll": mass_bin}]
 
 tight = all_mc_corrections(tight, time_proj_true, lumi_scaling, weightsum, cross_sec)
 loose = all_mc_corrections(loose, time_proj_true, lumi_scaling, weightsum, cross_sec)
@@ -286,43 +280,44 @@ trigger = all_mc_corrections(
     trigger, time_proj_true, lumi_scaling, weightsum, cross_sec
 )
 
+trigger_proj = trigger.project("time", "pt_probe", "eta_probe")
+tight_proj = tight.project("time", "pt_probe", "eta_probe")
+loose_proj = loose.project("time", "pt_probe", "eta_probe")
 
-# trig_all = addHists(
-#     trigger.project("time", "pt_lead", "eta_lead"),
-#     trigger.project("time", "pt_sublead", "eta_sublead"),
-# )
-# tight_all = addHists(
-#     tight.project("time", "pt_lead", "eta_lead"),
-#     tight.project("time", "pt_sublead", "eta_sublead"),
-# )
-# loose_all = addHists(
-#     loose.project("time", "pt_lead", "eta_lead"),
-#     loose.project("time", "pt_sublead", "eta_sublead"),
-# )
+eps_hlt_true = divideHists(trigger_proj, tight_proj)
+eps_id_true = divideHists(tight_proj, loose_proj)
 
-eps_hlt_true = divideHists(trigger, tight)
-eps_id_true = divideHists(tight, loose)
 
-# eps_hlt_true_lead = divideHists(
-#     trigger.project("time", "pt_lead", "eta_lead"),
-#     tight.project("time", "pt_lead", "eta_lead"),
-# )
-# eps_hlt_true_sublead = divideHists(
-#     trigger.project("time", "pt_sublead", "eta_sublead"),
-#     tight.project("time", "pt_sublead", "eta_sublead"),
-# )
-# eps_id_true_lead = divideHists(
-#     tight.project("time", "pt_lead", "eta_lead"),
-#     loose.project("time", "pt_lead", "eta_lead"),
-# )
-# eps_id_true_sublead = divideHists(
-#     tight.project("time", "pt_sublead", "eta_sublead"),
-#     loose.project("time", "pt_sublead", "eta_sublead"),
-# )
+def extract_diagonal(hist_in):
+    ## assumes hist_in comes as time, pt1, eta1, pt2, eta2
+    values = hist_in.values()  ## assumes this comeas as
+    hist_out = hist_in.copy().project("time", "pt_probe", "eta_probe")
+    hist_out_values = hist_out.values()
+    for k in range(hist_in.shape[0]):  # should be time
+        for i in range(hist_in.shape[1]):  ## pt
+            for j in range(hist_in.shape[2]):  # eta
+                hist_out_values[k, i, j] = values[k, i, j, i, j]
+    return hist_out
+
+
+h2 = trigger.project("time", "pt_probe", "eta_probe")
+
+h1 = addHists(
+    tight.project("time", "pt_probe", "eta_probe"),
+    scaleHist(trigger.project("time", "pt_probe", "eta_probe"), -1),
+)
+h0 = addHists(
+    loose.project("time", "pt_probe", "eta_probe"),
+    scaleHist(tight.project("time", "pt_probe", "eta_probe"), -1),
+)
+
+
+# h2 = extract_diagonal(trigger)
+# h1 = extract_diagonal(tight)
+# h0 = extract_diagonal(loose)
 
 
 efficiency_ones = make_ones_hist(h1)
-
 # generate histogram of ones
 
 eps_id_prime = 1.01
@@ -330,9 +325,9 @@ eps_hlt_prime = 1.01
 
 ### greater than 25 GeV
 ## e2 = 2*h2/(h1 + 2*h1)
+
 eps_hlt = addHists(h1, scaleHist(h2, 2))
-eps_hlt = divideHists(h2, eps_hlt)
-eps_hlt_high = scaleHist(eps_hlt, 2)
+eps_hlt_high = scaleHist(divideHists(h2, eps_hlt), 2)
 
 ##e1 = h1/(h0*(1-e2) + h1)
 eps_id = addHists(efficiency_ones, scaleHist(eps_hlt_high, -1))
@@ -350,12 +345,13 @@ h0var_id_high = get_h0var(eps_id_var_high, eps_hlt_high, heff_high, efficiency_o
 h0var_hlt_high = get_h0var(eps_id_high, eps_hlt_var_high, heff_high, efficiency_ones)
 h1var_id_high = get_h1var(eps_id_var_high, eps_hlt_high, heff_high, efficiency_ones)
 h1var_hlt_high = get_h1var(eps_id_high, eps_hlt_var_high, heff_high, efficiency_ones)
+
+
 h2var_id_high = get_h2var(eps_id_var_high, eps_hlt_high, heff_high)
 h2var_hlt_high = get_h2var(eps_id_high, eps_hlt_var_high, heff_high)
 
 
 ##### below 25 GeV
-eps_hlt_low = scaleHist(h2, 0)
 eps_hlt_low = eps_hlt_high
 
 ##e1 = h1/(h0 + h1)
@@ -376,10 +372,9 @@ h2var_id_low = get_h2var(eps_id_var_low, eps_hlt_low, heff_low)
 
 # h2var_id_low = remove_low_bins(h2var_id_low) ## this might already be projected on the wrong direction which isnt great
 
-h2_data = reco_dtdt_data.project("time", "pt_lead", "eta_lead")
-h1_data = reco_dtst_data.project("time", "pt_sublead", "eta_sublead")
-h0_data = reco_stst_data.project("time", "pt_sublead", "eta_sublead")
-
+h2_data = reco_dtdt_data.project("time", "pt_probe", "eta_probe")
+h1_data = reco_dtst_data.project("time", "pt_tag", "eta_tag")
+h0_data = reco_stst_data.project("time", "pt_tag", "eta_tag")
 
 eps_hlt_data = addHists(h1_data, scaleHist(h2_data, 2))
 eps_hlt_data = divideHists(h2_data, eps_hlt_data)
@@ -399,7 +394,6 @@ eps_id_data = addHists(h0_data, scaleHist(h1_data, 1))
 eps_id_data = divideHists(h1_data, eps_id_data)
 eps_id_low_data = scaleHist(eps_id_data, 1)
 
-
 efficiencies = {
     # "h2_id_high": divideHists(h2var_id_high, heff_high).values(),
     # "h2_id_low": divideHists(h2var_id_low, heff_low).values(),
@@ -410,16 +404,10 @@ efficiencies = {
     # "h2_hlt_high": divideHists(h2var_hlt_high, heff_high).values(),
     # "h1_hlt_high": divideHists(h1var_hlt_high, heff_high).values(),
     # "h0_hlt_high": divideHists(h0var_hlt_high, heff_high).values(),
-    # "epsilon_hlt_high": eps_hlt_high.values(),
-    # "epsilon_id_high": eps_id_high.values(),
+    "epsilon_hlt_high": eps_hlt_high.values(),
+    "epsilon_id_high": eps_id_high.values(),
     # "epsilon_hlt_low": eps_hlt_low.values(),
     # "epsilon_id_low": eps_id_low.values(),
-    # "eps_hlt_true": eps_hlt_true.values(),
-    # "eps_id_true": eps_id_true.values(),
-    # "eps_hlt_true_lead": eps_hlt_true_lead.values(),
-    # "eps_id_true_lead": eps_id_true_lead.values(),
-    # "eps_hlt_true_sublead": eps_hlt_true_sublead.values(),
-    # "eps_id_true_sublead": eps_id_true_sublead.values(),
     "eps_hlt_true_neg": eps_hlt_true.values(),
     "eps_id_true_neg": eps_id_true.values(),
     # "epsilon_hlt_high_data": eps_hlt_high_data.values(),
@@ -432,16 +420,17 @@ with open("efficiency_values.pkl", "wb") as f:
     pickle.dump(efficiencies, f)
 
 
+"""
 #### i think i will need to mix this too but it doesn't affect the fit
 
 reco_dtdt_data = reco_dtdt_data[{"mll": mass_bin}].project(
-    "time", "pt_lead", "eta_lead"
+    "time", "pt_probe", "eta_probe"
 )
 reco_dtst_data = reco_dtst_data[{"mll": mass_bin}].project(
-    "time", "pt_sublead", "eta_sublead"
+    "time", "pt_tag", "eta_tag"
 )
 reco_stst_data = reco_stst_data[{"mll": mass_bin}].project(
-    "time", "pt_sublead", "eta_sublead"
+    "time", "pt_tag", "eta_tag"
 )
 
 
@@ -482,14 +471,14 @@ stst_prpg = expand_hist_by_duplicate_axis(stst_prpg, "time", "gen_time")
 
 
 pass_gen_expanded = expand_hist_by_duplicate_axes(pass_gen, ["time"], ["gen_time"])
-# for e in range(nbins_eta_leading):
+# for e in range(nbins_eta_probeing):
 #     for t in range(nbins_time):
-#         print(h0[{"eta_sublead": e, "time": t}])
+#         print(h0[{"eta_tag": e, "time": t}])
 
 
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
-for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the center
-    for j in range(nbins_eta_leading):  # eta
+for i in range(2, nbins_pt_taging - 1):  # just select two pt bins in the center
+    for j in range(nbins_eta_probeing):  # eta
         for k in range(nbins_time):  #  time
 
             if i > 0:  ## we only have 1 bin beneath 25 GeV
@@ -497,7 +486,7 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
                 ### be more consistent about ordering of time and mll
                 ### fitting for the number of events
                 v2 = dtdt_prpg[
-                    {"pt_sublead": i - 1, "eta_sublead": j, "gen_time": k}
+                    {"pt_tag": i - 1, "eta_tag": j, "gen_time": k}
                 ]  ## equivalent to n2
                 var2 = addHists(v2 * var_size, h2)
 
@@ -511,7 +500,7 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
                 )
 
             v1 = dtst_prpg[
-                {"pt_lead": i, "eta_lead": j, "gen_time": k}
+                {"pt_probe": i, "eta_probe": j, "gen_time": k}
             ]  ## equivalent to n1
             var1 = addHists(v1 * var_size, h1)
             writer.add_systematic(
@@ -523,7 +512,7 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
                 groups=["nz"],
             )
             v0 = stst_prpg[
-                {"pt_lead": i, "eta_lead": j, "gen_time": k}
+                {"pt_probe": i, "eta_probe": j, "gen_time": k}
             ]  ## equivalent to n1
             var0 = addHists(v0 * var_size, h0)
             writer.add_systematic(
@@ -535,7 +524,7 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
                 groups=["nz"],
             )
             # for masked channel
-            v_masked = pass_gen_expanded[{"pt_lead": i, "eta_lead": j, "gen_time": k}]
+            v_masked = pass_gen_expanded[{"pt_probe": i, "eta_probe": j, "gen_time": k}]
             var_masked = addHists(v_masked * var_size, n_masked)
             cross_section_masked = divideHists(var_masked, lumi_scaling)
 
@@ -552,25 +541,25 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
             if i > 0:
                 # ## efficiency
                 h1var_id_primed = get_eff_hist(
-                    h1var_id_high, h1, i, j, k, "pt_sublead", "eta_sublead"
+                    h1var_id_high, h1, i, j, k, "pt_tag", "eta_tag"
                 )
                 h0var_id_primed = get_eff_hist(
-                    h0var_id_high, h0, i, j, k, "pt_sublead", "eta_sublead"
+                    h0var_id_high, h0, i, j, k, "pt_tag", "eta_tag"
                 )
 
                 h1var_hlt_primed = get_eff_hist(
-                    h1var_hlt_high, h1, i, j, k, "pt_sublead", "eta_sublead"
+                    h1var_hlt_high, h1, i, j, k, "pt_tag", "eta_tag"
                 )
                 h0var_hlt_primed = get_eff_hist(
-                    h0var_hlt_high, h0, i, j, k, "pt_sublead", "eta_sublead"
+                    h0var_hlt_high, h0, i, j, k, "pt_tag", "eta_tag"
                 )
 
                 # #     ### ID EFFICIENCY
                 h2var_id_primed = get_eff_hist(
-                    h2var_id_high, h2, i - 1, j, k, "pt_lead", "eta_lead"
+                    h2var_id_high, h2, i - 1, j, k, "pt_probe", "eta_probe"
                 )
                 h2var_hlt_primed = get_eff_hist(
-                    h2var_hlt_high, h2, i - 1, j, k, "pt_lead", "eta_lead"
+                    h2var_hlt_high, h2, i - 1, j, k, "pt_probe", "eta_probe"
                 )
                 #     pdb.set_trace()
 
@@ -610,10 +599,10 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
 
             else:
                 h1var_id_primed = get_eff_hist(
-                    h1var_id_low, h1, i, j, k, "pt_sublead", "eta_sublead"
+                    h1var_id_low, h1, i, j, k, "pt_tag", "eta_tag"
                 )
                 h0var_id_primed = get_eff_hist(
-                    h0var_id_low, h0, i, j, k, "pt_sublead", "eta_sublead"
+                    h0var_id_low, h0, i, j, k, "pt_tag", "eta_tag"
                 )
                 #     # ### ID EFFICIENCY, these two used to be i-2
                 h2var_id_primed = get_eff_hist(
@@ -622,8 +611,8 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
                     i,
                     j,
                     k,
-                    "pt_lead",
-                    "eta_lead",
+                    "pt_probe",
+                    "eta_probe",
                 )
 
             # ### order of these is time, pt, eta
@@ -685,7 +674,7 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
 
 
 ### these slightly increase the statistical uncertainty but dont contribute to the stability/linearity
-# dtdt_prpg_prefiring_syst = dtdt_prpg_prefiring_syst.project("time", "pt_lead", "eta_lead")
+# dtdt_prpg_prefiring_syst = dtdt_prpg_prefiring_syst.project("time", "pt_probe", "eta_probe")
 # writer.add_systematic(
 #     remove_low_bins(dtdt_prpg_prefiring_syst),
 #     f"prefiring_syst",
@@ -695,7 +684,7 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
 #     groups=["prefiring_syst"],
 # )
 # writer.add_systematic(
-#     dtst_prpg_prefiring_syst.project("time", "pt_sublead", "eta_sublead"),
+#     dtst_prpg_prefiring_syst.project("time", "pt_tag", "eta_tag"),
 #     f"prefiring_syst",
 #     "Zmumu pass gen",
 #     "ch_dtst",
@@ -703,7 +692,7 @@ for i in range(2, nbins_pt_subleading - 1):  # just select two pt bins in the ce
 #     groups=["prefiring_syst"],
 # )
 # writer.add_systematic(
-#     stst_prpg_prefiring_syst.project("time", "pt_sublead", "eta_sublead"),
+#     stst_prpg_prefiring_syst.project("time", "pt_tag", "eta_tag"),
 #     f"prefiring_syst",
 #     "Zmumu pass gen",
 #     "ch_stst",
@@ -810,3 +799,4 @@ luminometer_syst(
 )
 
 writer.write(outfolder="./", outfilename="liv")
+"""

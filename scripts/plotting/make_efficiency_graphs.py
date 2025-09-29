@@ -12,7 +12,7 @@ with open("efficiency_values.pkl", "rb") as f:
     input_dict = pickle.load(f)
 ### so these get loaded in as pt, eta.
 
-date = "2025-09-24"
+date = "2025-09-29"
 postfit = False  ### I SHOULD DO THIS
 print(date)
 
@@ -119,17 +119,18 @@ for efficiency in range(len(key_list)):
                 temp = []
                 for i in range(len(input_dict[key][0])):  ## pt bin
                     temp.append(np.average(input_dict[key][:, i, j]))
+                # pdb.set_trace()
+
                 if "high" in key:
                     plt.plot(
                         pt_bins[2:], temp[2:], label=f"eta bin: {j}", color=f"C{j}"
                     )
-                if "low" in key:
-                    plt.plot(
-                        pt_bins[:2], temp[:2], label=f"eta bin: {j}", color=f"C{j}"
-                    )
+                # if "low" in key:
+                #     plt.plot(
+                #         pt_bins[:2], temp[:2], label=f"eta bin: {j}", color=f"C{j}"
+                #     )
             plt.title(key + " prefit")
             plt.legend()
-            # plt.ylim([0.99, 1.01])
             plt.xlabel("pt bin lower edge [GeV]")
             plt.ylabel("input efficiency")
             plt.tight_layout()
@@ -139,17 +140,10 @@ for efficiency in range(len(key_list)):
             plt.clf()
 
         if "true" in key:
-            print(key)
-            # pdb.set_trace()
             for j in range(len(input_dict[key][0][0])):  # eta bin
                 temp = []
                 for i in range(len(input_dict[key][0])):  ## pt bin
                     temp.append(np.average(input_dict[key][:, i, j]))
-                # if "PLUS" in key:
-                #     plt.plot(
-                #         pt_bins[2:], temp[2:], label=f"eta bin: {j}", color=f"C{j}"
-                #     )
-                # elif "MINUS" in key or "average" in key:
                 plt.plot(pt_bins[2:], temp[2:], label=f"eta bin: {j}", color=f"C{j}")
 
             plt.title(key + " prefit")

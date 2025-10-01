@@ -4,6 +4,7 @@ import pickle
 import h5py
 from uncertainty_tools import (
     all_mc_corrections,
+    get_eff_hist,
     get_era_vals,
     get_h0var,
     get_h0var_low,
@@ -11,9 +12,11 @@ from uncertainty_tools import (
     get_h1var_low,
     get_h2var,
     get_mc_lumis,
+    luminometer_syst,
     make_ones_hist,
 )
 
+from rabbit import tensorwriter
 from utilities.io_tools import input_tools
 from wums.boostHistHelpers import (
     addHists,
@@ -113,10 +116,10 @@ cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 
 nbins_mll = len(dtdt_prfg.axes["mll"])
 nbins_time = len(reco_dtst_data.axes["time"])
-nbins_pt_taging = len(reco_dtst_data.axes["pt_tag"])
-nbins_pt_probeing = len(reco_dtst_data.axes["pt_probe"])
+nbins_pt = len(reco_dtst_data.axes["pt_probe"])
+# nbins_pt_probeing = len(reco_dtst_data.axes["pt_probe"])
 
-nbins_eta_probeing = len(reco_dtdt_data.axes["eta_probe"])
+nbins_eta = len(reco_dtdt_data.axes["eta_probe"])
 
 hfoc_scaling = divideHists(lumi_hfoc, lumi_hfoc_nom)
 hfoc_scaling = multiplyHists(hfoc_scaling, lumi_scaling)
@@ -202,6 +205,7 @@ dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = get_mc_lumis(
     weightsum,
     cross_sec,
 )
+
 dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ramses = get_mc_lumis(
     prpg_all,
     time_hists,
@@ -240,7 +244,9 @@ pass_gen = all_mc_corrections(
     cross_sec,
 )
 
-n_masked = pass_gen.project("time", "pt_tag", "eta_tag")
+n_masked = pass_gen.project(
+    "time", "pt_probe", "eta_probe"
+)  ### choosing tag versus probe for this did not matter
 
 trigger_proj = dtdt_prpg.project("time", "pt_probe", "eta_probe")
 tight_proj = dtst_prpg.project("time", "pt_probe", "eta_probe")
@@ -315,24 +321,19 @@ h0var_id_low = get_h0var_low(eps_id_var_low, eps_hlt_low, heff_low, efficiency_o
 h1var_id_low = get_h1var_low(eps_id_var_low, eps_hlt_low, heff_low, efficiency_ones)
 h2var_id_low = get_h2var(eps_id_var_low, eps_hlt_low, heff_low)
 
+reco_dtdt_data = reco_dtdt_data.project("time", "pt_probe", "eta_probe")
+reco_dtst_data = reco_dtst_data.project("time", "pt_probe", "eta_probe")
+reco_stst_data = reco_stst_data.project("time", "pt_probe", "eta_probe")
 
-# h2var_id_low = remove_low_bins(h2var_id_low) ## this might already be projected on the wrong direction which isnt great
-
-
-trigger_proj_data = reco_dtdt_data.project("time", "pt_probe", "eta_probe")
-tight_proj_data = reco_dtst_data.project("time", "pt_probe", "eta_probe")
-loose_proj_data = reco_stst_data.project("time", "pt_probe", "eta_probe")
-
-
-h2_data = trigger_proj_data
+h2_data = reco_dtdt_data
 
 h1_data = addHists(
-    tight_proj_data,
-    scaleHist(trigger_proj_data, -1),
+    reco_dtst_data,
+    scaleHist(reco_dtdt_data, -1),
 )
 h0_data = addHists(
-    loose_proj_data,
-    scaleHist(tight_proj_data, -1),
+    reco_stst_data,
+    scaleHist(reco_dtst_data, -1),
 )
 
 eps_hlt_data = addHists(h1_data, scaleHist(h2_data, 2))
@@ -384,38 +385,43 @@ with open("efficiency_values.pkl", "wb") as f:
     pickle.dump(efficiencies, f)
 
 
+###################################################################333
+#####  KNOW THIS IS CORRECT #####
+
+# should rewrite the section above to not have redundant code. same with some sections in the histmaker
+
 """
+combined epsilons: time, pt_probe, eta_probe; pt all the way down to 15 GeV
+need to check on all of the variations but they should all be time, pt_probe, eta_probe
+^will these two need to be expanded along another axis
+
+
+n_masked = time, pt_tag, eta_tag --> IS THAT CORRECT? I THINK IT SHOULD PROBABLY BE IN TERMS OF PROBE? OR IS THE POINT THAT IT IS MASKED SO IT IS TRACKING THE OTHER CHANNEL
+
+i am currently ignoring the low bins for hlt. i dont think i should do that. i think i should just not fit to those. 
+
+
+
+
+*t*t_prpg are all still 5d in (time, pt_probe, eta_probe, pt_tag, eta_tag)
+"""
+
+
 #### i think i will need to mix this too but it doesn't affect the fit
-
-reco_dtdt_data = reco_dtdt_data[{"mll": mass_bin}].project(
-    "time", "pt_probe", "eta_probe"
-)
-reco_dtst_data = reco_dtst_data[{"mll": mass_bin}].project(
-    "time", "pt_tag", "eta_tag"
-)
-reco_stst_data = reco_stst_data[{"mll": mass_bin}].project(
-    "time", "pt_tag", "eta_tag"
-)
-
 
 ## create the tensor
 writer = tensorwriter.TensorWriter()
-##g# enerator channel
-writer.add_channel(n_masked.axes, "ch_masked", masked=True)
+##generator channel
+writer.add_channel(n_masked.axes, "ch_masked", masked=True)  ## is this still correct?
 writer.add_process(
     divideHists(n_masked, lumi_scaling), "Zmumu pass gen", "ch_masked", signal=False
 )
 
-reco_dtdt_data = remove_low_bins(reco_dtdt_data)
-h2 = remove_low_bins(h2)
-dtdt_prpg = remove_low_bins(dtdt_prpg)
 
-h2var_id_low = remove_low_bins(h2var_id_low)
-
-
+### okay these are all 3d (time, pt_probe, eta_probe which is how i want it. )
 writer.add_channel(
     reco_dtdt_data.axes, "ch_dtdt"
-)  ### i have implicity selected a muon, this may be bad later
+)  # at this point it is only looking at information about the single muon. i don't think that is right, i think we want to keep the other soooo either i could expand the axes or i could attempt to solve the root issue and not project it down
 writer.add_data(reco_dtdt_data, "ch_dtdt")
 writer.add_process(h2, "Zmumu pass gen", "ch_dtdt", signal=False)
 
@@ -426,23 +432,18 @@ writer.add_process(h1, "Zmumu pass gen", "ch_dtst", signal=False)
 writer.add_channel(reco_stst_data.axes, "ch_stst")
 writer.add_data(reco_stst_data, "ch_stst")
 writer.add_process(h0, "Zmumu pass gen", "ch_stst", signal=False)
-# pdb.set_trace()
 
-### adding axes as appropriate to make everything 4 dimensional
+
+### adding axes as appropriate to make everything 6 dimensional
 dtdt_prpg = expand_hist_by_duplicate_axis(dtdt_prpg, "time", "gen_time")
 dtst_prpg = expand_hist_by_duplicate_axis(dtst_prpg, "time", "gen_time")
 stst_prpg = expand_hist_by_duplicate_axis(stst_prpg, "time", "gen_time")
 
-
-pass_gen_expanded = expand_hist_by_duplicate_axes(pass_gen, ["time"], ["gen_time"])
-# for e in range(nbins_eta_probeing):
-#     for t in range(nbins_time):
-#         print(h0[{"eta_tag": e, "time": t}])
-
+pass_gen = expand_hist_by_duplicate_axis(pass_gen, "time", "gen_time")
 
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
-for i in range(2, nbins_pt_taging - 1):  # just select two pt bins in the center
-    for j in range(nbins_eta_probeing):  # eta
+for i in range(1, nbins_pt):  # just select two pt bins in the center
+    for j in range(nbins_eta):  # eta
         for k in range(nbins_time):  #  time
 
             if i > 0:  ## we only have 1 bin beneath 25 GeV
@@ -464,7 +465,7 @@ for i in range(2, nbins_pt_taging - 1):  # just select two pt bins in the center
                 )
 
             v1 = dtst_prpg[
-                {"pt_probe": i, "eta_probe": j, "gen_time": k}
+                {"pt_tag": i, "eta_tag": j, "gen_time": k}
             ]  ## equivalent to n1
             var1 = addHists(v1 * var_size, h1)
             writer.add_systematic(
@@ -476,7 +477,7 @@ for i in range(2, nbins_pt_taging - 1):  # just select two pt bins in the center
                 groups=["nz"],
             )
             v0 = stst_prpg[
-                {"pt_probe": i, "eta_probe": j, "gen_time": k}
+                {"pt_tag": i, "eta_tag": j, "gen_time": k}
             ]  ## equivalent to n1
             var0 = addHists(v0 * var_size, h0)
             writer.add_systematic(
@@ -488,7 +489,7 @@ for i in range(2, nbins_pt_taging - 1):  # just select two pt bins in the center
                 groups=["nz"],
             )
             # for masked channel
-            v_masked = pass_gen_expanded[{"pt_probe": i, "eta_probe": j, "gen_time": k}]
+            v_masked = pass_gen[{"pt_tag": i, "eta_tag": j, "gen_time": k}]
             var_masked = addHists(v_masked * var_size, n_masked)
             cross_section_masked = divideHists(var_masked, lumi_scaling)
 
@@ -505,17 +506,17 @@ for i in range(2, nbins_pt_taging - 1):  # just select two pt bins in the center
             if i > 0:
                 # ## efficiency
                 h1var_id_primed = get_eff_hist(
-                    h1var_id_high, h1, i, j, k, "pt_tag", "eta_tag"
+                    h1var_id_high, h1, i, j, k, "pt_probe", "eta_probe"
                 )
                 h0var_id_primed = get_eff_hist(
-                    h0var_id_high, h0, i, j, k, "pt_tag", "eta_tag"
+                    h0var_id_high, h0, i, j, k, "pt_probe", "eta_probe"
                 )
 
                 h1var_hlt_primed = get_eff_hist(
-                    h1var_hlt_high, h1, i, j, k, "pt_tag", "eta_tag"
+                    h1var_hlt_high, h1, i, j, k, "pt_probe", "eta_probe"
                 )
                 h0var_hlt_primed = get_eff_hist(
-                    h0var_hlt_high, h0, i, j, k, "pt_tag", "eta_tag"
+                    h0var_hlt_high, h0, i, j, k, "pt_probe", "eta_probe"
                 )
 
                 # #     ### ID EFFICIENCY
@@ -525,16 +526,7 @@ for i in range(2, nbins_pt_taging - 1):  # just select two pt bins in the center
                 h2var_hlt_primed = get_eff_hist(
                     h2var_hlt_high, h2, i - 1, j, k, "pt_probe", "eta_probe"
                 )
-                #     pdb.set_trace()
 
-                writer.add_systematic(
-                    h2var_id_primed,
-                    f"id_prime_pt{i}_eta{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_dtdt",
-                    constrained=False,
-                    groups=["eff_id"],
-                )
                 writer.add_systematic(
                     h2var_hlt_primed,
                     f"hlt_prime_pt{i}_eta{j}_time{k}",
@@ -560,27 +552,33 @@ for i in range(2, nbins_pt_taging - 1):  # just select two pt bins in the center
                     constrained=False,
                     groups=["eff_trig"],
                 )
-
+                writer.add_systematic(
+                    h2var_id_primed,
+                    f"id_prime_pt{i}_eta{j}_time{k}",
+                    "Zmumu pass gen",
+                    "ch_dtdt",
+                    constrained=False,
+                    groups=["eff_id"],
+                )
             else:
                 h1var_id_primed = get_eff_hist(
-                    h1var_id_low, h1, i, j, k, "pt_tag", "eta_tag"
+                    h1var_id_low, h1, i, j, k, "pt_probe", "eta_probe"
                 )
                 h0var_id_primed = get_eff_hist(
-                    h0var_id_low, h0, i, j, k, "pt_tag", "eta_tag"
+                    h0var_id_low, h0, i, j, k, "pt_probe", "eta_probe"
                 )
                 #     # ### ID EFFICIENCY, these two used to be i-2
-                h2var_id_primed = get_eff_hist(
-                    remove_low_bins(h2var_id_low.copy()),
-                    h2,
-                    i,
-                    j,
-                    k,
-                    "pt_probe",
-                    "eta_probe",
-                )
+                # hd = get_eff_hist(
+                #     h2var_id_low,
+                #     h2,
+                #     i,
+                #     j,
+                #     k,
+                #     "pt_probe",
+                #     "eta_probe",
+                # )2var_id_prime
 
-            # ### order of these is time, pt, eta
-
+            ### order of these is time, pt, eta
             writer.add_systematic(
                 h1var_id_primed,
                 f"id_prime_pt{i}_eta{j}_time{k}",
@@ -600,6 +598,7 @@ for i in range(2, nbins_pt_taging - 1):  # just select two pt bins in the center
             )
 
 
+### SO THESE SHOULD BE DONE ACROSS ALL MASS BINS
 # ##### NONE OF THIS IS MASS DEPENDENT ## may be linked to statistical uncertainty becuase the eta region? do i still need this or am i double counting
 # lowers stability uncetainty increase linearity uncertainty.
 # num_etaphi = len(dtdt_prpg_H_stat.project("etaPhiRegion").values())
@@ -727,32 +726,39 @@ for i in range(2, nbins_pt_taging - 1):  # just select two pt bins in the center
 #     )
 
 
-## PCC cross detector
-luminometer_syst(
-    writer, "pcc", dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc, "stability"
-)
-# ## HFOC cross detector
-luminometer_syst(
-    writer, "hfoc", dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc, "stability"
-)
+### statistical uncertainty and the stability and linearity still slightly linked (~0.003%)
 
-#### RAMSES cross detector
+
+### stability cross detector seems to generate hte majority of that
+# ## PCC cross detector
+# luminometer_syst(
+#     writer, "pcc", dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc, "stability"
+# )
+# # ## HFOC cross detector
+# luminometer_syst(
+#     writer, "hfoc", dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc, "stability"
+# )
+
+# #### RAMSES cross detector
 luminometer_syst(
     writer, "ramses", dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses, "stability"
 )
 
 
-#### HFOC linearity
-luminometer_syst(
-    writer,
-    "hfoc",
-    dtdt_prpg_sbil_hfoc,
-    dtst_prpg_sbil_hfoc,
-    stst_prpg_sbil_hfoc,
-    "linearity",
-)
+## seems to generate about the same amount of statistical uncertainty and together the uncertainties on each are higher so they are somehow linked which is a problem
 
-#### RAMSES linearity
+### YEAH THESE ARE 100% COUPLED. CRAP.
+#### HFOC linearity
+# luminometer_syst(
+#     writer,
+#     "hfoc",
+#     dtdt_prpg_sbil_hfoc,
+#     dtst_prpg_sbil_hfoc,
+#     stst_prpg_sbil_hfoc,
+#     "linearity",
+# )
+
+# #### RAMSES linearity
 luminometer_syst(
     writer,
     "ramses",
@@ -763,4 +769,3 @@ luminometer_syst(
 )
 
 writer.write(outfolder="./", outfilename="liv")
-"""

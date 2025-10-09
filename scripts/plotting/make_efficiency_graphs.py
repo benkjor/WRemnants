@@ -12,9 +12,12 @@ with open("efficiency_values.pkl", "rb") as f:
     input_dict = pickle.load(f)
 ### so these get loaded in as pt, eta.
 
-date = "2025-09-29"
+date = "2025-10-08"
 postfit = False  ### I SHOULD DO THIS
 print(date)
+
+# pt_cutoff = 2
+pt_cutoff = 0
 
 # Read your input from a text file
 with open("efficiency_graph_fit_9-5-25.txt", "r") as mult:
@@ -85,8 +88,20 @@ pt_bins = [
     45.87573,
     48.56281,
     53.1789,
+    80,
 ]  # , 80,], ### these are not the pt bins
-eta_bins = np.linspace(-2.4, 2.4, 6)
+
+pt_bins = [
+    15,
+    # 21,
+    25,
+    50,
+    80,
+]
+
+# pdb.set_trace()
+pt_bins = [(pt_bins[i] + (pt_bins[i + 1])) / 2 for i in range(len(pt_bins) - 1)]
+eta_bins = np.linspace(-2.4, 2.4, 3)
 
 
 for efficiency in range(len(key_list)):
@@ -99,7 +114,7 @@ for efficiency in range(len(key_list)):
         #             temp.append(np.max(input_dict[key][:, i, j]))
         #         if "high" in key:
         #             plt.plot(
-        #                 pt_bins[2:], temp[2:], label=f"eta bin: {j}", color=f"C{j}"
+        #                 pt_bins[pt_cutoff:], temp[pt_cutoff:], label=f"eta bin: {j}", color=f"C{j}"
         #             )
         #         else:
         #             plt.plot(pt_bins, temp, label=f"eta bin: {j}", color=f"C{j}")
@@ -124,13 +139,18 @@ for efficiency in range(len(key_list)):
                 if (
                     "high" in key
                 ):  ###SHOULD COME UP WITH A SMART WAY TO PLOT THESE SIMULTANEOUSLY
-
                     plt.plot(
-                        pt_bins[2:], temp[2:], label=f"eta bin: {j}", color=f"C{j}"
+                        pt_bins[pt_cutoff:],
+                        temp[pt_cutoff:],
+                        label=f"eta bin: {j}",
+                        color=f"C{j}",
                     )
                 if "low" in key:
                     plt.plot(
-                        pt_bins[:2], temp[:2], label=f"eta bin: {j}", color=f"C{j}"
+                        pt_bins[:pt_cutoff],
+                        temp[:pt_cutoff],
+                        label=f"eta bin: {j}",
+                        color=f"C{j}",
                     )
             plt.title(key + " prefit")
             plt.legend()

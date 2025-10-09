@@ -34,7 +34,7 @@ slope_hfoc = 0.0007
 mass_bin = 2
 var_size = 0.01
 
-######################################################################33
+######################################################################
 # DATA IMPORTS #
 
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
@@ -49,10 +49,11 @@ MC_Zmumu = results["ZmumuPostVFP"]["output"]
 dtdt_data = data_output["time_mll"].get()
 dtst_data = data_output["time_dtst"].get()
 stst_data = data_output["time_stst"].get()
-time_proj_low_all = data_output[
-    "time_proj"
-].get()  #### HONESTLY NOT SURE WHY WE HAVE THIS STILL, MAY NEED TO BE DELETED
+
 time_proj_hlt_all = data_output["time_proj"].get()
+
+time_proj_hlt_all = time_proj_hlt_all[{"mll": mass_bin}]  # , "gen_mll": mass_bin}]
+time_proj_low_all = time_proj_hlt_all.copy()
 
 
 ### PASS GENERATOR CUTOFFS
@@ -94,7 +95,6 @@ lumi_hfoc = lumi_output["lumi_hfoc"].get()
 lumi_pcc = lumi_output["lumi_pcc"].get()
 lumi_ramses = lumi_output["lumi_ramses"].get()
 
-# NOT QUITE SURE WHAT THIS DIFFERENCE IS TBH
 lumi_hfoc_nom = lumi_output["lumi_in_hfoc"].get()
 lumi_pcc_nom = lumi_output["lumi_in_pcc"].get()
 lumi_ramses_nom = lumi_output["lumi_in_ramses"].get()
@@ -103,7 +103,6 @@ lumi_ramses_nom = lumi_output["lumi_in_ramses"].get()
 sbil_pcc = lumi_output["sbil_pcc"].get()
 count_pcc = lumi_output["count_pcc"].get()
 
-#### A COUPLE FIXED QUANTITIES
 nbins_mll = len(dtdt_prfg.axes["mll"])  ## don't currenyl use this
 nbins_time = len(dtst_data.axes["time"])
 nbins_pt = len(dtst_data.axes["pt_probe"])
@@ -138,12 +137,14 @@ ramses_scaling = multiplyHists(ramses_scaling, lumi_scaling)
 
 ### okay i don't want to do the mass selection here
 
-# dtdt_prpg_H = dtdt_prpg_H[{"mll": mass_bin, "gen_mll": mass_bin}] ### instead of specifying mass bins here could i use : to use them all?
-# dtst_prpg_H = dtst_prpg_H[{"mll": mass_bin, "gen_mll": mass_bin}]
-# stst_prpg_H = stst_prpg_H[{"mll": mass_bin, "gen_mll": mass_bin}]
-# dtdt_prpg_BG = dtdt_prpg_BG[{"mll": mass_bin, "gen_mll": mass_bin}]
-# dtst_prpg_BG = dtst_prpg_BG[{"mll": mass_bin, "gen_mll": mass_bin}]
-# stst_prpg_BG = stst_prpg_BG[{"mll": mass_bin, "gen_mll": mass_bin}]
+dtdt_prpg_H = (
+    dtdt_prpg_H[{"mll": mass_bin}],
+)  # "gen_mll": mass_bin}] ### instead of specifying mass bins here could i use : to use them all?
+dtst_prpg_H = (dtst_prpg_H[{"mll": mass_bin}],)  # , "gen_mll": mass_bin}]
+stst_prpg_H = (stst_prpg_H[{"mll": mass_bin}],)  # , "gen_mll": mass_bin}]
+dtdt_prpg_BG = (dtdt_prpg_BG[{"mll": mass_bin}],)  # , "gen_mll": mass_bin}]
+dtst_prpg_BG = (dtst_prpg_BG[{"mll": mass_bin}],)  # , "gen_mll": mass_bin}]
+stst_prpg_BG = (stst_prpg_BG[{"mll": mass_bin}],)  # , "gen_mll": mass_bin}]
 
 
 ### this just puts them in a list
@@ -164,10 +165,7 @@ prpg_all = [
 #     stst_prpg_BG_syst[{"downUpVar": 0}], #"mll": mass_bin, "gen_mll": mass_bin}],
 # ]
 
-time_hists = [
-    time_proj_hlt_all,
-    time_proj_low_all,
-]  ## do i currently differentiate between these two?
+time_hists = [time_proj_hlt_all, time_proj_low_all]
 lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
 # dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
@@ -312,7 +310,6 @@ h1var_hlt_high = get_h1var(eps_id_high, eps_hlt_var_high, heff_high, efficiency_
 
 h2var_id_high = get_h2var(eps_id_var_high, eps_hlt_high, heff_high)
 h2var_hlt_high = get_h2var(eps_id_high, eps_hlt_var_high, heff_high)
-
 
 ##### below 25 GeV
 eps_hlt_low = scaleHist(

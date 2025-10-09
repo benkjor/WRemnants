@@ -565,7 +565,7 @@ def build_graph(df, dataset):
     ## need the original pt and eta and whatnot, this
     df = df.Define(
         "Muon_isGoodGlobal",
-        f"Muon_isGlobal && Muon_highPurity && Muon_standalonePt > 15 && Muon_standaloneNumberOfValidHits > 0 && wrem::vectDeltaR2(Muon_standaloneEta, Muon_standalonePhi, Muon_eta, Muon_phi) < 0.09 && Muon_pt>=15 && abs(Muon_eta) < 2.4 && Muon_charge != -99",
+        f"Muon_isGlobal && Muon_highPurity && Muon_standalonePt > 15 && Muon_standaloneNumberOfValidHits > 0 && wrem::vectDeltaR2(Muon_standaloneEta, Muon_standalonePhi, Muon_eta, Muon_phi) < 0.09 && Muon_pt>=15 && abs(Muon_eta) < 2.4 && Muon_charge != -99",  ### do i need to include the looseID criterion
     )
     df = df.Filter("Sum(Muon_isGoodGlobal) == 2")
     df = df.Filter(

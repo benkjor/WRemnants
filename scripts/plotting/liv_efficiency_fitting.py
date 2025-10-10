@@ -21,6 +21,7 @@ from utilities.io_tools import input_tools
 from wums.boostHistHelpers import (
     addHists,
     divideHists,
+    expand_hist_by_duplicate_axes,
     expand_hist_by_duplicate_axis,
     multiplyHists,
     scaleHist,
@@ -385,6 +386,19 @@ writer.add_channel(h0_data.axes, "ch_stst")
 writer.add_data(h0_data, "ch_stst")
 writer.add_process(h0, "Zmumu pass gen", "ch_stst", signal=False)
 
+stst_prpg = stst_prpg.project("time", "pt_probe", "eta_probe")
+dtst_prpg = dtst_prpg.project("time", "pt_probe", "eta_probe")
+dtdt_prpg = dtdt_prpg.project("time", "pt_probe", "eta_probe")
+
+dtdt_prpg = expand_hist_by_duplicate_axes(
+    dtdt_prpg, ["pt_probe", "eta_probe"], ["pt_tag", "eta_tag"]
+)
+dtst_prpg = expand_hist_by_duplicate_axes(
+    dtst_prpg, ["pt_probe", "eta_probe"], ["pt_tag", "eta_tag"]
+)
+stst_prpg = expand_hist_by_duplicate_axes(
+    stst_prpg, ["pt_probe", "eta_probe"], ["pt_tag", "eta_tag"]
+)
 
 ### adding axes as appropriate to make everything 6 dimensional
 dtdt_prpg = expand_hist_by_duplicate_axis(dtdt_prpg, "time", "gen_time")

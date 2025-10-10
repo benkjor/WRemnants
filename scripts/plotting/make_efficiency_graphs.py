@@ -4,6 +4,8 @@ import re
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
 
 matplotlib.rcParams.update({"font.size": 12})
 
@@ -95,15 +97,19 @@ pt_bins = [
     15,
     # 21,
     25,
-    50,
+    45,
+    65,
     80,
 ]
 
+num_eta_bins = 3
 # pdb.set_trace()
 pt_bins = [(pt_bins[i] + (pt_bins[i + 1])) / 2 for i in range(len(pt_bins) - 1)]
-eta_bins = np.linspace(-2.4, 2.4, 3)
+eta_bins = np.linspace(-2.4, 2.4, num_eta_bins)
 
-
+xx, yy = np.meshgrid(eta_bins, pt_bins)
+zz = np.zeros((len(pt_bins), num_eta_bins))
+print(zz.shape)
 for efficiency in range(len(key_list)):
     for key in [key_list[efficiency]]:
         # pdb.set_trace()
@@ -135,7 +141,6 @@ for efficiency in range(len(key_list)):
                 for i in range(len(input_dict[key][0])):  ## pt bin
                     temp.append(np.average(input_dict[key][:, i, j]))
                 # pdb.set_trace()
-
                 if (
                     "high" in key
                 ):  ###SHOULD COME UP WITH A SMART WAY TO PLOT THESE SIMULTANEOUSLY
@@ -167,6 +172,8 @@ for efficiency in range(len(key_list)):
                 temp = []
                 for i in range(len(input_dict[key][0])):  ## pt bin
                     temp.append(np.average(input_dict[key][:, i, j]))
+                    zz[i, j] = np.average(input_dict[key][:, i, j])
+
                 plt.plot(pt_bins[:], temp[:], label=f"eta bin: {j}", color=f"C{j}")
 
             plt.title(key + " prefit")
@@ -179,6 +186,24 @@ for efficiency in range(len(key_list)):
                 f"/home/submit/jbenke/public_html/liv_uncert/efficiency/{date}/pt_projection/{key}.png"
             )
             plt.clf()
+
+
+# pdb.set_trace()
+plt.clf
+
+# plt.plot(xx, yy, marker = 'o')
+# heatmap = np.array([xx, yy, zz])
+df = pd.DataFrame(zz, columns=eta_bins, index=pt_bins)
+ax = sns.heatmap(df)
+ax.invert_yaxis()
+# plt.contourf(eta_bins, pt_bins, zz)
+plt.xlabel("eta")
+plt.ylabel("pt")
+# plt.colorbar()
+plt.tight_layout()
+plt.savefig(
+    f"/home/submit/jbenke/public_html/liv_uncert/efficiency/{date}/pt_projection/efficiency_heatmap.png"
+)
 
 
 for efficiency in range(len(key_list)):

@@ -91,6 +91,7 @@ def all_mc_corrections(hist_in, hist_proj, lumi_scaling, weightsum, cross_sec):
     hist_in_new = mc_scaling(hist_in_new, weightsum, cross_sec)
     hist_in_2d = broadcastSystHist(hist_in_new, hist_proj)
     hist_in_2d = multiplyHists(hist_in_2d, lumi_scaling)
+
     return hist_in_2d
 
 
@@ -136,6 +137,7 @@ def get_mc_lumis(
 
     dtdt_h, dtst_h, stst_h, dtdt_bg, dtst_bg, stst_bg = input_data
     time_proj_hlt, time_proj_low = time_hists
+
     lumi_h, lumi_bg = lumi_hists
     sum_lumis = addHists(lumi_bg, lumi_h)
     lumi_scaling_h = divideHists(lumi_h, sum_lumis)
@@ -146,6 +148,7 @@ def get_mc_lumis(
         stst_h,
         time_proj_hlt,
         time_proj_low,
+        # lumi_h,
         multiplyHists(lumi_scaling_h, scaling),
         weightsum,
         cross_sec,
@@ -157,6 +160,7 @@ def get_mc_lumis(
         stst_bg,
         time_proj_hlt,
         time_proj_low,
+        # lumi_bg,
         multiplyHists(lumi_scaling_bg, scaling),
         weightsum,
         cross_sec,
@@ -165,6 +169,10 @@ def get_mc_lumis(
     dtdt = addHists(dtdt_bg, dtdt_h)
     dtst = addHists(dtst_bg, dtst_h)
     stst = addHists(stst_bg, stst_h)
+
+    # dtdt = multiplyHists(dtdt, scaling)
+    # dtst = multiplyHists(dtst, scaling)
+    # stst = multiplyHists(stst, scaling)
 
     return dtdt, dtst, stst
 
@@ -190,29 +198,29 @@ def eta_phi_systematic(
         cross_sec,
     )
 
-    dtdt_stat = remove_low_bins(dtdt_stat.copy())
+    # dtdt_stat = remove_low_bins(dtdt_stat.copy())
 
     writer.add_systematic(
-        dtdt_stat.project("time", "pt_lead", "eta_lead"),
+        dtdt_stat.project("time", "pt_probe", "eta_probe"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu pass gen",
-        "ch_dtdt",
+        "ch_dtdt_5d",
         constrained=True,
         groups=["prefiring_stat"],
     )
     writer.add_systematic(
-        dtst_stat.project("time", "pt_sublead", "eta_sublead"),
+        dtst_stat.project("time", "pt_probe", "eta_probe"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu pass gen",
-        "ch_dtst",
+        "ch_dtst_5d",
         constrained=True,
         groups=["prefiring_stat"],
     )
     writer.add_systematic(
-        stst_stat.project("time", "pt_sublead", "eta_sublead"),
+        stst_stat.project("time", "pt_probe", "eta_probe"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu pass gen",
-        "ch_stst",
+        "ch_stst_5d",
         constrained=True,
         groups=["prefiring_stat"],
     )
@@ -227,29 +235,28 @@ def get_era_vals(mc, trigger_cut, era):
 
 
 def luminometer_syst(writer, luminometer, dtdt, dtst, stst, syst):
-    dtdt = remove_low_bins(dtdt.copy())
-
+    # dtdt = remove_low_bins(dtdt.copy())
     writer.add_systematic(
-        dtdt.project("time", "pt_lead", "eta_lead"),
+        dtdt.project("time", "mll"),
         f"{luminometer}_{syst}",
         "Zmumu pass gen",
-        "ch_dtdt",
+        "ch_dtdt_2d",
         constrained=True,
         groups=[f"{syst}"],
     )
     writer.add_systematic(
-        dtst.project("time", "pt_sublead", "eta_sublead"),
+        dtst.project("time", "mll"),
         f"{luminometer}_{syst}",
         "Zmumu pass gen",
-        "ch_dtst",
+        "ch_dtst_2d",
         constrained=True,
         groups=[f"{syst}"],
     )
     writer.add_systematic(
-        stst.project("time", "pt_sublead", "eta_sublead"),
+        stst.project("time", "mll"),
         f"{luminometer}_{syst}",
         "Zmumu pass gen",
-        "ch_stst",
+        "ch_stst_2d",
         constrained=True,
         groups=[f"{syst}"],
     )
@@ -283,10 +290,6 @@ def background_syst(
         weightsum = results["ZmumuPostVFP"]["weight_sum"]
         cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 
-    # dtdt = dtdt.project("gen_mll", 'mll', 'pt_lead', 'eta_lead', 'pt_sublead', 'eta_sublead')
-    # dtst = dtdt.project("gen_mll", 'mll', 'pt_lead', 'eta_lead', 'pt_sublead', 'eta_sublead')
-    # stst = dtdt.project("gen_mll", 'mll', 'pt_lead', 'eta_lead', 'pt_sublead', 'eta_sublead')
-    # pdb.set_trace()
     dtdt, dtst, stst = mc_corrections_all_cases(
         dtdt,
         dtst,
@@ -297,23 +300,22 @@ def background_syst(
         weightsum,
         cross_sec,
     )
-    dtdt_proc = dtdt.project("time", "pt_lead", "eta_lead")
-    dtdt_proc = remove_low_bins(dtdt_proc.copy())
+    dtdt_proc = dtdt.project("time", "pt_probe", "eta_probe")
 
-    dtst_proc = dtst.project("time", "pt_sublead", "eta_sublead")
-    stst_proc = stst.project("time", "pt_sublead", "eta_sublead")
-    writer.add_process(dtdt_proc, f"{proc_name}", "ch_dtdt", signal=False)
-    writer.add_process(dtst_proc, f"{proc_name}", "ch_dtst", signal=False)
-    writer.add_process(stst_proc, f"{proc_name}", "ch_stst", signal=False)
+    dtst_proc = dtst.project("time", "pt_probe", "eta_probe")
+    stst_proc = stst.project("time", "pt_probe", "eta_probe")
+    writer.add_process(dtdt_proc, f"{proc_name}", "ch_dtdt_5d", signal=False)
+    writer.add_process(dtst_proc, f"{proc_name}", "ch_dtst_5d", signal=False)
+    writer.add_process(stst_proc, f"{proc_name}", "ch_stst_5d", signal=False)
 
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_dtdt", 1.01, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_dtdt_5d", 1.01, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_dtst", 1.01, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_dtst_5d", 1.01, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_stst", 1.01, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_stst_5d", 1.01, groups=["bkg"]
     )
 
 
@@ -348,19 +350,24 @@ def get_eff_variations(h1_leading, h2_leading, h0_leading, eps_id_prime, eps_hlt
     return h0var_id, h0var_hlt, h1var_id, h1var_hlt, h2var_id, h2var_hlt
 
 
-def remove_low_bins(old_hist, ax_name="pt_lead"):
-    org_pt_axis = old_hist.axes[1]
+def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
+    if len(old_hist.axes) != 6:
+        org_pt_axis = old_hist.axes[1]
+    else:
+        org_pt_axis = old_hist.axes[2]
     edges = org_pt_axis.edges
-    new_pt_edges = edges[2:]
+    new_pt_edges = edges[nbins:]
     # eta_edges =
     new_pt_axis = hist.axis.Variable(new_pt_edges, name=ax_name)
-    new_pt_axis_2 = hist.axis.Variable(new_pt_edges, name="pt_sublead")
+    new_pt_axis_2 = hist.axis.Variable(new_pt_edges, name="pt_tag")
     new_eta_axis = hist.axis.Variable(
-        old_hist.axes[2].edges, name="eta_lead"
+        old_hist.axes[2].edges, name="eta_probe"
     )  ## actually a regular axis but whatever
+    # pdb.set_trace()
+
     if len(old_hist.axes) == 3:
         new_hist = hist.Hist(old_hist.axes[0], new_pt_axis, new_eta_axis)
-        new_hist.values()[...] = old_hist.values()[:, 2:, :]
+        new_hist.values()[...] = old_hist.values()[:, nbins:, :]
 
     elif len(old_hist.axes) == 5:
         new_hist = hist.Hist(
@@ -370,6 +377,17 @@ def remove_low_bins(old_hist, ax_name="pt_lead"):
             new_pt_axis_2,
             old_hist.axes[4],
         )
-        new_hist.values()[...] = old_hist.values()[:, 2:, :, 2:, :]
+        new_hist.values()[...] = old_hist.values()[:, nbins:, :, nbins:, :]
+
+    elif len(old_hist.axes) == 6:
+        new_hist = hist.Hist(
+            old_hist.axes[0],
+            old_hist.axes[1],
+            new_pt_axis,
+            old_hist.axes[3],
+            old_hist.axes[4],
+            old_hist.axes[5],
+        )
+        new_hist.values()[...] = old_hist.values()[:, :, 2:, :, :, :]
 
     return new_hist

@@ -4,13 +4,7 @@ import pickle
 import h5py
 from uncertainty_tools import (
     all_mc_corrections,
-    get_eff_hist,
     get_era_vals,
-    get_h0var,
-    get_h0var_low,
-    get_h1var,
-    get_h1var_low,
-    get_h2var,
     get_mc_lumis,
     make_ones_hist,
     remove_low_bins,
@@ -269,67 +263,16 @@ eps_id_true = divideHists(dtst_3d, stst_3d)
 efficiency_ones = make_ones_hist(h1)
 # generate histogram of ones
 
+hlt_var_nom = eps_hlt_true
+id_var_nom = eps_id_true
+
 eps_id_prime = 1.01
 eps_hlt_prime = 1.01
 
-### greater than 25 GeV
-## e2 = 2*h2/(h1 + 2*h1)
-eps_hlt = addHists(h1, scaleHist(h2, 2))
-eps_hlt_high = scaleHist(divideHists(h2, eps_hlt), 2)
-
-##e1 = h1/(h0*(1-e2) + h1)
-eps_id = addHists(efficiency_ones, scaleHist(eps_hlt_high, -1))
-eps_id = multiplyHists(h0, eps_id)
-eps_id = addHists(eps_id, h1)
-eps_id_high = divideHists(h1, eps_id)
-
-heff_high = divideHists(h2, multiplyHists(eps_hlt_high, eps_hlt_high))
-heff_high = divideHists(heff_high, multiplyHists(eps_id_high, eps_id_high))
-
-eps_id_var_high = scaleHist(eps_id_high, eps_id_prime)
-eps_hlt_var_high = scaleHist(eps_hlt_high, eps_hlt_prime)
-
-h0var_id_high = get_h0var(eps_id_var_high, eps_hlt_high, heff_high, efficiency_ones)
-h0var_hlt_high = get_h0var(eps_id_high, eps_hlt_var_high, heff_high, efficiency_ones)
-h1var_id_high = get_h1var(eps_id_var_high, eps_hlt_high, heff_high, efficiency_ones)
-h1var_hlt_high = get_h1var(eps_id_high, eps_hlt_var_high, heff_high, efficiency_ones)
-
-h2var_id_high = get_h2var(eps_id_var_high, eps_hlt_high, heff_high)
-h2var_hlt_high = get_h2var(eps_id_high, eps_hlt_var_high, heff_high)
-
-
-##### below 25 GeV
-eps_hlt_low = scaleHist(h2, 0)
-
-##e1 = h1/(h0 + h1)
-eps_id = addHists(h0, h1)
-eps_id_low = divideHists(h1, eps_id)
-
-heff_low = divideHists(h0, addHists(efficiency_ones, scaleHist(eps_id_low, -1)))
-heff_low = divideHists(heff_low, multiplyHists(eps_id_low, eps_hlt_high))
-
-eps_id_var_low = scaleHist(eps_id_low.copy(), eps_id_prime)
-eps_hlt_var_low = scaleHist(eps_hlt_low.copy(), eps_hlt_prime)
-
-h0var_id_low = get_h0var_low(eps_id_var_low, eps_hlt_low, heff_low, efficiency_ones)
-h1var_id_low = get_h1var_low(eps_id_var_low, eps_hlt_low, heff_low, efficiency_ones)
-h2var_id_low = get_h2var(eps_id_var_low, eps_hlt_low, heff_low)
-
-combined_epsilon_hlt = eps_hlt_high.values()
-combined_epsilon_hlt[:, :1, :] = eps_hlt_low.values()[:, :1, :]
-combined_epsilon_id = eps_id_high.values()
-combined_epsilon_id[:, :1, :] = eps_id_low.values()[:, :1, :]
-
 ##### for plotting efficiencies, not for the fit
 efficiencies = {
-    "epsilon_hlt_high": eps_hlt_high.values(),
-    "epsilon_id_high": eps_id_high.values(),
-    "epsilon_hlt_low": eps_hlt_low.values(),
-    "epsilon_id_low": eps_id_low.values(),
     "eps_hlt_true": eps_hlt_true.values(),
     "eps_id_true": eps_id_true.values(),
-    "COMBINED_epsilon_hlt": combined_epsilon_hlt,
-    "COMBINED_epsilon_id": combined_epsilon_id,
 }
 
 with open("efficiency_values.pkl", "wb") as f:
@@ -360,7 +303,7 @@ i am currently ignoring the low bins for hlt. i dont think i should do that. i t
 h2_data = remove_low_bins(h2_data)
 h2 = remove_low_bins(h2)
 dtdt_prpg = remove_low_bins(dtdt_prpg)
-
+hlt_var_nom_h2 = remove_low_bins(hlt_var_nom)
 #### i think i will need to mix this too but it doesn't affect the fit
 
 ## create the tensor
@@ -389,30 +332,41 @@ writer.add_process(h0, "Zmumu pass gen", "ch_stst", signal=False)
 stst_prpg = stst_prpg.project("time", "pt_probe", "eta_probe")
 dtst_prpg = dtst_prpg.project("time", "pt_probe", "eta_probe")
 dtdt_prpg = dtdt_prpg.project("time", "pt_probe", "eta_probe")
-
-dtdt_prpg = expand_hist_by_duplicate_axes(
-    dtdt_prpg, ["pt_probe", "eta_probe"], ["pt_tag", "eta_tag"]
-)
-dtst_prpg = expand_hist_by_duplicate_axes(
-    dtst_prpg, ["pt_probe", "eta_probe"], ["pt_tag", "eta_tag"]
-)
-stst_prpg = expand_hist_by_duplicate_axes(
-    stst_prpg, ["pt_probe", "eta_probe"], ["pt_tag", "eta_tag"]
-)
+### ^ are they not already these dimensions
 
 ### adding axes as appropriate to make everything 6 dimensional
-dtdt_prpg = expand_hist_by_duplicate_axis(dtdt_prpg, "time", "gen_time")
-dtst_prpg = expand_hist_by_duplicate_axis(dtst_prpg, "time", "gen_time")
-stst_prpg = expand_hist_by_duplicate_axis(stst_prpg, "time", "gen_time")
+
+dtdt_prpg = expand_hist_by_duplicate_axes(
+    dtdt_prpg, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
+)
+dtst_prpg = expand_hist_by_duplicate_axes(
+    dtst_prpg, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
+)
+stst_prpg = expand_hist_by_duplicate_axes(
+    stst_prpg, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
+)
+
+hlt_var_nom_h2 = expand_hist_by_duplicate_axes(
+    hlt_var_nom_h2, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
+)
+
+hlt_var_nom = expand_hist_by_duplicate_axes(
+    hlt_var_nom, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
+)
+
+id_var_nom = expand_hist_by_duplicate_axes(
+    id_var_nom, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
+)
+
 pass_gen = expand_hist_by_duplicate_axis(pass_gen, "time", "gen_time")
 
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
-for i in range(1, nbins_pt):  # just select two pt bins in the center
+for i in range(nbins_pt):  # just select two pt bins in the center
     for j in range(nbins_eta):  # eta
         for k in range(nbins_time):  #  time
 
             if i > 0:  ## we only have 1 bin beneath 25 GeV
-
+                # pdb.set_trace()
                 ### be more consistent about ordering of time and mll
                 ### fitting for the number of events
                 v2 = dtdt_prpg[
@@ -454,98 +408,56 @@ for i in range(1, nbins_pt):  # just select two pt bins in the center
                 groups=["nz"],
             )
             # for masked channel
-            # v_masked = pass_gen[{"pt_tag": i, "eta_tag": j, "gen_time": k}]
-            # var_masked = addHists(v_masked * var_size, n_masked)
-            # cross_section_masked = divideHists(var_masked, lumi_scaling)
+            v_masked = pass_gen[{"pt_tag": i, "eta_tag": j, "gen_time": k}]
+            var_masked = addHists(v_masked * var_size, n_masked)
+            cross_section_masked = divideHists(var_masked, lumi_scaling)
 
-            # # pdb.set_trace()
-            # writer.add_systematic(
-            #     cross_section_masked,
-            #     f"n_pt{i}_eta{j}_time{k}",
-            #     "Zmumu pass gen",
-            #     "ch_masked",
-            #     constrained=False,
-            #     groups=["nz"],
-            # )
+            # pdb.set_trace()
+            writer.add_systematic(
+                cross_section_masked,
+                f"n_pt{i}_eta{j}_time{k}",
+                "Zmumu pass gen",
+                "ch_masked",
+                constrained=False,
+                groups=["nz"],
+            )
 
             if i > 0:
-                #     # ## efficiency
-                h1var_id_primed = get_eff_hist(
-                    h1var_id_high, h1, i, j, k, "pt_probe", "eta_probe"
-                )
-                h0var_id_primed = get_eff_hist(
-                    h0var_id_high, h0, i, j, k, "pt_probe", "eta_probe"
-                )
+                #### HLT
+                hlt_var_h2 = hlt_var_nom_h2[
+                    {"pt_tag": i - 1, "eta_tag": j, "gen_time": k}
+                ]  ## equivalent to n2
 
-                h1var_hlt_primed = get_eff_hist(
-                    h1var_hlt_high, h1, i, j, k, "pt_probe", "eta_probe"
-                )
-                h0var_hlt_primed = get_eff_hist(
-                    h0var_hlt_high, h0, i, j, k, "pt_probe", "eta_probe"
-                )
-
-                #     # #     ### ID EFFICIENCY
-                h2var_id_primed = get_eff_hist(
-                    h2var_id_high, h2, i - 1, j, k, "pt_probe", "eta_probe"
-                )
-                h2var_hlt_primed = get_eff_hist(
-                    h2var_hlt_high, h2, i - 1, j, k, "pt_probe", "eta_probe"
-                )
-
+                hlt_var_h2 = multiplyHists(scaleHist(hlt_var_h2, var_size), h2)
                 writer.add_systematic(
-                    h2var_hlt_primed,
+                    addHists(hlt_var_h2, h2),
                     f"hlt_prime_pt{i}_eta{j}_time{k}",
                     "Zmumu pass gen",
                     "ch_dtdt",
                     constrained=False,
                     groups=["eff_trig"],
                 )
+                hlt_var_h1 = hlt_var_nom[{"pt_tag": i, "eta_tag": j, "gen_time": k}]
 
+                hlt_var_h1 = multiplyHists(scaleHist(hlt_var_h1, var_size), h1)
                 writer.add_systematic(
-                    h1var_hlt_primed,
+                    addHists(scaleHist(hlt_var_h1, -2), h1),
                     f"hlt_prime_pt{i}_eta{j}_time{k}",
                     "Zmumu pass gen",
                     "ch_dtst",
                     constrained=False,
                     groups=["eff_trig"],
                 )
-                writer.add_systematic(
-                    h0var_hlt_primed,
-                    f"hlt_prime_pt{i}_eta{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_stst",
-                    constrained=False,
-                    groups=["eff_trig"],
-                )
 
-            else:
-                h1var_id_primed = get_eff_hist(
-                    h1var_id_low, h1, i, j, k, "pt_probe", "eta_probe"
-                )
-                h0var_id_primed = get_eff_hist(
-                    h0var_id_low, h0, i, j, k, "pt_probe", "eta_probe"
-                )
-                # ### ID EFFICIENCY, these two used to be i-2
-                h2var_id_primed = get_eff_hist(
-                    h2var_id_low,
-                    h2,
-                    i,
-                    j,
-                    k,
-                    "pt_probe",
-                    "eta_probe",
-                )
-            writer.add_systematic(
-                h2var_id_primed,
-                f"id_prime_pt{i}_eta{j}_time{k}",
-                "Zmumu pass gen",
-                "ch_dtdt",
-                constrained=False,
-                groups=["eff_id"],
-            )
+            id_var = id_var_nom[
+                {"pt_tag": i, "eta_tag": j, "gen_time": k}
+            ]  ## equivalent to n2
+            id_var_h1 = multiplyHists(scaleHist(id_var, var_size), h1)
+            id_var_h0 = multiplyHists(scaleHist(id_var, var_size), h0)
+
             ### order of these is time, pt, eta
             writer.add_systematic(
-                h1var_id_primed,
+                addHists(id_var_h1, h1),
                 f"id_prime_pt{i}_eta{j}_time{k}",
                 "Zmumu pass gen",
                 "ch_dtst",
@@ -554,7 +466,7 @@ for i in range(1, nbins_pt):  # just select two pt bins in the center
             )
 
             writer.add_systematic(
-                h0var_id_primed,
+                addHists(scaleHist(id_var_h0, -1), h0),
                 f"id_prime_pt{i}_eta{j}_time{k}",
                 "Zmumu pass gen",
                 "ch_stst",

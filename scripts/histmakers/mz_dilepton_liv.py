@@ -365,9 +365,6 @@ axis_sbil = hist.axis.Regular(
 )
 
 
-# axis_eta = hist.axis.Regular(4, -2.4, 2.4, name="eta_probe")  ### want this to be 6
-# axis_eta_copy = hist.axis.Regular(4, -2.4, 2.4, name="eta_tag")  ### want this to be 6
-
 axis_eta = hist.axis.Variable(
     [-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name="eta_probe"
 )
@@ -375,55 +372,6 @@ axis_eta_copy = hist.axis.Variable(
     [-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name="eta_tag"
 )
 
-# axis_pt_high = hist.axis.Variable(
-#     [
-#         15,
-#         # 21,
-#         25,
-#         45,
-#         65,
-#         80,
-#     ],
-#     name="pt_tag",
-# )
-
-
-# axis_pt_high_copy = hist.axis.Variable(
-#     [
-#         15,
-#         # 21,
-#         25,
-#         45,
-#         65,
-#         80,
-#     ],
-#     name="pt_tag",
-# )
-
-# axis_pt_low = hist.axis.Variable(
-#     [
-#         15,
-#         # 21,
-#         25,
-#         45,
-#         65,
-#         80,
-#     ],
-#     name="pt_probe",
-# )
-
-
-# axis_pt_low_copy = hist.axis.Variable(
-#     [
-#         15,
-#         # 21,
-#         25,
-#         45,
-#         65,
-#         80,
-#     ],
-#     name="pt_probe",
-# )
 
 axis_pt_high = hist.axis.Variable(
     [
@@ -507,9 +455,6 @@ axis_mll = hist.axis.Variable(
 axis_mll_copy = hist.axis.Variable(
     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="gen_mll"
 )
-
-# axis_mll = hist.axis.Regular(5, 15, 120, name="mll")
-# axis_mll_copy = hist.axis.Regular(5, 15, 120, name="gen_mll")
 
 
 ########################################################
@@ -636,14 +581,12 @@ def build_graph(df, dataset):
             "pass_gen",
             [
                 axis_mll,
-                # axis_mll_copy,
                 axis_pt_low,
                 axis_eta,
                 axis_pt_high,
                 axis_eta_copy,
             ],
             [
-                # "mll",
                 "gen_mll",
                 "pt_probe",
                 "eta_probe",
@@ -687,14 +630,12 @@ def build_graph(df, dataset):
             "dtst_prfg",
             [
                 axis_mll,
-                # axis_mll_copy,
                 axis_pt_low,
                 axis_eta,
                 axis_pt_high,
                 axis_eta_copy,
             ],
             [
-                # "mll",
                 "gen_mll",
                 "pt_probe",
                 "eta_probe",
@@ -708,14 +649,12 @@ def build_graph(df, dataset):
             "stst_prfg",
             [
                 axis_mll,
-                # axis_mll_copy,
                 axis_pt_low,
                 axis_eta,
                 axis_pt_high,
                 axis_eta_copy,
             ],
             [
-                # "mll",
                 "gen_mll",
                 "pt_probe",
                 "eta_probe",
@@ -729,14 +668,12 @@ def build_graph(df, dataset):
             "dtdt_prfg",
             [
                 axis_mll,
-                # axis_mll_copy,
                 axis_pt_low,
                 axis_eta,
                 axis_pt_high,
                 axis_eta_copy,
             ],
             [
-                # "goodLoose_mll",
                 "gen_mll",
                 "pt_probe",
                 "eta_probe",
@@ -755,10 +692,6 @@ def build_graph(df, dataset):
                 "fine_bin_axis_gen", [fine_bin_axis], ["eta_probe", "weight"]
             )
             results.append(fine_bin_mll)
-
-        # results.append(hist_tight_muons)
-        # results.append(hist_loose_muons)
-        # results.append(hist_trigger_muons)
 
         results.append(hist_tight_muons_fg)
         results.append(hist_loose_muons_fg)

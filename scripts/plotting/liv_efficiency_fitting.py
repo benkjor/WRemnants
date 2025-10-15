@@ -34,7 +34,7 @@ args = parser.parse_args()
 
 slope_ramses = 0.0006
 slope_hfoc = 0.0007
-mass_bin = 3
+mass_bin = 9
 var_size = 0.01
 
 ######################################################################

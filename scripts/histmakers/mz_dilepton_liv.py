@@ -358,39 +358,106 @@ datasets = getDatasets(
     era=era,
 )
 
-axis_date = hist.axis.Regular(2, 0, 24, name="time", overflow=False, underflow=False)
+axis_date = hist.axis.Regular(24, 0, 24, name="time", overflow=False, underflow=False)
 
 axis_sbil = hist.axis.Regular(
     24, 9e-7, 3e-8, name="sbil", overflow=False, underflow=False
 )
 
 
-axis_eta = hist.axis.Regular(3, -2.4, 2.4, name="eta_probe")  ### want this to be 6
-axis_eta_copy = hist.axis.Regular(3, -2.4, 2.4, name="eta_tag")  ### want this to be 6
+# axis_eta = hist.axis.Regular(4, -2.4, 2.4, name="eta_probe")  ### want this to be 6
+# axis_eta_copy = hist.axis.Regular(4, -2.4, 2.4, name="eta_tag")  ### want this to be 6
 
-# axis_eta = hist.axis.Variable([-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name = "eta_probe")
-# axis_eta_copy = hist.axis.Variable([-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name = "eta_tag")
+axis_eta = hist.axis.Variable(
+    [-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name="eta_probe"
+)
+axis_eta_copy = hist.axis.Variable(
+    [-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name="eta_tag"
+)
+
+# axis_pt_high = hist.axis.Variable(
+#     [
+#         15,
+#         # 21,
+#         25,
+#         45,
+#         65,
+#         80,
+#     ],
+#     name="pt_tag",
+# )
+
+
+# axis_pt_high_copy = hist.axis.Variable(
+#     [
+#         15,
+#         # 21,
+#         25,
+#         45,
+#         65,
+#         80,
+#     ],
+#     name="pt_tag",
+# )
+
+# axis_pt_low = hist.axis.Variable(
+#     [
+#         15,
+#         # 21,
+#         25,
+#         45,
+#         65,
+#         80,
+#     ],
+#     name="pt_probe",
+# )
+
+
+# axis_pt_low_copy = hist.axis.Variable(
+#     [
+#         15,
+#         # 21,
+#         25,
+#         45,
+#         65,
+#         80,
+#     ],
+#     name="pt_probe",
+# )
 
 axis_pt_high = hist.axis.Variable(
     [
         15,
         # 21,
         25,
-        45,
-        65,
+        32.35393,
+        35.70991,
+        38.30856,
+        40.43642,
+        42.22635,
+        43.92092,
+        45.87573,
+        48.56281,
+        53.1789,
         80,
     ],
     name="pt_tag",
 )
-
 
 axis_pt_high_copy = hist.axis.Variable(
     [
         15,
         # 21,
         25,
-        45,
-        65,
+        32.35393,
+        35.70991,
+        38.30856,
+        40.43642,
+        42.22635,
+        43.92092,
+        45.87573,
+        48.56281,
+        53.1789,
         80,
     ],
     name="pt_tag",
@@ -401,111 +468,48 @@ axis_pt_low = hist.axis.Variable(
         15,
         # 21,
         25,
-        45,
-        65,
+        32.35393,
+        35.70991,
+        38.30856,
+        40.43642,
+        42.22635,
+        43.92092,
+        45.87573,
+        48.56281,
+        53.1789,
         80,
     ],
     name="pt_probe",
 )
-
 
 axis_pt_low_copy = hist.axis.Variable(
     [
         15,
         # 21,
         25,
-        45,
-        65,
+        32.35393,
+        35.70991,
+        38.30856,
+        40.43642,
+        42.22635,
+        43.92092,
+        45.87573,
+        48.56281,
+        53.1789,
         80,
     ],
     name="pt_probe",
 )
 
-# axis_pt_high = hist.axis.Variable(
-#     [
-#         15,
-#         # 21,
-#         25,
-#         32.35393,
-#         35.70991,
-#         38.30856,
-#         40.43642,
-#         42.22635,
-#         43.92092,
-#         45.87573,
-#         48.56281,
-#         53.1789,
-#         80,
-#     ],
-#     name="pt_tag",
-# )
+axis_mll = hist.axis.Variable(
+    [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="mll"
+)
+axis_mll_copy = hist.axis.Variable(
+    [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="gen_mll"
+)
 
-# axis_pt_high_copy = hist.axis.Variable(
-#     [
-#         15,
-#         # 21,
-#         25,
-#         32.35393,
-#         35.70991,
-#         38.30856,
-#         40.43642,
-#         42.22635,
-#         43.92092,
-#         45.87573,
-#         48.56281,
-#         53.1789,
-#         80,
-# #     ],
-# #     name="pt_tag",
-# # )
-
-# axis_pt_low = hist.axis.Variable(
-#     [
-#         15,
-#         # 21,
-#         25,
-#         32.35393,
-#         35.70991,
-#         38.30856,
-#         40.43642,
-#         42.22635,
-#         43.92092,
-#         45.87573,
-#         48.56281,
-#         53.1789,
-#         80,
-#     ],
-#     name="pt_probe",
-# )
-
-# axis_pt_low_copy = hist.axis.Variable(
-#     [
-#         15,
-#         # 21,
-#         25,
-#         32.35393,
-#         35.70991,
-#         38.30856,
-#         40.43642,
-#         42.22635,
-#         43.92092,
-#         45.87573,
-#         48.56281,
-#         53.1789,
-#         80,
-#     ],
-#     name="pt_probe",
-# )
-
-# axis_mll = hist.axis.Variable(
-#     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="mll"
-# )
-# axis_mll_copy = hist.axis.Variable(
-#     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="gen_mll"
-# )
-
-axis_mll = hist.axis.Regular(5, 15, 120, name="mll")
-axis_mll_copy = hist.axis.Regular(5, 15, 120, name="gen_mll")
+# axis_mll = hist.axis.Regular(5, 15, 120, name="mll")
+# axis_mll_copy = hist.axis.Regular(5, 15, 120, name="gen_mll")
 
 
 ########################################################

@@ -14,6 +14,7 @@ from rabbit import tensorwriter
 from utilities.io_tools import input_tools
 from wums.boostHistHelpers import (
     addHists,
+    broadcastSystHist,
     divideHists,
     expand_hist_by_duplicate_axes,
     expand_hist_by_duplicate_axis,
@@ -245,7 +246,6 @@ dtdt_3d = dtdt_prpg.project("time", "pt_probe", "eta_probe")
 dtst_3d = dtst_prpg.project("time", "pt_probe", "eta_probe")
 stst_3d = stst_prpg.project("time", "pt_probe", "eta_probe")
 
-
 dtdt_data = dtdt_data.project("time", "pt_probe", "eta_probe")
 dtst_data = dtst_data.project("time", "pt_probe", "eta_probe")
 stst_data = stst_data.project("time", "pt_probe", "eta_probe")
@@ -254,25 +254,21 @@ h2, h1, h0 = make_mutually_exclusive(dtdt_3d, dtst_3d, stst_3d)
 h2_data, h1_data, h0_data = make_mutually_exclusive(dtdt_data, dtst_data, stst_data)
 
 
-########## true efficiencies
-eps_hlt_true = divideHists(dtdt_3d, dtst_3d)
-eps_id_true = divideHists(dtst_3d, stst_3d)
-
 #### tag and probe efficiencies
-
 efficiency_ones = make_ones_hist(h1)
 # generate histogram of ones
 
-hlt_var_nom = eps_hlt_true
-id_var_nom = eps_id_true
+hlt_var_nom = divideHists(dtdt_3d, dtst_3d)
+id_var_nom = divideHists(dtst_3d, stst_3d)
+
 
 eps_id_prime = 1.01
 eps_hlt_prime = 1.01
 
 ##### for plotting efficiencies, not for the fit
 efficiencies = {
-    "eps_hlt_true": eps_hlt_true.values(),
-    "eps_id_true": eps_id_true.values(),
+    "eps_hlt_true": hlt_var_nom.values(),
+    "eps_id_true": id_var_nom.values(),
 }
 
 with open("efficiency_values.pkl", "wb") as f:
@@ -329,48 +325,55 @@ writer.add_channel(h0_data.axes, "ch_stst")
 writer.add_data(h0_data, "ch_stst")
 writer.add_process(h0, "Zmumu pass gen", "ch_stst", signal=False)
 
-stst_prpg = stst_prpg.project("time", "pt_probe", "eta_probe")
-dtst_prpg = dtst_prpg.project("time", "pt_probe", "eta_probe")
-dtdt_prpg = dtdt_prpg.project("time", "pt_probe", "eta_probe")
-### ^ are they not already these dimensions
 
-### adding axes as appropriate to make everything 6 dimensional
+stst_prpg_proj = stst_prpg.project(
+    "time", "pt_probe", "eta_probe"
+)  ### for some reason this projection is essential for the normalization
+dtst_prpg_proj = dtst_prpg.project("time", "pt_probe", "eta_probe")
+dtdt_prpg_proj = dtdt_prpg.project("time", "pt_probe", "eta_probe")
 
-dtdt_prpg = expand_hist_by_duplicate_axes(
-    dtdt_prpg, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
+dtdt_prpg_proj = expand_hist_by_duplicate_axes(
+    dtdt_prpg_proj, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
 )
-dtst_prpg = expand_hist_by_duplicate_axes(
-    dtst_prpg, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
+dtst_prpg_proj = expand_hist_by_duplicate_axes(
+    dtst_prpg_proj, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
 )
-stst_prpg = expand_hist_by_duplicate_axes(
-    stst_prpg, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
+stst_prpg_proj = expand_hist_by_duplicate_axes(
+    stst_prpg_proj, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
 )
+
+
+dtdt_prpg = expand_hist_by_duplicate_axis(dtdt_prpg, "time", "gen_time")
+dtst_prpg = expand_hist_by_duplicate_axis(dtst_prpg, "time", "gen_time")
+stst_prpg = expand_hist_by_duplicate_axis(stst_prpg, "time", "gen_time")
+
 
 hlt_var_nom_h2 = expand_hist_by_duplicate_axes(
     hlt_var_nom_h2, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
 )
-
 hlt_var_nom = expand_hist_by_duplicate_axes(
     hlt_var_nom, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
 )
-
 id_var_nom = expand_hist_by_duplicate_axes(
     id_var_nom, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
 )
 
 pass_gen = expand_hist_by_duplicate_axis(pass_gen, "time", "gen_time")
 
+
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
-for i in range(nbins_pt):  # just select two pt bins in the center
+for i in range(1, 2):  # just select two pt bins in the center
+    print(f"pt bin: {i}")
     for j in range(nbins_eta):  # eta
-        for k in range(nbins_time):  #  time
+        for k in range(0, 1):  #  time
 
             if i > 0:  ## we only have 1 bin beneath 25 GeV
-                # pdb.set_trace()
                 ### be more consistent about ordering of time and mll
                 ### fitting for the number of events
-                v2 = dtdt_prpg[
-                    {"pt_tag": i - 1, "eta_tag": j, "gen_time": k}
+
+                ### so i may need a separate one for this, unclear
+                v2 = dtdt_prpg_proj[
+                    {"gen_time": k, "pt_tag": i - 1, "eta_tag": j}
                 ]  ## equivalent to n2
                 var2 = addHists(v2 * var_size, h2)
 
@@ -383,8 +386,8 @@ for i in range(nbins_pt):  # just select two pt bins in the center
                     groups=["nz"],
                 )
 
-            v1 = dtst_prpg[
-                {"pt_tag": i, "eta_tag": j, "gen_time": k}
+            v1 = dtst_prpg_proj[
+                {"gen_time": k, "pt_tag": i, "eta_tag": j}
             ]  ## equivalent to n1
             var1 = addHists(v1 * var_size, h1)
             writer.add_systematic(
@@ -395,8 +398,8 @@ for i in range(nbins_pt):  # just select two pt bins in the center
                 constrained=False,
                 groups=["nz"],
             )
-            v0 = stst_prpg[
-                {"pt_tag": i, "eta_tag": j, "gen_time": k}
+            v0 = stst_prpg_proj[
+                {"gen_time": k, "pt_tag": i, "eta_tag": j}
             ]  ## equivalent to n1
             var0 = addHists(v0 * var_size, h0)
             writer.add_systematic(
@@ -408,11 +411,10 @@ for i in range(nbins_pt):  # just select two pt bins in the center
                 groups=["nz"],
             )
             # for masked channel
-            v_masked = pass_gen[{"pt_tag": i, "eta_tag": j, "gen_time": k}]
+            v_masked = pass_gen[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
             var_masked = addHists(v_masked * var_size, n_masked)
             cross_section_masked = divideHists(var_masked, lumi_scaling)
 
-            # pdb.set_trace()
             writer.add_systematic(
                 cross_section_masked,
                 f"n_pt{i}_eta{j}_time{k}",
@@ -424,24 +426,76 @@ for i in range(nbins_pt):  # just select two pt bins in the center
 
             if i > 0:
                 #### HLT
-                hlt_var_h2 = hlt_var_nom_h2[
-                    {"pt_tag": i - 1, "eta_tag": j, "gen_time": k}
+                hlt_var_tag_h2 = hlt_var_nom_h2[
+                    {"gen_time": k, "pt_probe": i - 1, "eta_probe": j}
+                ]  ## equivalent to n2
+                hlt_var_tag_h1 = hlt_var_nom[
+                    {"gen_time": k, "pt_probe": i, "eta_probe": j}
                 ]  ## equivalent to n2
 
-                hlt_var_h2 = multiplyHists(scaleHist(hlt_var_h2, var_size), h2)
+                hlt_var_tag_h2 = hlt_var_tag_h2.project(
+                    "time", "pt_tag", "eta_tag"
+                )  ### smarter way would be to project it at the beginning so things come out in the right order
+                hlt_var_tag_h1 = hlt_var_tag_h1.project(
+                    "time", "pt_tag", "eta_tag"
+                )  ### smarter way would be to project it at the beginning so things come out in the right order
+
+                hlt_var_tag_h2 = broadcastSystHist(
+                    hlt_var_tag_h2, dtdt_prpg
+                )  ### so i think this puts the variation in all bins where pt_tag and eta_tag are what they should be
+                hlt_var_tag_h1 = broadcastSystHist(
+                    hlt_var_tag_h1, dtst_prpg
+                )  ### so i think this puts the variation in all bins where pt_tag and eta_tag are what they should be
+
+                hlt_var_tag_h2 = multiplyHists(
+                    scaleHist(
+                        hlt_var_tag_h2,
+                        var_size / ((nbins_pt - 1) + nbins_eta + nbins_time),
+                    ),
+                    dtdt_prpg,
+                )
+                hlt_var_tag_h1 = multiplyHists(
+                    scaleHist(
+                        hlt_var_tag_h1, var_size / (nbins_pt + nbins_eta + nbins_time)
+                    ),
+                    dtst_prpg,
+                )
+
+                hlt_var_tag_h2 = hlt_var_tag_h2.project("time", "pt_probe", "eta_probe")
+                hlt_var_tag_h1 = hlt_var_tag_h1.project("time", "pt_probe", "eta_probe")
+
+                hlt_var_probe_h2 = hlt_var_nom_h2[
+                    {"gen_time": k, "pt_tag": i - 1, "eta_tag": j}
+                ]  ## equivalent to n2
+                hlt_var_probe_h1 = hlt_var_nom[
+                    {"gen_time": k, "pt_tag": i, "eta_tag": j}
+                ]  ## equivalent to n2
+
+                hlt_var_probe_h1 = multiplyHists(
+                    scaleHist(hlt_var_probe_h1, var_size), h1
+                )
+                hlt_var_probe_h2 = multiplyHists(
+                    scaleHist(hlt_var_probe_h2, var_size), h2
+                )
+
+                hlt_var_total_h2 = hlt_var_probe_h2
+                hlt_var_total_h1 = hlt_var_probe_h1
+
+                # hlt_var_total_h2 = addHists(hlt_var_probe_h2, hlt_var_tag_h2)
+                # hlt_var_total_h1 = addHists(hlt_var_probe_h1, -1*hlt_var_tag_h1)
+
+                ### david was saying add then project.... this is project then add. we shall seeeeee which is right
                 writer.add_systematic(
-                    addHists(hlt_var_h2, h2),
+                    addHists(hlt_var_total_h2, h2),
                     f"hlt_prime_pt{i}_eta{j}_time{k}",
                     "Zmumu pass gen",
                     "ch_dtdt",
                     constrained=False,
                     groups=["eff_trig"],
                 )
-                hlt_var_h1 = hlt_var_nom[{"pt_tag": i, "eta_tag": j, "gen_time": k}]
 
-                hlt_var_h1 = multiplyHists(scaleHist(hlt_var_h1, var_size), h1)
                 writer.add_systematic(
-                    addHists(scaleHist(hlt_var_h1, -2), h1),
+                    addHists(scaleHist(hlt_var_total_h1, -2), h1),
                     f"hlt_prime_pt{i}_eta{j}_time{k}",
                     "Zmumu pass gen",
                     "ch_dtst",
@@ -449,15 +503,43 @@ for i in range(nbins_pt):  # just select two pt bins in the center
                     groups=["eff_trig"],
                 )
 
-            id_var = id_var_nom[
+            id_var_tag = id_var_nom[
+                {"gen_time": k, "pt_probe": i, "eta_probe": j}
+            ]  ## equivalent to n2
+            id_var_tag = id_var_tag.project("time", "pt_tag", "eta_tag")
+
+            id_var_tag = broadcastSystHist(
+                id_var_tag, dtst_prpg
+            )  ### so i think this puts the variation in all bins where pt_tag and eta_tag are what they should be
+            # /(nbins_time*nbins_eta*nbins_time)
+            id_var_tag_h1 = multiplyHists(
+                scaleHist(id_var_tag, var_size / (nbins_pt + nbins_eta + nbins_time)),
+                dtst_prpg,
+            )
+            id_var_tag_h0 = multiplyHists(
+                scaleHist(id_var_tag, var_size / (nbins_pt + nbins_eta + nbins_time)),
+                stst_prpg,
+            )
+
+            id_var_tag_h1 = id_var_tag_h1.project("time", "pt_probe", "eta_probe")
+            id_var_tag_h0 = id_var_tag_h0.project("time", "pt_probe", "eta_probe")
+
+            id_var_probe = id_var_nom[
                 {"pt_tag": i, "eta_tag": j, "gen_time": k}
             ]  ## equivalent to n2
-            id_var_h1 = multiplyHists(scaleHist(id_var, var_size), h1)
-            id_var_h0 = multiplyHists(scaleHist(id_var, var_size), h0)
+            # pdb.set_trace()
+            id_var_probe_h1 = multiplyHists(scaleHist(id_var_probe, var_size), h1)
+            id_var_probe_h0 = multiplyHists(scaleHist(id_var_probe, var_size), h0)
 
+            id_var_total_h1 = id_var_probe_h1
+            id_var_total_h0 = id_var_probe_h0
+            # id_var_total_h1 = addHists(id_var_probe_h1, id_var_tag_h1)
+            # id_var_total_h0 = addHists(id_var_probe_h0, -1*id_var_tag_h0)
             ### order of these is time, pt, eta
+            # pdb.set_trace()
+
             writer.add_systematic(
-                addHists(id_var_h1, h1),
+                addHists(id_var_total_h1, h1),
                 f"id_prime_pt{i}_eta{j}_time{k}",
                 "Zmumu pass gen",
                 "ch_dtst",
@@ -466,7 +548,7 @@ for i in range(nbins_pt):  # just select two pt bins in the center
             )
 
             writer.add_systematic(
-                addHists(scaleHist(id_var_h0, -1), h0),
+                addHists(scaleHist(id_var_total_h0, -1), h0),
                 f"id_prime_pt{i}_eta{j}_time{k}",
                 "Zmumu pass gen",
                 "ch_stst",
@@ -645,4 +727,4 @@ for i in range(nbins_pt):  # just select two pt bins in the center
 #     "linearity",
 # )
 
-writer.write(outfolder="./", outfilename="liv")
+writer.write(outfolder="./", outfilename="liv_probe")

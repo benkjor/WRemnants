@@ -107,7 +107,7 @@ def mc_corrections_all_cases(
 ):
 
     dtdt = all_mc_corrections(
-        dtdt_mc.copy(), hist_proj_hlt, lumi_scaling, weightsum, cross_sec
+        dtdt_mc.copy(), hist_proj_low, lumi_scaling, weightsum, cross_sec
     )
     dtst = all_mc_corrections(
         dtst_mc.copy(), hist_proj_low.copy(), lumi_scaling, weightsum, cross_sec
@@ -226,12 +226,19 @@ def eta_phi_systematic(
     )
 
 
-def get_era_vals(mc, trigger_cut, era):
-    return (
-        mc[f"{trigger_cut}_prpg_{era}"].get(),
-        mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireSyst"].get(),
-        mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireStat"].get(),
-    )
+def get_era_vals(mc, trigger_cut, era, type_gen="pass"):
+    if type_gen == "pass":
+        return (
+            mc[f"{trigger_cut}_prpg_{era}"].get(),
+            mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireSyst"].get(),
+            mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireStat"].get(),
+        )
+    else:
+        return (
+            mc[f"{trigger_cut}_prfg_{era}"].get(),
+            mc[f"{trigger_cut}_prfg_{era}_muonL1PrefireSyst"].get(),
+            mc[f"{trigger_cut}_prfg_{era}_muonL1PrefireStat"].get(),
+        )
 
 
 def luminometer_syst(writer, luminometer, dtdt, dtst, stst, syst):
@@ -269,20 +276,15 @@ def background_syst(
     time_proj_hlt,
     time_proj_low,
     lumi_scaling,
+    lumi_hists,
     proc_name,
     bkg_name,
     fail_gen=False,
+    mass_bin=9,
 ):
 
     MC = results[res_str]["output"]
-    if fail_gen:
-        dtdt = MC["dtdt_prfg"].get()
-        dtst = MC["dtst_prfg"].get()
-        stst = MC["stst_prfg"].get()
-    else:
-        dtdt = MC["dtdt_prpg"].get()
-        dtst = MC["dtst_prpg"].get()
-        stst = MC["stst_prpg"].get()
+
     try:
         weightsum = results[proc_name]["weight_sum"]
         cross_sec = results[proc_name]["dataset"]["xsec"]
@@ -290,33 +292,76 @@ def background_syst(
         weightsum = results["ZmumuPostVFP"]["weight_sum"]
         cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
 
-    dtdt, dtst, stst = mc_corrections_all_cases(
-        dtdt,
-        dtst,
-        stst,
-        time_proj_hlt,
-        time_proj_low,
+    ### MAKE THIS IMPLEMENTATION NOT STUPID
+    if fail_gen:
+        dtdt_prpg_BG, _, _ = get_era_vals(MC, "dtdt", "BG", "fail")
+        dtst_prpg_BG, _, _ = get_era_vals(MC, "dtst", "BG", "fail")
+        stst_prpg_BG, _, _ = get_era_vals(MC, "stst", "BG", "fail")
+
+        dtdt_prpg_H, _, _ = get_era_vals(MC, "dtdt", "H", "fail")
+        dtst_prpg_H, _, _ = get_era_vals(MC, "dtst", "H", "fail")
+        stst_prpg_H, _, _ = get_era_vals(MC, "stst", "H", "fail")
+    else:
+        dtdt_prpg_BG, _, _ = get_era_vals(MC, "dtdt", "BG")
+        dtst_prpg_BG, _, _ = get_era_vals(MC, "dtst", "BG")
+        stst_prpg_BG, _, _ = get_era_vals(MC, "stst", "BG")
+
+        dtdt_prpg_H, _, _ = get_era_vals(MC, "dtdt", "H")
+        dtst_prpg_H, _, _ = get_era_vals(MC, "dtst", "H")
+        stst_prpg_H, _, _ = get_era_vals(MC, "stst", "H")
+
+    dtdt_prpg_H = dtdt_prpg_H[{"mll": mass_bin}]
+    dtst_prpg_H = dtst_prpg_H[{"mll": mass_bin}]
+    stst_prpg_H = stst_prpg_H[{"mll": mass_bin}]
+    dtdt_prpg_BG = dtdt_prpg_BG[{"mll": mass_bin}]
+    dtst_prpg_BG = dtst_prpg_BG[{"mll": mass_bin}]
+    stst_prpg_BG = stst_prpg_BG[{"mll": mass_bin}]
+
+    prpg_all = [
+        dtdt_prpg_H,
+        dtst_prpg_H,
+        stst_prpg_H,
+        dtdt_prpg_BG,
+        dtst_prpg_BG,
+        stst_prpg_BG,
+    ]
+
+    time_hists = [time_proj_hlt, time_proj_low]
+
+    dtdt, dtst, stst = get_mc_lumis(
+        prpg_all,
+        time_hists,
         lumi_scaling,
+        lumi_hists,
         weightsum,
         cross_sec,
     )
-    dtdt_proc = dtdt.project("time", "pt_probe", "eta_probe")
 
+    dtdt_proc = dtdt.project("time", "pt_probe", "eta_probe")
     dtst_proc = dtst.project("time", "pt_probe", "eta_probe")
     stst_proc = stst.project("time", "pt_probe", "eta_probe")
-    writer.add_process(dtdt_proc, f"{proc_name}", "ch_dtdt_5d", signal=False)
-    writer.add_process(dtst_proc, f"{proc_name}", "ch_dtst_5d", signal=False)
-    writer.add_process(stst_proc, f"{proc_name}", "ch_stst_5d", signal=False)
+    # pdb.set_trace()
+
+    dtdt_proc, dtst_proc, stst_proc = make_mutually_exclusive(
+        dtdt_proc, dtst_proc, stst_proc
+    )
+
+    dtdt_proc = remove_low_bins(dtdt_proc)
+
+    writer.add_process(dtdt_proc, f"{proc_name}", "ch_dtdt", signal=False)
+    writer.add_process(dtst_proc, f"{proc_name}", "ch_dtst", signal=False)
+    writer.add_process(stst_proc, f"{proc_name}", "ch_stst", signal=False)
 
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_dtdt_5d", 1.01, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_dtdt", 1.01, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_dtst_5d", 1.01, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_dtst", 1.01, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_stst_5d", 1.01, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_stst", 1.01, groups=["bkg"]
     )
+    # return dtdt, dtst, stst
 
 
 def get_eff_variations(h1_leading, h2_leading, h0_leading, eps_id_prime, eps_hlt_prime):
@@ -391,3 +436,18 @@ def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
         new_hist.values()[...] = old_hist.values()[:, :, 2:, :, :, :]
 
     return new_hist
+
+
+def probe_to_tag(old_hist):
+    new_pt_axis = hist.axis.Variable(old_hist.axes[1].edges, name="pt_tag")
+    new_eta_axis = hist.axis.Variable(old_hist.axes[2].edges, name="eta_tag")
+    new_hist = hist.Hist(old_hist.axes[0], new_pt_axis, new_eta_axis)
+    new_hist.values()[...] = old_hist.values()[...]
+    return new_hist
+
+
+def make_mutually_exclusive(dtdt, dtst, stst):
+    dtdt_ex = dtdt
+    dtst_ex = addHists(dtst, scaleHist(dtdt, -1))
+    stst_ex = addHists(stst, scaleHist(dtst, -1))
+    return dtdt_ex, dtst_ex, stst_ex

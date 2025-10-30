@@ -11,7 +11,7 @@ from narf.lumitools import (
     make_lumihelper,
 )
 from utilities import common, parsing
-from wremnants import muon_prefiring, syst_tools, theory_tools
+from wremnants import muon_prefiring, muon_selections, syst_tools, theory_tools
 from wremnants.datasets.datagroups import Datagroups
 from wremnants.datasets.dataset_tools import getDatasets
 from wremnants.histmaker_tools import (
@@ -462,6 +462,10 @@ def build_graph_lumi(df, dataset):
 
 def build_graph(df, dataset):
 
+    isoThreshold = args.isolationThreshold
+
+    isoBranch = muon_selections.getIsoBranch(args.isolationDefinition)
+
     logger.info(f"fomrbuild graph for dataset: {dataset.name}")
     era = args.era
     results = []
@@ -480,71 +484,21 @@ def build_graph(df, dataset):
         "Muon_isGoodGlobal",
         f" Muon_isGlobal && Muon_highPurity && Muon_standaloneNumberOfValidHits > 0 && Muon_standalonePt > 15 &&  wrem::vectDeltaR2(Muon_standaloneEta, Muon_standalonePhi, Muon_eta, Muon_phi) < 0.09 && Muon_pt >= 15 && abs(Muon_eta) <= 2.4 && Muon_charge != -99",
     )
-    #
 
-    if not dataset.is_data:
-        hist_mc_before = df.HistoBoost(
-            "mc_before",
-            [
-                axis_pt_low,
-            ],
-            [
-                "Muon_pt",
-                "weight",
-            ],
-        )
-    if dataset.is_data:
-        hist_data_before = df.HistoBoost(
-            "data_before",
-            [
-                axis_date,
-                axis_pt_low,
-            ],
-            [
-                "time",
-                "Muon_pt",
-                "weight",
-            ],
-        )
+    # && {isoBranch} < {isoThreshold} this selection seems strange. becuase isoBranch is a name but the threshold is a number
+    #
 
     #### THIS IS WHAT CAUSES THE DIFFERENCE
     df = df.Filter("Sum(Muon_isGoodGlobal) == 2")
 
-    if not dataset.is_data:
-        hist_mc_after = df.HistoBoost(
-            "mc_after",
-            [
-                axis_pt_low,
-            ],
-            [
-                "Muon_pt",
-                "weight",
-            ],
-        )
-        results.append(hist_mc_before)
-        results.append(hist_mc_after)
-    if dataset.is_data:
-        hist_data_after = df.HistoBoost(
-            "data_after",
-            [
-                axis_date,
-                axis_pt_low,
-            ],
-            [
-                "time",
-                "Muon_pt",
-                "weight",
-            ],
-        )
-        results.append(hist_data_before)
-        results.append(hist_data_after)
+    ###     okay so this is already built in. im confused why the isolation is less than but seems to already be in place
 
     df = df.Filter(
         "Muon_charge[Muon_isGoodGlobal][0] != Muon_charge[Muon_isGoodGlobal][1]"
     )
     df = df.Define(
         "Muon_isGoodMedium",
-        f"Muon_isGoodGlobal && Muon_mediumId && abs(Muon_dxybs) < 0.05",
+        f"Muon_isGoodGlobal && Muon_mediumId && abs(Muon_dxybs) < 0.05 && {isoBranch} < {isoThreshold}",
     )
 
     df = df.Define(
@@ -570,7 +524,9 @@ def build_graph(df, dataset):
         "mu_probe",
         "Muon_isGoodTrigger[Muon_isGoodGlobal][0] == 1 && Muon_isGoodMedium[Muon_isGoodGlobal][0] == 1 ? (Muon_isGoodTrigger[Muon_isGoodGlobal][1] == 1 && Muon_isGoodMedium[Muon_isGoodGlobal][1] == 1 ? abs(rand()%2): 1) : 0",
     )  ## looked through nanoaod for event number, couldnt find it. genEventcount did not work. i checked and this does evenly split it.
+    df = df.Define("mu_tag", "abs(mu_probe - 1)")
 
+    ### isEvenEvent is the thing that i could use
     df = df.Define(
         "pt_probe", "mu_probe == 0 ? goodLoose_mu_mom4.pt() : goodLoose_smu_mom4.pt()"
     )

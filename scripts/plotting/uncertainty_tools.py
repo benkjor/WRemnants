@@ -433,7 +433,7 @@ def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
             old_hist.axes[4],
             old_hist.axes[5],
         )
-        new_hist.values()[...] = old_hist.values()[:, :, 2:, :, :, :]
+        new_hist.values()[...] = old_hist.values()[:, :, nbins:, :, :, :]
 
     return new_hist
 
@@ -451,3 +451,30 @@ def make_mutually_exclusive(dtdt, dtst, stst):
     dtst_ex = addHists(dtst, scaleHist(dtdt, -1))
     stst_ex = addHists(stst, scaleHist(dtst, -1))
     return dtdt_ex, dtst_ex, stst_ex
+
+
+def create_variation(
+    variation_hist,
+    refererence_hist,
+    i,
+    j,
+    k,
+    nbins_total,
+    muon="tag",
+    h2=False,
+    var_size=0.01,
+):
+    if h2:
+        i -= 1
+    not_muon = "probe"
+    if muon == "probe":
+        not_muon = "tag"
+
+    var = variation_hist[{"gen_time": k, f"pt_{not_muon}": i, f"eta_{not_muon}": j}]
+
+    if muon == "tag":
+        var = var.project("time", f"pt_{muon}", f"eta_{muon}")
+        var = broadcastSystHist(var, refererence_hist)
+        var = multiplyHists(scaleHist(var, var_size / (nbins_total)), refererence_hist)
+        var = var.project("time", "pt_probe", "eta_probe")
+    return var

@@ -578,19 +578,19 @@ def build_graph(df, dataset):
         df_loose = df_pg  ### had it as df_pg
         df_tight = df_loose.Filter(
             "Muon_isGoodMedium[Muon_isGoodGlobal][0] == 1 && Muon_isGoodMedium[Muon_isGoodGlobal][1] == 1"
-        )  ## have already defined that this passes the looseId
+        )
         df_trig = df_tight.Filter(
             "Muon_isGoodTrigger[Muon_isGoodGlobal][0] == 1 && Muon_isGoodTrigger[Muon_isGoodGlobal][1] == 1"
-        )  ## filter for it.
+        )
 
         # ### fail generator
         df_loose_fg = df.Filter("!gen_pass")
         df_tight_fg = df_loose_fg.Filter(
             "Muon_isGoodMedium[Muon_isGoodGlobal][0] == 1 && Muon_isGoodMedium[Muon_isGoodGlobal][1] == 1"
-        )  ## have already defined that this passes the looseId
+        )
         df_trig_fg = df_tight_fg.Filter(
             "Muon_isGoodTrigger[Muon_isGoodGlobal][0] == 1 && Muon_isGoodTrigger[Muon_isGoodGlobal][1] == 1"
-        )  ## filter for it.
+        )
 
         hist_tight_muons_fg = df_tight_fg.HistoBoost(
             "dtst_prfg",
@@ -680,11 +680,10 @@ def build_graph(df, dataset):
         stst = df
         dtst = stst.Filter(
             "Muon_isGoodMedium[Muon_isGoodGlobal][0] == 1 && Muon_isGoodMedium[Muon_isGoodGlobal][1] == 1"
-        )  ## have already defined that this passes the looseId
+        )
         dtdt = dtst.Filter(
             "Muon_isGoodTrigger[Muon_isGoodGlobal][0] == 1 && Muon_isGoodTrigger[Muon_isGoodGlobal][1] == 1"
-        )  ## filter for it.
-
+        )
         hist_time_proj = df.HistoBoost(
             "time_proj",
             [

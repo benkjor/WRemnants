@@ -3,6 +3,7 @@ import argparse
 import h5py
 from uncertainty_tools import (
     all_mc_corrections,
+    background_syst,
     create_variation,
     get_era_vals,
     get_mc_lumis,
@@ -240,16 +241,14 @@ dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
 # )
 
 pass_gen = all_mc_corrections(
-    pass_gen[{"mll": mass_bin}],  # , "gen_mll": mass_bin}],
+    pass_gen[{"mll": mass_bin}],
     time_proj_low,
     lumi_scaling,
     weightsum,
     cross_sec,
 )
 
-n_masked = pass_gen.project(
-    "time", "pt_probe", "eta_probe"
-)  ### choosing tag versus probe for this did not matter
+n_masked = pass_gen.project("time", "pt_probe", "eta_probe")
 
 
 hlt_var_nom = divideHists(
@@ -282,12 +281,12 @@ h1_data = dtst_data.project("time", "pt_probe", "eta_probe")
 h0_data = stst_data.project("time", "pt_probe", "eta_probe")
 
 
-print("DTDT")
-print(divideHists(h2.project("pt_probe"), h2_data.project("pt_probe")))
-print("DTST")
-print(divideHists(h1.project("pt_probe"), h1_data.project("pt_probe")))
-print("STST")
-print(divideHists(h0.project("pt_probe"), h0_data.project("pt_probe")))
+# print("DTDT")
+# print(divideHists(h2.project("pt_probe"), h2_data.project("pt_probe")))
+# print("DTST")
+# print(divideHists(h1.project("pt_probe"), h1_data.project("pt_probe")))
+# print("STST")
+# print(divideHists(h0.project("pt_probe"), h0_data.project("pt_probe")))
 
 
 dtdt_prpg_proj = expand_hist_by_duplicate_axes(
@@ -341,10 +340,10 @@ pass_gen = expand_hist_by_duplicate_axis(pass_gen, "time", "gen_time")
 nbins_h2 = (nbins_pt - 1) + nbins_eta + nbins_time
 nbins_h1 = nbins_pt + nbins_eta + nbins_time
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
-for i in range(1, 2):  # just select two pt bins in the center
+for i in range(nbins_pt):  # just select two pt bins in the center
     print(f"pt bin: {i}")
     for j in range(nbins_eta):  # eta
-        for k in range(0, 1):  #  time
+        for k in range(nbins_time):  #  time
 
             if i > 0:  ## we only have 1 bin beneath 25 GeV
                 v2 = dtdt_prpg_proj[{"gen_time": k, "pt_tag": i - 1, "eta_tag": j}]
@@ -502,25 +501,25 @@ for i in range(1, 2):  # just select two pt bins in the center
                 groups=["eff_id"],
             )
 
-# for i in range(len(background_syst_names)):
-#     proc_name = background_proc[i]
-#     if proc_name == "Zmumu fail gen":
-#         fgen = True
-#     else:
-#         fgen = False
-#     print("proc_name: %s" % proc_name)
-#     background_syst(
-#         writer,
-#         results,
-#         background_syst_names[i],
-#         time_proj_hlt,
-#         time_proj_low,
-#         lumi_scaling,
-#         [lumi_scaling_h, lumi_scaling_bg],
-#         proc_name,
-#         f"bkg_{proc_name}",
-#         fail_gen=fgen,
-#     )
+for i in range(len(background_syst_names)):
+    proc_name = background_proc[i]
+    if proc_name == "Zmumu fail gen":
+        fgen = True
+    else:
+        fgen = False
+    print("proc_name: %s" % proc_name)
+    background_syst(
+        writer,
+        results,
+        background_syst_names[i],
+        time_proj_hlt,
+        time_proj_low,
+        lumi_scaling,
+        [lumi_scaling_h, lumi_scaling_bg],
+        proc_name,
+        f"bkg_{proc_name}",
+        fail_gen=fgen,
+    )
 
 
 ### SO THESE SHOULD BE DONE ACROSS ALL MASS BINS
@@ -630,4 +629,4 @@ for i in range(1, 2):  # just select two pt bins in the center
 #     "linearity",
 # )
 
-writer.write(outfolder="./", outfilename="liv")
+writer.write(outfolder="./", outfilename="liv_ALL")

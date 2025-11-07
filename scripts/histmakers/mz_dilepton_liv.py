@@ -11,7 +11,13 @@ from narf.lumitools import (
     make_lumihelper,
 )
 from utilities import common, parsing
-from wremnants import muon_prefiring, muon_selections, syst_tools, theory_tools
+from wremnants import (
+    muon_efficiencies_liv,
+    muon_prefiring,
+    muon_selections,
+    syst_tools,
+    theory_tools,
+)
 from wremnants.datasets.datagroups import Datagroups
 from wremnants.datasets.dataset_tools import getDatasets
 from wremnants.histmaker_tools import (
@@ -181,6 +187,9 @@ def make_prefire_hists(df, results, name, axes=2):
     eta_1 = "eta_probe"
     eta_2 = "eta_tag"
 
+    df_BG = df_BG.Redefine("weight", "weight * weight_newMuonPrefiringSF_BG")
+    df_H = df_H.Redefine("weight", "weight * weight_newMuonPrefiringSF_H")
+
     h_weights = df_H.HistoBoost(
         f"{name}_H",
         [
@@ -196,7 +205,7 @@ def make_prefire_hists(df, results, name, axes=2):
             eta_1,
             pt_2,
             eta_2,
-            "weight_newMuonPrefiringSF_H",
+            "weight",
         ],
     )
     bg_weights = df_BG.HistoBoost(
@@ -214,7 +223,7 @@ def make_prefire_hists(df, results, name, axes=2):
             eta_1,
             pt_2,
             eta_2,
-            "weight_newMuonPrefiringSF_BG",
+            "weight",
         ],
     )
     results.append(h_weights)
@@ -241,7 +250,7 @@ def make_prefire_hists(df, results, name, axes=2):
         helper_syst=muon_prefiring_helper_syst_BG,
         storage_type=hist.storage.Double(),
         base_name=name + "_BG",
-        weight="weight_newMuonPrefiringSF_BG",
+        weight="weight",
     )
 
     syst_tools.add_L1Prefire_unc_hists(
@@ -265,61 +274,11 @@ def make_prefire_hists(df, results, name, axes=2):
         helper_syst=muon_prefiring_helper_syst_H,
         storage_type=hist.storage.Double(),
         base_name=name + "_H",
-        weight="weight_newMuonPrefiringSF_H",
+        weight="weight",
     )
 
     return bg_weights, h_weights
 
-
-redo_cdf = True
-args = parser.parse_args()
-logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
-era = args.era
-calib_filepaths = common.calib_filepaths
-lumi_files_path = "/work/submit/jbenke/WRemnants/wremnants/datasets"  #### THIS IS A REALLY DUMB WAY TO DO THIS
-# hoping this can go up top
-lumicsv = f"{lumi_files_path}/bylsoutput_nBunches.csv"
-hfoc_csv = f"{lumi_files_path}/bylsoutput_nBunches_HFOC.csv"
-pcc_csv = f"{lumi_files_path}/bylsoutput_nBunches_PCC.csv"
-ramses_csv = f"{lumi_files_path}/bylsoutput_nBunches_RAMSES.csv"
-
-brilcalc_helper = make_timehelper(lumicsv)
-lumi_no_time = make_lumihelper(lumicsv)  # post_vfp
-lumi_bunch_helper = make_brilcalc_helper(lumicsv, idx=9, action=float)
-
-hfoc_helper = make_lumihelper(hfoc_csv)
-pcc_helper = make_lumihelper(pcc_csv)
-ramses_helper = make_lumihelper(ramses_csv)
-
-hfoc_bunch_helper = make_brilcalc_helper(hfoc_csv, idx=9, action=float)
-pcc_bunch_helper = make_brilcalc_helper(pcc_csv, idx=9, action=float)
-ramses_bunch_helper = make_brilcalc_helper(ramses_csv, idx=9, action=float)
-
-hfoc_filter_helper = make_brilcalc_filter_helper(hfoc_csv)
-pcc_filter_helper = make_brilcalc_filter_helper(pcc_csv)
-ramses_filter_helper = make_brilcalc_filter_helper(ramses_csv)
-
-
-## make the two sets of prefiring helpers for each port of the data
-(
-    muon_prefiring_helper_BG,
-    muon_prefiring_helper_stat_BG,
-    muon_prefiring_helper_syst_BG,
-) = muon_prefiring.make_muon_prefiring_helpers(era="2016BG")
-
-muon_prefiring_helper_H, muon_prefiring_helper_stat_H, muon_prefiring_helper_syst_H = (
-    muon_prefiring.make_muon_prefiring_helpers(era="2016H")
-)
-
-datasets = getDatasets(
-    maxFiles=args.maxFiles,
-    filt=args.filterProcs,
-    excl=args.excludeProcs,
-    nanoVersion="v9",
-    base_path=args.dataPath,
-    extended="msht20an3lo" not in args.pdfs,
-    era=era,
-)
 
 axis_date = hist.axis.Regular(24, 0, 24, name="time", overflow=False, underflow=False)
 
@@ -327,8 +286,6 @@ axis_sbil = hist.axis.Regular(
     24, 9e-7, 3e-8, name="sbil", overflow=False, underflow=False
 )
 
-### need copies of each axis so that i can have one be the tag and probe. s
-# hould probably have a function to take in a probe axis and spit out a tag axis
 axis_eta = hist.axis.Variable(
     [-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name="eta_probe"
 )
@@ -421,6 +378,69 @@ axis_mll_copy = hist.axis.Variable(
 )
 
 
+axis_weight = hist.axis.Regular(50, 0.5, 1, name="weight")
+
+redo_cdf = True
+args = parser.parse_args()
+logger = logging.setup_logger(__file__, args.verbose, args.noColorLogger)
+era = args.era
+calib_filepaths = common.calib_filepaths
+lumi_files_path = "/work/submit/jbenke/WRemnants/wremnants/datasets"  #### THIS IS A REALLY DUMB WAY TO DO THIS
+# hoping this can go up top
+lumicsv = f"{lumi_files_path}/bylsoutput_nBunches.csv"
+hfoc_csv = f"{lumi_files_path}/bylsoutput_nBunches_HFOC.csv"
+pcc_csv = f"{lumi_files_path}/bylsoutput_nBunches_PCC.csv"
+ramses_csv = f"{lumi_files_path}/bylsoutput_nBunches_RAMSES.csv"
+
+brilcalc_helper = make_timehelper(lumicsv)
+lumi_no_time = make_lumihelper(lumicsv)  # post_vfp
+lumi_bunch_helper = make_brilcalc_helper(lumicsv, idx=9, action=float)
+
+hfoc_helper = make_lumihelper(hfoc_csv)
+pcc_helper = make_lumihelper(pcc_csv)
+ramses_helper = make_lumihelper(ramses_csv)
+
+hfoc_bunch_helper = make_brilcalc_helper(hfoc_csv, idx=9, action=float)
+pcc_bunch_helper = make_brilcalc_helper(pcc_csv, idx=9, action=float)
+ramses_bunch_helper = make_brilcalc_helper(ramses_csv, idx=9, action=float)
+
+hfoc_filter_helper = make_brilcalc_filter_helper(hfoc_csv)
+pcc_filter_helper = make_brilcalc_filter_helper(pcc_csv)
+ramses_filter_helper = make_brilcalc_filter_helper(ramses_csv)
+
+
+## make the two sets of prefiring helpers for each port of the data
+(
+    muon_prefiring_helper_BG,
+    muon_prefiring_helper_stat_BG,
+    muon_prefiring_helper_syst_BG,
+) = muon_prefiring.make_muon_prefiring_helpers(era="2016BG")
+
+muon_prefiring_helper_H, muon_prefiring_helper_stat_H, muon_prefiring_helper_syst_H = (
+    muon_prefiring.make_muon_prefiring_helpers(era="2016H")
+)
+
+
+muon_reco_efficiency_helper = muon_efficiencies_liv.make_muon_reco_efficiency_helper(
+    era="2016BG",
+)
+muon_tracking_efficiency_helper = (
+    muon_efficiencies_liv.make_muon_tracking_efficiency_helper(
+        era="2016BG",
+    )
+)
+
+datasets = getDatasets(
+    maxFiles=args.maxFiles,
+    filt=args.filterProcs,
+    excl=args.excludeProcs,
+    nanoVersion="v9",
+    base_path=args.dataPath,
+    extended="msht20an3lo" not in args.pdfs,
+    era=era,
+)
+
+
 ########################################################
 def build_graph_lumi(df, dataset):
     df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
@@ -461,7 +481,6 @@ def build_graph_lumi(df, dataset):
 
 
 def build_graph(df, dataset):
-
     isoThreshold = args.isolationThreshold
 
     isoBranch = muon_selections.getIsoBranch(args.isolationDefinition)
@@ -475,6 +494,7 @@ def build_graph(df, dataset):
         df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
         hist_time = df.HistoBoost("time", [axis_date], ["time"])
     else:
+        # weight_expr += "*weight_fullMuonSF_withTrackingReco"
         df = df.Define("weight", "std::copysign(1.0, genWeight)")
     weightsum = df.SumAndCount("weight")
 
@@ -496,10 +516,13 @@ def build_graph(df, dataset):
     df = df.Filter(
         "Muon_charge[Muon_isGoodGlobal][0] != Muon_charge[Muon_isGoodGlobal][1]"
     )
+
     df = df.Define(
         "Muon_isGoodMedium",
         f"Muon_isGoodGlobal && Muon_mediumId && abs(Muon_dxybs) < 0.05 && {isoBranch} < {isoThreshold}",
     )
+
+    df = df.Define("Muon_passIso", f"{isoBranch} < {isoThreshold}")
 
     df = df.Define(
         "goodTrigObjs",
@@ -510,6 +533,7 @@ def build_graph(df, dataset):
         "Muon_isGoodTrigger",
         "Muon_pt>=25 && Muon_isGoodMedium && wrem::hasTriggerMatch(Muon_eta,Muon_phi,TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])",
     )
+
     #### filter to ensure that at least one muon passes HLT
     df = df.Filter(
         "(Muon_isGoodTrigger[Muon_isGoodGlobal][0] == 1) || (Muon_isGoodTrigger[Muon_isGoodGlobal][1] == 1)"
@@ -543,12 +567,31 @@ def build_graph(df, dataset):
     )
 
     if not dataset.is_data:
-
         df = theory_tools.define_postfsr_vars(df)
+
+        #### NO IDEA WHAT THIS OR WHY IT IS NEEDED FOR THE EFFICIENCIES.
+        #### NO IDEA WHAT PTVEGN AND PHIVGEN ARE
+
+        df = df.Define(
+            "reco_scalefactor_weight",
+            muon_reco_efficiency_helper,
+            ["Muon_eta", "Muon_pt"],
+        )
+
+        df = df.Define(
+            "tracking_scalefactor_weight",
+            muon_tracking_efficiency_helper,
+            ["Muon_standaloneEta", "Muon_standalonePt"],
+        )
+
+        df = df.Redefine(
+            "weight", "weight * reco_scalefactor_weight* tracking_scalefactor_weight"
+        )
+
         df = df.Define(
             "postfsrMuons_loose",
             f"postfsrMuons && abs(GenPart_eta) < 2.4 && GenPart_pt > 15",
-        )  ### used to be > 25, not sure if that is changes anything
+        )
 
         #### THIS IS HTE PROBLEM, THIS CRITERION DOES NOT MATCH ALL THE SELECTION CASES I DONT THINKG
 
@@ -667,6 +710,7 @@ def build_graph(df, dataset):
         # results.append(hist_trigger_muons_pg)
 
         results.append(hist_pass_gen)
+        # results.append(hist_reco_weight)
         make_prefire_hists(df_trig, results, "dtdt_prpg")
         make_prefire_hists(df_tight, results, "dtst_prpg")
         make_prefire_hists(df_loose, results, "stst_prpg")
@@ -676,7 +720,6 @@ def build_graph(df, dataset):
         make_prefire_hists(df_loose_fg, results, "stst_prfg")
 
     else:  ### this is for real data
-
         stst = df
         dtst = stst.Filter(
             "Muon_isGoodMedium[Muon_isGoodGlobal][0] == 1 && Muon_isGoodMedium[Muon_isGoodGlobal][1] == 1"
@@ -781,6 +824,7 @@ def build_graph(df, dataset):
         results.append(hist_time_mll)
         results.append(hist_time_dtst)
         results.append(hist_time_stst)
+
     return results, weightsum
 
 

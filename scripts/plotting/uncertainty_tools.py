@@ -96,6 +96,7 @@ def all_mc_corrections(hist_in, hist_proj, lumi_scaling, weightsum, cross_sec):
 
 
 def mc_corrections_all_cases(
+    iso_mc,
     dtdt_mc,
     dtst_mc,
     stst_mc,
@@ -105,7 +106,9 @@ def mc_corrections_all_cases(
     weightsum,
     cross_sec,
 ):
-
+    iso = all_mc_corrections(
+        iso_mc.copy(), hist_proj_low, lumi_scaling, weightsum, cross_sec
+    )
     dtdt = all_mc_corrections(
         dtdt_mc.copy(), hist_proj_low, lumi_scaling, weightsum, cross_sec
     )
@@ -116,7 +119,7 @@ def mc_corrections_all_cases(
     stst = all_mc_corrections(
         stst_mc.copy(), hist_proj_low.copy(), lumi_scaling, weightsum, cross_sec
     )
-    return dtdt, dtst, stst
+    return iso, dtdt, dtst, stst
 
 
 def make_ones_hist(hist_ref):
@@ -135,46 +138,42 @@ def get_mc_lumis(
     cross_sec,
 ):
 
-    dtdt_h, dtst_h, stst_h, dtdt_bg, dtst_bg, stst_bg = input_data
+    iso_h, dtdt_h, dtst_h, stst_h, iso_bg, dtdt_bg, dtst_bg, stst_bg = input_data
     time_proj_hlt, time_proj_low = time_hists
 
     lumi_h, lumi_bg = lumi_hists
     sum_lumis = addHists(lumi_bg, lumi_h)
     lumi_scaling_h = divideHists(lumi_h, sum_lumis)
     lumi_scaling_bg = divideHists(lumi_bg, sum_lumis)
-    dtdt_h, dtst_h, stst_h = mc_corrections_all_cases(
+    iso_h, dtdt_h, dtst_h, stst_h = mc_corrections_all_cases(
+        iso_h,
         dtdt_h,
         dtst_h,
         stst_h,
         time_proj_hlt,
         time_proj_low,
-        # lumi_h,
         multiplyHists(lumi_scaling_h, scaling),
         weightsum,
         cross_sec,
     )
 
-    dtdt_bg, dtst_bg, stst_bg = mc_corrections_all_cases(
+    iso_bg, dtdt_bg, dtst_bg, stst_bg = mc_corrections_all_cases(
+        iso_bg,
         dtdt_bg,
         dtst_bg,
         stst_bg,
         time_proj_hlt,
         time_proj_low,
-        # lumi_bg,
         multiplyHists(lumi_scaling_bg, scaling),
         weightsum,
         cross_sec,
     )
-
+    iso = addHists(iso_bg, iso_h)
     dtdt = addHists(dtdt_bg, dtdt_h)
     dtst = addHists(dtst_bg, dtst_h)
     stst = addHists(stst_bg, stst_h)
 
-    # dtdt = multiplyHists(dtdt, scaling)
-    # dtst = multiplyHists(dtst, scaling)
-    # stst = multiplyHists(stst, scaling)
-
-    return dtdt, dtst, stst
+    return iso, dtdt, dtst, stst
 
 
 ### i need to get good at coding so i dont need to pass in all these variables
@@ -454,19 +453,19 @@ def probe_to_tag(old_hist):
     return new_hist
 
 
-# def make_mutually_exclusive(iso, dtdt, dtst, stst):
-#     iso_ex = iso
-#     dtdt_ex = addHists(dtdt, scaleHist(iso, -1))
-#     dtst_ex = addHists(dtst, scaleHist(dtdt, -1))
-#     stst_ex = addHists(stst, scaleHist(dtst, -1))
-#     return iso_ex, dtdt_ex, dtst_ex, stst_ex
-
-
-def make_mutually_exclusive(dtdt, dtst, stst):
-    dtdt_ex = dtdt
+def make_mutually_exclusive(iso, dtdt, dtst, stst):
+    iso_ex = iso
+    dtdt_ex = addHists(dtdt, scaleHist(iso, -1))
     dtst_ex = addHists(dtst, scaleHist(dtdt, -1))
     stst_ex = addHists(stst, scaleHist(dtst, -1))
-    return dtdt_ex, dtst_ex, stst_ex
+    return iso_ex, dtdt_ex, dtst_ex, stst_ex
+
+
+# def make_mutually_exclusive(dtdt, dtst, stst):
+#     dtdt_ex = dtdt
+#     dtst_ex = addHists(dtst, scaleHist(dtdt, -1))
+#     stst_ex = addHists(stst, scaleHist(dtst, -1))
+#     return dtdt_ex, dtst_ex, stst_ex
 
 
 def create_variation(

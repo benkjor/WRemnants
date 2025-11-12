@@ -504,8 +504,6 @@ def build_graph(df, dataset):
         "Muon_isGoodGlobal",
         f" Muon_isGlobal && Muon_highPurity && Muon_standaloneNumberOfValidHits > 0 && Muon_standalonePt > 15 &&  wrem::vectDeltaR2(Muon_standaloneEta, Muon_standalonePhi, Muon_eta, Muon_phi) < 0.09 && Muon_pt >= 15 && abs(Muon_eta) <= 2.4 && Muon_charge != -99",
     )
-
-    # && {isoBranch} < {isoThreshold} this selection seems strange. becuase isoBranch is a name but the threshold is a number
     #
 
     #### THIS IS WHAT CAUSES THE DIFFERENCE
@@ -564,10 +562,10 @@ def build_graph(df, dataset):
     )
 
     df = df.Define(
-        "Muon_passIso", f"Muon_isGoodTrigger && {isoBranch} < {isoThreshold}"
+        "Muon_passIso", f"Muon_isGoodTrigger && ({isoBranch} < {isoThreshold})"
     )
 
-    # df = df.Filter("Muon_passIso[Muon_isGoodGlobal][mu_tag] == 1")
+    df = df.Filter("Muon_passIso[Muon_isGoodGlobal][mu_tag] == 1")
 
     if not dataset.is_data:
         df = theory_tools.define_postfsr_vars(df)
@@ -624,7 +622,45 @@ def build_graph(df, dataset):
             "Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1"
         )
 
-        # df_iso = df_trig.Filter("Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1")
+        df_iso = df_trig.Filter("Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1")
+
+        hist_trig = df_trig.HistoBoost(
+            "trigger_test",
+            [
+                axis_mll,
+                axis_pt_low,
+                axis_eta,
+                axis_pt_high,
+                axis_eta_copy,
+            ],
+            [
+                "goodLoose_mll",
+                "pt_probe",
+                "eta_probe",
+                "pt_tag",
+                "eta_tag",
+                "weight",
+            ],
+        )
+
+        hist_iso = df_iso.HistoBoost(
+            "iso_test",
+            [
+                axis_mll,
+                axis_pt_low,
+                axis_eta,
+                axis_pt_high,
+                axis_eta_copy,
+            ],
+            [
+                "goodLoose_mll",
+                "pt_probe",
+                "eta_probe",
+                "pt_tag",
+                "eta_tag",
+                "weight",
+            ],
+        )
 
         # ### fail generator
         df_loose_fg = df.Filter("!gen_pass")
@@ -646,7 +682,9 @@ def build_graph(df, dataset):
             results.append(fine_bin_mll)
 
         results.append(hist_pass_gen)
-        # make_prefire_hists(df_iso, results, "pass_iso")
+        results.append(hist_iso)
+        results.append(hist_trig)
+        make_prefire_hists(df_iso, results, "pass_iso")
         make_prefire_hists(df_trig, results, "dtdt_prpg")
         make_prefire_hists(df_tight, results, "dtst_prpg")
         make_prefire_hists(df_loose, results, "stst_prpg")
@@ -659,7 +697,7 @@ def build_graph(df, dataset):
         stst = df
         dtst = stst.Filter("Muon_isGoodMedium[Muon_isGoodGlobal][mu_probe] == 1")
         dtdt = dtst.Filter("Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1")
-        # iso = dtdt.Filter("Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1")
+        iso = dtdt.Filter("Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1")
 
         hist_time_proj = df.HistoBoost(
             "time_proj",
@@ -682,26 +720,26 @@ def build_graph(df, dataset):
             ],
         )
 
-        # hist_time_iso = iso.HistoBoost(
-        #     "time_iso",
-        #     [
-        #         axis_date,
-        #         axis_mll,
-        #         axis_pt_low,
-        #         axis_eta,
-        #         axis_pt_high,
-        #         axis_eta_copy,
-        #     ],
-        #     [
-        #         "time",
-        #         "goodLoose_mll",
-        #         "pt_probe",
-        #         "eta_probe",
-        #         "pt_tag",
-        #         "eta_tag",
-        #         "weight",
-        #     ],
-        # )
+        hist_time_iso = iso.HistoBoost(
+            "time_iso",
+            [
+                axis_date,
+                axis_mll,
+                axis_pt_low,
+                axis_eta,
+                axis_pt_high,
+                axis_eta_copy,
+            ],
+            [
+                "time",
+                "goodLoose_mll",
+                "pt_probe",
+                "eta_probe",
+                "pt_tag",
+                "eta_tag",
+                "weight",
+            ],
+        )
 
         hist_time_mll = dtdt.HistoBoost(
             "time_mll",
@@ -773,7 +811,7 @@ def build_graph(df, dataset):
         #         "fine_bin_axis_gen", [fine_bin_axis], ["eta_tag", "weight"]
         #     )
         #     results.append(fine_bin_mll)
-        # results.append(hist_time_iso)
+        results.append(hist_time_iso)
         results.append(hist_time_proj)
         results.append(hist_time)
         results.append(hist_time_mll)

@@ -226,13 +226,21 @@ def eta_phi_systematic(
     )
 
 
-def get_era_vals(mc, trigger_cut, era, type_gen="pass"):
+def get_era_vals(mc, trigger_cut, era, type_gen="pass", iso=False):
     if type_gen == "pass":
-        return (
-            mc[f"{trigger_cut}_prpg_{era}"].get(),
-            mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireSyst"].get(),
-            mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireStat"].get(),
-        )
+        if not iso:
+            return (
+                mc[f"{trigger_cut}_prpg_{era}"].get(),
+                mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireSyst"].get(),
+                mc[f"{trigger_cut}_prpg_{era}_muonL1PrefireStat"].get(),
+            )
+        else:
+            return (
+                mc[f"{trigger_cut}_{era}"].get(),
+                mc[f"{trigger_cut}_{era}_muonL1PrefireSyst"].get(),
+                mc[f"{trigger_cut}_{era}_muonL1PrefireStat"].get(),
+            )
+
     else:
         return (
             mc[f"{trigger_cut}_prfg_{era}"].get(),
@@ -294,6 +302,7 @@ def background_syst(
 
     ### MAKE THIS IMPLEMENTATION NOT STUPID
     if fail_gen:
+
         dtdt_prpg_BG, _, _ = get_era_vals(MC, "dtdt", "BG", "fail")
         dtst_prpg_BG, _, _ = get_era_vals(MC, "dtst", "BG", "fail")
         stst_prpg_BG, _, _ = get_era_vals(MC, "stst", "BG", "fail")
@@ -340,7 +349,6 @@ def background_syst(
     dtdt_proc = dtdt.project("time", "pt_probe", "eta_probe")
     dtst_proc = dtst.project("time", "pt_probe", "eta_probe")
     stst_proc = stst.project("time", "pt_probe", "eta_probe")
-    # pdb.set_trace()
 
     dtdt_proc, dtst_proc, stst_proc = make_mutually_exclusive(
         dtdt_proc, dtst_proc, stst_proc
@@ -444,6 +452,14 @@ def probe_to_tag(old_hist):
     new_hist = hist.Hist(old_hist.axes[0], new_pt_axis, new_eta_axis)
     new_hist.values()[...] = old_hist.values()[...]
     return new_hist
+
+
+# def make_mutually_exclusive(iso, dtdt, dtst, stst):
+#     iso_ex = iso
+#     dtdt_ex = addHists(dtdt, scaleHist(iso, -1))
+#     dtst_ex = addHists(dtst, scaleHist(dtdt, -1))
+#     stst_ex = addHists(stst, scaleHist(dtst, -1))
+#     return iso_ex, dtdt_ex, dtst_ex, stst_ex
 
 
 def make_mutually_exclusive(dtdt, dtst, stst):

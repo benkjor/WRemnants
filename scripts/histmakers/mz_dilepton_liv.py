@@ -529,6 +529,10 @@ def build_graph(df, dataset):
         "Muon_isGoodTrigger",
         "Muon_pt>=25 && Muon_isGoodMedium && wrem::hasTriggerMatch(Muon_eta,Muon_phi,TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])",
     )
+    # df = df.Define(
+    #     "low_pt_isolation",
+    #     "Muon_pt <= 25 && Muon_isGoodMedium == 1 && Muon_passIsoTrig == 1"
+    # )
 
     #### filter to ensure that at least one muon passes HLT
     df = df.Filter(
@@ -560,12 +564,13 @@ def build_graph(df, dataset):
     df = df.Define(
         "eta_tag", "mu_probe == 0 ? goodLoose_smu_mom4.eta() :goodLoose_mu_mom4.eta()"
     )
+    df = df.Define("Muon_passIso", f"({isoBranch} < {isoThreshold})")
 
     df = df.Define(
-        "Muon_passIso", f"Muon_isGoodTrigger && ({isoBranch} < {isoThreshold})"
+        "Muon_passIsoTrig", "(Muon_isGoodTrigger == 1) && (Muon_passIso == 1)"
     )
 
-    df = df.Filter("Muon_passIso[Muon_isGoodGlobal][mu_tag] == 1")
+    df = df.Filter("Muon_passIsoTrig[Muon_isGoodGlobal][mu_tag] == 1")
 
     if not dataset.is_data:
         df = theory_tools.define_postfsr_vars(df)
@@ -591,7 +596,7 @@ def build_graph(df, dataset):
             f"postfsrMuons && abs(GenPart_eta) < 2.4 && GenPart_pt > 15",
         )
 
-        #### THIS IS HTE PROBLEM, THIS CRITERION DOES NOT MATCH ALL THE SELECTION CASES I DONT THINKG
+        #### THIS IS HTE PROBLEM, THIS CRITERION DOES NOT MATCH ALL THE SELECTION CASES I DONT THINK
 
         df = mass_extraction(df, "gen_", "GenPart", "postfsrMuons_loose")
         # df_loose = df.Filter("gen_pass")
@@ -622,45 +627,13 @@ def build_graph(df, dataset):
             "Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1"
         )
 
-        df_iso = df_trig.Filter("Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1")
+        # df_iso = df_trig.Filter("Muon_passIsoTrig[Muon_isGoodGlobal][mu_probe] == 1")
 
-        hist_trig = df_trig.HistoBoost(
-            "trigger_test",
-            [
-                axis_mll,
-                axis_pt_low,
-                axis_eta,
-                axis_pt_high,
-                axis_eta_copy,
-            ],
-            [
-                "goodLoose_mll",
-                "pt_probe",
-                "eta_probe",
-                "pt_tag",
-                "eta_tag",
-                "weight",
-            ],
+        ## either the probe muon passes the trigger or it is going to pass iso. or is okay because trigger is above 25 and this is mutually exclusive
+        df_iso = df_tight.Filter(
+            "Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1 || (Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1 && Muon_pt[Muon_isGoodGlobal][mu_probe] < 25)"
         )
-
-        hist_iso = df_iso.HistoBoost(
-            "iso_test",
-            [
-                axis_mll,
-                axis_pt_low,
-                axis_eta,
-                axis_pt_high,
-                axis_eta_copy,
-            ],
-            [
-                "goodLoose_mll",
-                "pt_probe",
-                "eta_probe",
-                "pt_tag",
-                "eta_tag",
-                "weight",
-            ],
-        )
+        df_iso = df_iso.Filter("Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1")
 
         # ### fail generator
         df_loose_fg = df.Filter("!gen_pass")
@@ -682,8 +655,7 @@ def build_graph(df, dataset):
             results.append(fine_bin_mll)
 
         results.append(hist_pass_gen)
-        results.append(hist_iso)
-        results.append(hist_trig)
+
         make_prefire_hists(df_iso, results, "pass_iso")
         make_prefire_hists(df_trig, results, "dtdt_prpg")
         make_prefire_hists(df_tight, results, "dtst_prpg")
@@ -697,7 +669,11 @@ def build_graph(df, dataset):
         stst = df
         dtst = stst.Filter("Muon_isGoodMedium[Muon_isGoodGlobal][mu_probe] == 1")
         dtdt = dtst.Filter("Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1")
-        iso = dtdt.Filter("Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1")
+
+        iso = dtst.Filter(
+            "Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1 || (Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1 && Muon_pt[Muon_isGoodGlobal][mu_probe] < 25)"
+        )
+        iso = iso.Filter("Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1")
 
         hist_time_proj = df.HistoBoost(
             "time_proj",

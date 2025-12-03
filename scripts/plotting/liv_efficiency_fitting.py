@@ -1,5 +1,4 @@
 import argparse
-import pdb
 
 import h5py
 from uncertainty_tools import (
@@ -138,15 +137,16 @@ pcc_scaling = multiplyHists(pcc_scaling, lumi_scaling)
 ramses_scaling = divideHists(lumi_ramses, lumi_ramses_nom)
 ramses_scaling = multiplyHists(ramses_scaling, lumi_scaling)
 
+iso_H = iso_H[{"mll": mass_bin}]
 dtdt_prpg_H = dtdt_prpg_H[{"mll": mass_bin}]
 dtst_prpg_H = dtst_prpg_H[{"mll": mass_bin}]
 stst_prpg_H = stst_prpg_H[{"mll": mass_bin}]
+
+iso_BG = iso_BG[{"mll": mass_bin}]
 dtdt_prpg_BG = dtdt_prpg_BG[{"mll": mass_bin}]
 dtst_prpg_BG = dtst_prpg_BG[{"mll": mass_bin}]
 stst_prpg_BG = stst_prpg_BG[{"mll": mass_bin}]
 
-iso_H = iso_H[{"mll": mass_bin}]
-iso_BG = iso_BG[{"mll": mass_bin}]
 
 prpg_all = [
     iso_H,
@@ -263,9 +263,15 @@ pass_gen = all_mc_corrections(
 )
 
 n_masked = pass_gen.project("time", "pt_probe", "eta_probe")
+# iso_var_nom = divideHists(
+#     iso.project("time", "pt_probe", "eta_probe"),
+#     dtdt_prpg.project("time", "pt_probe", "eta_probe"),
+# )
+
+### making it one
 iso_var_nom = divideHists(
     iso.project("time", "pt_probe", "eta_probe"),
-    dtdt_prpg.project("time", "pt_probe", "eta_probe"),
+    iso.project("time", "pt_probe", "eta_probe"),
 )
 
 
@@ -289,7 +295,7 @@ iso_mc, dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = make_mutually_exclusive(
 )
 
 
-iso_mc = remove_low_bins(iso_mc)
+# iso_mc = remove_low_bins(iso_mc)
 dtdt_prpg_mc = remove_low_bins(dtdt_prpg_mc)
 h3 = iso_mc.project("time", "pt_probe", "eta_probe")
 
@@ -298,7 +304,7 @@ h1 = dtst_prpg_mc.project("time", "pt_probe", "eta_probe")
 h0 = stst_prpg_mc.project("time", "pt_probe", "eta_probe")
 
 dtdt_data = remove_low_bins(dtdt_data)
-iso_data = remove_low_bins(iso_data)
+# iso_data = remove_low_bins(iso_data)
 
 h3_data = iso_data.project("time", "pt_probe", "eta_probe")
 h2_data = dtdt_data.project("time", "pt_probe", "eta_probe")
@@ -344,7 +350,6 @@ iso_var_nom = expand_hist_by_duplicate_axes(
     iso_var_nom, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
 )
 
-
 ###################################################################333
 
 ## create the tensor
@@ -361,7 +366,6 @@ writer.add_channel(h2_data.axes, "ch_dtdt")
 writer.add_data(h2_data, "ch_dtdt")
 writer.add_process(h2, "Zmumu pass gen", "ch_dtdt")
 
-pdb.set_trace()
 writer.add_channel(h1_data.axes, "ch_dtst")
 writer.add_data(h1_data, "ch_dtst")
 writer.add_process(h1, "Zmumu pass gen", "ch_dtst")
@@ -370,15 +374,14 @@ writer.add_channel(h0_data.axes, "ch_stst")
 writer.add_data(h0_data, "ch_stst")
 writer.add_process(h0, "Zmumu pass gen", "ch_stst")
 
-
 pass_gen = expand_hist_by_duplicate_axis(pass_gen, "time", "gen_time")
 nbins_h2 = (nbins_pt - 1) + nbins_eta + nbins_time
 nbins_h1 = nbins_pt + nbins_eta + nbins_time
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
-for i in range(0, 1):  # just select two pt bins in the center
+for i in range(nbins_pt):  # pt
     print(f"pt bin: {i}")
     for j in range(nbins_eta):  # eta
-        for k in range(0, 1):  #  time
+        for k in range(nbins_time):  #  time
 
             if i > 0:  ## we only have 1 bin beneath 25 GeV
                 #### NORMALIZATION #####
@@ -394,24 +397,12 @@ for i in range(0, 1):  # just select two pt bins in the center
                     groups=["nz"],
                 )
 
-                v3 = iso_proj[{"gen_time": k, "pt_tag": i - 1, "eta_tag": j}]
-                var3 = addHists(v3 * var_size, h3)
-
-                writer.add_systematic(
-                    var3,
-                    f"n_pt{i}_eta{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_iso",
-                    constrained=False,
-                    groups=["nz"],
-                )
-
                 ##### HLT #####
                 hlt_var_tag_h3 = create_variation(
-                    hlt_var_nom_h2.copy(), iso_mc, i, j, k, nbins_h2, h2=True
+                    hlt_var_nom, iso_mc, i, j, k, nbins_h1
                 )
                 hlt_probe_h3 = create_variation(
-                    hlt_var_nom_h2.copy(), iso_mc, i, j, k, 0, "probe", h2=True
+                    hlt_var_nom, iso_mc, i, j, k, 0, "probe"
                 )
                 hlt_probe_h3 = multiplyHists(scaleHist(hlt_probe_h3, var_size), h3)
                 hlt_var_total_h3 = addHists(hlt_var_tag_h3, hlt_probe_h3)
@@ -464,7 +455,7 @@ for i in range(0, 1):  # just select two pt bins in the center
                 )
 
                 hlt_var_tag_h0 = create_variation(
-                    hlt_var_nom, stst_prpg_mc, i, j, k, nbins_h2
+                    hlt_var_nom, stst_prpg_mc, i, j, k, nbins_h1
                 )
                 hlt_var_total_h0 = 2 * hlt_var_tag_h0
 
@@ -478,24 +469,6 @@ for i in range(0, 1):  # just select two pt bins in the center
                 )
 
                 #### ID ######
-
-                id_var_tag_h3 = create_variation(
-                    id_var_h2.copy(), iso_mc, i, j, k, nbins_h2, h2=True
-                )
-                id_probe_h3 = create_variation(
-                    id_var_h2.copy(), iso_mc, i, j, k, 0, "probe", h2=True
-                )
-                id_probe_h3 = multiplyHists(scaleHist(id_probe_h3, var_size), h3)
-                id_var_total_h3 = scaleHist(addHists(id_var_tag_h3, id_probe_h3), 1 / 2)
-
-                writer.add_systematic(
-                    addHists(id_var_total_h3, h3),
-                    f"id_pt{i}_eta{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_iso",
-                    constrained=False,
-                    groups=["eff_id"],
-                )
 
                 id_var_tag_h2 = create_variation(
                     id_var_h2, dtdt_prpg_mc, i, j, k, nbins_h2, h2=True
@@ -517,24 +490,6 @@ for i in range(0, 1):  # just select two pt bins in the center
 
                 ### ISOLATION ### --> can only be valid when hlt is valid
 
-                iso_var_tag_h3 = create_variation(
-                    iso_var_nom_h2.copy(), iso_mc, i, j, k, nbins_h2, h2=True
-                )
-                iso_probe_h3 = create_variation(
-                    iso_var_nom_h2.copy(), iso_mc, i, j, k, 0, "probe", h2=True
-                )
-                iso_probe_h3 = multiplyHists(scaleHist(iso_probe_h3, var_size), h3)
-                iso_var_total_h3 = addHists(iso_var_tag_h3, iso_probe_h3)
-
-                writer.add_systematic(
-                    addHists(iso_var_total_h3, h3),
-                    f"iso_pt{i}_eta{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_iso",
-                    constrained=False,
-                    groups=["eff_trig"],
-                )
-
                 iso_var_tag_h2 = create_variation(
                     iso_var_nom_h2, dtdt_prpg_mc, i, j, k, nbins_h2, h2=True
                 )
@@ -555,43 +510,71 @@ for i in range(0, 1):  # just select two pt bins in the center
                     groups=["eff_trig"],
                 )
 
-                iso_var_tag_h1 = create_variation(
-                    iso_var_nom, dtst_prpg_mc, i, j, k, nbins_h1
-                )
-                iso_probe_h1 = create_variation(
-                    iso_var_nom, dtst_prpg_mc, i, j, k, 0, "probe"
-                )
-                iso_probe_h1 = multiplyHists(scaleHist(iso_probe_h1, var_size), h1)
-                iso_var_total_h1 = scaleHist(
-                    addHists(iso_var_tag_h1, -1 * iso_probe_h1), 2
-                )
+            # pdb.set_trace()
 
-                writer.add_systematic(
-                    addHists(iso_var_total_h1, h1),
-                    f"iso_pt{i}_eta{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_dtst",
-                    constrained=False,
-                    groups=["eff_trig"],
-                )
+            iso_var_tag_h3 = create_variation(iso_var_nom, iso_mc, i, j, k, nbins_h1)
+            iso_probe_h3 = create_variation(iso_var_nom, iso_mc, i, j, k, 0, "probe")
 
-                iso_var_tag_h0 = create_variation(
-                    iso_var_nom, stst_prpg_mc, i, j, k, nbins_h2
-                )
-                iso_var_total_h0 = 2 * iso_var_tag_h0
+            iso_probe_h3 = multiplyHists(scaleHist(iso_probe_h3, var_size), h3)
+            iso_var_total_h3 = addHists(iso_var_tag_h3, iso_probe_h3)
 
-                writer.add_systematic(
-                    addHists(iso_var_total_h0, h0),
-                    f"iso_pt{i}_eta{j}_time{k}",
-                    "Zmumu pass gen",
-                    "ch_stst",
-                    constrained=False,
-                    groups=["eff_trig"],
-                )
+            writer.add_systematic(
+                addHists(iso_var_total_h3, h3),
+                f"iso_pt{i}_eta{j}_time{k}",
+                "Zmumu pass gen",
+                "ch_iso",
+                constrained=False,
+                groups=["eff_trig"],
+            )
+
+            iso_var_tag_h1 = create_variation(
+                iso_var_nom, dtst_prpg_mc, i, j, k, nbins_h1
+            )
+            iso_probe_h1 = create_variation(
+                iso_var_nom, dtst_prpg_mc, i, j, k, 0, "probe"
+            )
+            iso_probe_h1 = multiplyHists(scaleHist(iso_probe_h1, var_size), h1)
+            iso_var_total_h1 = scaleHist(addHists(iso_var_tag_h1, -1 * iso_probe_h1), 2)
+
+            writer.add_systematic(
+                addHists(iso_var_total_h1, h1),
+                f"iso_pt{i}_eta{j}_time{k}",
+                "Zmumu pass gen",
+                "ch_dtst",
+                constrained=False,
+                groups=["eff_trig"],
+            )
+
+            iso_var_tag_h0 = create_variation(
+                iso_var_nom, stst_prpg_mc, i, j, k, nbins_h1
+            )
+            iso_var_total_h0 = 2 * iso_var_tag_h0
+
+            writer.add_systematic(
+                addHists(iso_var_total_h0, h0),
+                f"iso_pt{i}_eta{j}_time{k}",
+                "Zmumu pass gen",
+                "ch_stst",
+                constrained=False,
+                groups=["eff_trig"],
+            )
 
             #### FOR THE LOWEST PT BIN ####
 
             ##### NORMALIZATION #####
+
+            v3 = iso_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
+            var3 = addHists(v3 * var_size, h3)
+
+            writer.add_systematic(
+                var3,
+                f"n_pt{i}_eta{j}_time{k}",
+                "Zmumu pass gen",
+                "ch_iso",
+                constrained=False,
+                groups=["nz"],
+            )
+
             v1 = dtst_prpg_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
             var1 = addHists(v1 * var_size, h1)
             writer.add_systematic(
@@ -628,6 +611,19 @@ for i in range(0, 1):  # just select two pt bins in the center
             )
 
             ###### ID #####
+            id_var_tag_h3 = create_variation(id_var_nom, iso_mc, i, j, k, nbins_h1)
+            id_probe_h3 = create_variation(id_var_nom, iso_mc, i, j, k, 0, "probe")
+            id_probe_h3 = multiplyHists(scaleHist(id_probe_h3, var_size), h3)
+            id_var_total_h3 = scaleHist(addHists(id_var_tag_h3, id_probe_h3), 1 / 2)
+
+            writer.add_systematic(
+                addHists(id_var_total_h3, h3),
+                f"id_pt{i}_eta{j}_time{k}",
+                "Zmumu pass gen",
+                "ch_iso",
+                constrained=False,
+                groups=["eff_id"],
+            )
 
             id_var_tag_h1 = create_variation(
                 id_var_nom, dtst_prpg_mc, i, j, k, nbins_h1

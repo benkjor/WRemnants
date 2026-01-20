@@ -168,6 +168,7 @@ def get_mc_lumis(
         weightsum,
         cross_sec,
     )
+
     iso = addHists(iso_bg, iso_h)
     dtdt = addHists(dtdt_bg, dtdt_h)
     dtst = addHists(dtst_bg, dtst_h)
@@ -310,25 +311,32 @@ def background_syst(
         dtst_prpg_H, _, _ = get_era_vals(MC, "dtst", "H", "fail")
         stst_prpg_H, _, _ = get_era_vals(MC, "stst", "H", "fail")
     else:
+        iso_BG, _, _ = get_era_vals(MC, "pass_iso", "BG", iso=True)
         dtdt_prpg_BG, _, _ = get_era_vals(MC, "dtdt", "BG")
         dtst_prpg_BG, _, _ = get_era_vals(MC, "dtst", "BG")
         stst_prpg_BG, _, _ = get_era_vals(MC, "stst", "BG")
 
+        iso_H, _, _ = get_era_vals(MC, "pass_iso", "H", iso=True)
         dtdt_prpg_H, _, _ = get_era_vals(MC, "dtdt", "H")
         dtst_prpg_H, _, _ = get_era_vals(MC, "dtst", "H")
         stst_prpg_H, _, _ = get_era_vals(MC, "stst", "H")
 
+    iso_H = iso_H[{"mll": mass_bin}]
     dtdt_prpg_H = dtdt_prpg_H[{"mll": mass_bin}]
     dtst_prpg_H = dtst_prpg_H[{"mll": mass_bin}]
     stst_prpg_H = stst_prpg_H[{"mll": mass_bin}]
+
+    iso_BG = iso_BG[{"mll": mass_bin}]
     dtdt_prpg_BG = dtdt_prpg_BG[{"mll": mass_bin}]
     dtst_prpg_BG = dtst_prpg_BG[{"mll": mass_bin}]
     stst_prpg_BG = stst_prpg_BG[{"mll": mass_bin}]
 
     prpg_all = [
+        iso_H,
         dtdt_prpg_H,
         dtst_prpg_H,
         stst_prpg_H,
+        iso_BG,
         dtdt_prpg_BG,
         dtst_prpg_BG,
         stst_prpg_BG,
@@ -336,7 +344,7 @@ def background_syst(
 
     time_hists = [time_proj_hlt, time_proj_low]
 
-    dtdt, dtst, stst = get_mc_lumis(
+    iso, dtdt, dtst, stst = get_mc_lumis(
         prpg_all,
         time_hists,
         lumi_scaling,
@@ -344,21 +352,26 @@ def background_syst(
         weightsum,
         cross_sec,
     )
+    iso_proc = iso.project("time", "pt_probe", "eta_probe")
 
     dtdt_proc = dtdt.project("time", "pt_probe", "eta_probe")
     dtst_proc = dtst.project("time", "pt_probe", "eta_probe")
     stst_proc = stst.project("time", "pt_probe", "eta_probe")
 
-    dtdt_proc, dtst_proc, stst_proc = make_mutually_exclusive(
-        dtdt_proc, dtst_proc, stst_proc
+    iso_proc, dtdt_proc, dtst_proc, stst_proc = make_mutually_exclusive(
+        iso_proc, dtdt_proc, dtst_proc, stst_proc
     )
-
+    iso_proc = remove_low_bins(iso_proc)
     dtdt_proc = remove_low_bins(dtdt_proc)
 
+    writer.add_process(iso_proc, f"{proc_name}", "ch_iso", signal=False)
     writer.add_process(dtdt_proc, f"{proc_name}", "ch_dtdt", signal=False)
     writer.add_process(dtst_proc, f"{proc_name}", "ch_dtst", signal=False)
     writer.add_process(stst_proc, f"{proc_name}", "ch_stst", signal=False)
 
+    writer.add_norm_systematic(
+        f"{bkg_name}", f"{proc_name}", "ch_iso", 1.01, groups=["bkg"]
+    )
     writer.add_norm_systematic(
         f"{bkg_name}", f"{proc_name}", "ch_dtdt", 1.01, groups=["bkg"]
     )
@@ -368,7 +381,6 @@ def background_syst(
     writer.add_norm_systematic(
         f"{bkg_name}", f"{proc_name}", "ch_stst", 1.01, groups=["bkg"]
     )
-    # return dtdt, dtst, stst
 
 
 def get_eff_variations(h1_leading, h2_leading, h0_leading, eps_id_prime, eps_hlt_prime):
@@ -459,13 +471,6 @@ def make_mutually_exclusive(iso, dtdt, dtst, stst):
     dtst_ex = addHists(dtst, scaleHist(dtdt, -1))
     stst_ex = addHists(stst, scaleHist(dtst, -1))
     return iso_ex, dtdt_ex, dtst_ex, stst_ex
-
-
-# def make_mutually_exclusive(dtdt, dtst, stst):
-#     dtdt_ex = dtdt
-#     dtst_ex = addHists(dtst, scaleHist(dtdt, -1))
-#     stst_ex = addHists(stst, scaleHist(dtst, -1))
-#     return dtdt_ex, dtst_ex, stst_ex
 
 
 def create_variation(

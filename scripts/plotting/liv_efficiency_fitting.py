@@ -1,4 +1,5 @@
 import argparse
+import pickle
 
 import h5py
 from uncertainty_tools import (
@@ -7,6 +8,7 @@ from uncertainty_tools import (
     get_era_vals,
     get_mc_lumis,
     make_mutually_exclusive,
+    make_ones_hist,
     remove_low_bins,
 )
 
@@ -72,7 +74,6 @@ time_proj_hlt_all = data_output["time_proj"].get()
 
 time_proj_low = time_proj_low_all[{"mll": mass_bin}]
 time_proj_hlt = time_proj_hlt_all[{"mll": mass_bin}]
-
 
 ### should loop over these instead of calling them explicitly
 
@@ -158,75 +159,75 @@ prpg_all = [
     dtst_prpg_BG,
     stst_prpg_BG,
 ]
-# prpg_syst = [
-#     dtdt_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-#     dtst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-#     stst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-#     dtdt_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-#     dtst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-#     stst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-# ]
+prpg_syst = [
+    dtdt_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+    dtst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+    stst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+    dtdt_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+    dtst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+    stst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+]
 
 
 time_hists = [time_proj_hlt, time_proj_low]
 lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
-# dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
-#     prpg_all,
-#     time_hists,
-#     hfoc_scaling,
-#     lumi_hists,
-#     weightsum,
-#     cross_sec,
-# )
+dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
+    prpg_all,
+    time_hists,
+    hfoc_scaling,
+    lumi_hists,
+    weightsum,
+    cross_sec,
+)
 
-# dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
-#     prpg_all,
-#     time_hists,
-#     pcc_scaling,
-#     lumi_hists,
-#     weightsum,
-#     cross_sec,
-# )
+dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
+    prpg_all,
+    time_hists,
+    pcc_scaling,
+    lumi_hists,
+    weightsum,
+    cross_sec,
+)
 
-# dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
-#     prpg_all,
-#     time_hists,
-#     ramses_scaling,
-#     lumi_hists,
-#     weightsum,
-#     cross_sec,
-# )
+dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
+    prpg_all,
+    time_hists,
+    ramses_scaling,
+    lumi_hists,
+    weightsum,
+    cross_sec,
+)
 
-# avg_sbil_pcc = scaleHist(divideHists(sbil_pcc, count_pcc), 1e9)
+avg_sbil_pcc = scaleHist(divideHists(sbil_pcc, count_pcc), 1e9)
 
-# sbil_hfoc_fit = scaleHist(avg_sbil_pcc, slope_hfoc)
+sbil_hfoc_fit = scaleHist(avg_sbil_pcc, slope_hfoc)
 
-# sbil_ones = make_ones_hist(sbil_hfoc_fit)
-# sbil_hfoc_fit = addHists(sbil_hfoc_fit, sbil_ones)
-# sbil_hfoc_fit = multiplyHists(sbil_hfoc_fit, lumi_scaling)
+sbil_ones = make_ones_hist(sbil_hfoc_fit)
+sbil_hfoc_fit = addHists(sbil_hfoc_fit, sbil_ones)
+sbil_hfoc_fit = multiplyHists(sbil_hfoc_fit, lumi_scaling)
 
-# sbil_ramses_fit = scaleHist(avg_sbil_pcc, slope_ramses)
-# sbil_ramses_fit = addHists(sbil_ramses_fit, sbil_ones)
-# sbil_ramses_fit = multiplyHists(sbil_ramses_fit, lumi_scaling)
+sbil_ramses_fit = scaleHist(avg_sbil_pcc, slope_ramses)
+sbil_ramses_fit = addHists(sbil_ramses_fit, sbil_ones)
+sbil_ramses_fit = multiplyHists(sbil_ramses_fit, lumi_scaling)
 
-# dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = get_mc_lumis(
-#     prpg_all,
-#     time_hists,
-#     sbil_hfoc_fit,
-#     lumi_hists,
-#     weightsum,
-#     cross_sec,
-# )
+dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = get_mc_lumis(
+    prpg_all,
+    time_hists,
+    sbil_hfoc_fit,
+    lumi_hists,
+    weightsum,
+    cross_sec,
+)
 
-# dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ramses = get_mc_lumis(
-#     prpg_all,
-#     time_hists,
-#     sbil_ramses_fit,
-#     lumi_hists,
-#     weightsum,
-#     cross_sec,
-# )
+dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ramses = get_mc_lumis(
+    prpg_all,
+    time_hists,
+    sbil_ramses_fit,
+    lumi_hists,
+    weightsum,
+    cross_sec,
+)
 
 #### normal
 iso, dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
@@ -274,11 +275,11 @@ iso_var_nom = divideHists(
     iso.project("time", "pt_probe", "eta_probe"),
 )
 
-
 hlt_var_nom = divideHists(
     dtdt_prpg.project("time", "pt_probe", "eta_probe"),
     dtst_prpg.project("time", "pt_probe", "eta_probe"),
 )
+
 id_var_nom = divideHists(
     dtst_prpg.project("time", "pt_probe", "eta_probe"),
     stst_prpg.project("time", "pt_probe", "eta_probe"),
@@ -294,9 +295,17 @@ iso_mc, dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = make_mutually_exclusive(
     iso, dtdt_prpg, dtst_prpg, stst_prpg
 )
 
-
-# iso_mc = remove_low_bins(iso_mc)
 dtdt_prpg_mc = remove_low_bins(dtdt_prpg_mc)
+with open("mutually_exclusive_iso.pkl", "wb") as f:
+    pickle.dump(iso_mc, f)
+with open("mutually_exclusive_dtdt.pkl", "wb") as f:
+    pickle.dump(dtdt_prpg_mc, f)
+with open("mutually_exclusive_dtst.pkl", "wb") as f:
+    pickle.dump(dtst_prpg_mc, f)
+with open("mutually_exclusive_stst.pkl", "wb") as f:
+    pickle.dump(stst_prpg_mc, f)
+
+
 h3 = iso_mc.project("time", "pt_probe", "eta_probe")
 
 h2 = dtdt_prpg_mc.project("time", "pt_probe", "eta_probe")
@@ -304,7 +313,6 @@ h1 = dtst_prpg_mc.project("time", "pt_probe", "eta_probe")
 h0 = stst_prpg_mc.project("time", "pt_probe", "eta_probe")
 
 dtdt_data = remove_low_bins(dtdt_data)
-# iso_data = remove_low_bins(iso_data)
 
 h3_data = iso_data.project("time", "pt_probe", "eta_probe")
 h2_data = dtdt_data.project("time", "pt_probe", "eta_probe")
@@ -350,7 +358,7 @@ iso_var_nom = expand_hist_by_duplicate_axes(
     iso_var_nom, ["time", "pt_probe", "eta_probe"], ["gen_time", "pt_tag", "eta_tag"]
 )
 
-###################################################################333
+###################################################################
 
 ## create the tensor
 writer = tensorwriter.TensorWriter()
@@ -790,4 +798,5 @@ for i in range(nbins_pt):  # pt
 #     "linearity",
 # )
 
-writer.write(outfolder="./", outfilename="liv")
+# writer.write(outfolder="./", outfilename="liv")
+writer.write(outfolder="./")

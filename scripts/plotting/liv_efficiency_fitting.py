@@ -1,5 +1,4 @@
 import argparse
-import pickle
 
 import h5py
 from uncertainty_tools import (
@@ -159,20 +158,20 @@ prpg_all = [
     dtst_prpg_BG,
     stst_prpg_BG,
 ]
-prpg_syst = [
-    dtdt_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-    dtst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-    stst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-    dtdt_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-    dtst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-    stst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-]
+# prpg_syst = [
+#     dtdt_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+#     dtst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+#     stst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+#     dtdt_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+#     dtst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+#     stst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
+# ]
 
 
 time_hists = [time_proj_hlt, time_proj_low]
 lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
-dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
+iso_hfoc, dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
     prpg_all,
     time_hists,
     hfoc_scaling,
@@ -181,7 +180,7 @@ dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
     cross_sec,
 )
 
-dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
+iso_pcc, dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
     prpg_all,
     time_hists,
     pcc_scaling,
@@ -190,7 +189,7 @@ dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
     cross_sec,
 )
 
-dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
+iso_ramses, dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
     prpg_all,
     time_hists,
     ramses_scaling,
@@ -211,22 +210,26 @@ sbil_ramses_fit = scaleHist(avg_sbil_pcc, slope_ramses)
 sbil_ramses_fit = addHists(sbil_ramses_fit, sbil_ones)
 sbil_ramses_fit = multiplyHists(sbil_ramses_fit, lumi_scaling)
 
-dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = get_mc_lumis(
-    prpg_all,
-    time_hists,
-    sbil_hfoc_fit,
-    lumi_hists,
-    weightsum,
-    cross_sec,
+iso_sbil_hfoc, dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = (
+    get_mc_lumis(
+        prpg_all,
+        time_hists,
+        sbil_hfoc_fit,
+        lumi_hists,
+        weightsum,
+        cross_sec,
+    )
 )
 
-dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ramses = get_mc_lumis(
-    prpg_all,
-    time_hists,
-    sbil_ramses_fit,
-    lumi_hists,
-    weightsum,
-    cross_sec,
+iso_sbil_ramses, dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ramses = (
+    get_mc_lumis(
+        prpg_all,
+        time_hists,
+        sbil_ramses_fit,
+        lumi_hists,
+        weightsum,
+        cross_sec,
+    )
 )
 
 #### normal
@@ -238,11 +241,6 @@ iso, dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
     weightsum,
     cross_sec,
 )
-
-# iso_H = all_mc_corrections(iso_H, time_hists[1], lumi_scaling, weightsum, cross_sec)
-# iso_BG = all_mc_corrections(iso_BG, time_hists[1], lumi_scaling, weightsum, cross_sec)
-# iso = addHists(iso_H, iso_BG)
-
 
 # (dtdt_prpg_prefiring_syst, dtst_prpg_prefiring_syst, stst_prpg_prefiring_syst) = (
 #     get_mc_lumis(
@@ -296,14 +294,14 @@ iso_mc, dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = make_mutually_exclusive(
 )
 
 dtdt_prpg_mc = remove_low_bins(dtdt_prpg_mc)
-with open("mutually_exclusive_iso.pkl", "wb") as f:
-    pickle.dump(iso_mc, f)
-with open("mutually_exclusive_dtdt.pkl", "wb") as f:
-    pickle.dump(dtdt_prpg_mc, f)
-with open("mutually_exclusive_dtst.pkl", "wb") as f:
-    pickle.dump(dtst_prpg_mc, f)
-with open("mutually_exclusive_stst.pkl", "wb") as f:
-    pickle.dump(stst_prpg_mc, f)
+# with open("mutually_exclusive_iso.pkl", "wb") as f:
+#     pickle.dump(iso_mc, f)
+# with open("mutually_exclusive_dtdt.pkl", "wb") as f:
+#     pickle.dump(dtdt_prpg_mc, f)
+# with open("mutually_exclusive_dtst.pkl", "wb") as f:
+#     pickle.dump(dtst_prpg_mc, f)
+# with open("mutually_exclusive_stst.pkl", "wb") as f:
+#     pickle.dump(stst_prpg_mc, f)
 
 
 h3 = iso_mc.project("time", "pt_probe", "eta_probe")
@@ -517,8 +515,6 @@ for i in range(nbins_pt):  # pt
                     constrained=False,
                     groups=["eff_trig"],
                 )
-
-            # pdb.set_trace()
 
             iso_var_tag_h3 = create_variation(iso_var_nom, iso_mc, i, j, k, nbins_h1)
             iso_probe_h3 = create_variation(iso_var_nom, iso_mc, i, j, k, 0, "probe")

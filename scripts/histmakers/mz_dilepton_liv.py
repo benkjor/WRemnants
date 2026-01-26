@@ -30,7 +30,6 @@ from wums import logging
 analysis_label = Datagroups.analysisLabel(os.path.basename(__file__))
 parser, initargs = parsing.common_parser(analysis_label)
 
-
 parser.add_argument(
     "--muonIsolation",
     type=int,
@@ -106,7 +105,6 @@ def make_timehelper(filename):
 
 
 def mass_extraction(dataframe, name, root_dataype, filter_name):
-
     condition = (
         lambda x, idx, f=filter_name: f"Sum({f}) > {idx} ? ROOT::Math::PtEtaPhiMVector({x}_pt[{f}][{idx}], {x}_eta[{f}][{idx}], {x}_phi[{f}][{idx}], wrem::muon_mass) : ROOT::Math::PtEtaPhiMVector(0,0,0,0)"
     )
@@ -168,7 +166,7 @@ def luminometer_filter(df, lumi_name, filter_helper, helper):
         return df_filtered_hist, df_filtered_hist_nominal, df_count_hist
 
 
-def make_prefire_hists(df, results, name, axes=2):
+def make_prefire_hists(df, results, name, mass_name="goodLoose"):
     df_H = df.Define(
         "weight_newMuonPrefiringSF_H",
         muon_prefiring_helper_H,
@@ -180,103 +178,175 @@ def make_prefire_hists(df, results, name, axes=2):
         ["Muon_eta", "Muon_pt", "Muon_phi", "Muon_charge", "Muon_tightId"],
     )
 
-    a1 = axis_pt_low
-    a2 = axis_pt_high
-    pt_1 = "pt_probe"
-    pt_2 = "pt_tag"
-    eta_1 = "eta_probe"
-    eta_2 = "eta_tag"
-
     df_BG = df_BG.Redefine("weight", "weight * weight_newMuonPrefiringSF_BG")
     df_H = df_H.Redefine("weight", "weight * weight_newMuonPrefiringSF_H")
 
-    h_weights = df_H.HistoBoost(
-        f"{name}_H",
-        [
-            axis_mll,
-            a1,
-            axis_eta,
-            a2,
-            axis_eta_copy,
-        ],
-        [
-            "goodLoose_mll",
-            pt_1,
-            eta_1,
-            pt_2,
-            eta_2,
-            "weight",
-        ],
-    )
-    bg_weights = df_BG.HistoBoost(
-        f"{name}_BG",
-        [
-            axis_mll,
-            a1,
-            axis_eta,
-            a2,
-            axis_eta_copy,
-        ],
-        [
-            "goodLoose_mll",
-            pt_1,
-            eta_1,
-            pt_2,
-            eta_2,
-            "weight",
-        ],
-    )
+    if mass_name == "goodLoose":
+        a1 = axis_pt_low
+        a2 = axis_pt_high
+        pt_1 = "pt_probe"
+        pt_2 = "pt_tag"
+        eta_1 = "eta_probe"
+        eta_2 = "eta_tag"
+
+        h_weights = df_H.HistoBoost(
+            f"{name}_H",
+            [
+                axis_mll,
+                a1,
+                axis_eta,
+                a2,
+                axis_eta_copy,
+            ],
+            [
+                f"{mass_name}_mll",
+                pt_1,
+                eta_1,
+                pt_2,
+                eta_2,
+                "weight",
+            ],
+        )
+        bg_weights = df_BG.HistoBoost(
+            f"{name}_BG",
+            [
+                axis_mll,
+                a1,
+                axis_eta,
+                a2,
+                axis_eta_copy,
+            ],
+            [
+                f"{mass_name}_mll",
+                pt_1,
+                eta_1,
+                pt_2,
+                eta_2,
+                "weight",
+            ],
+        )
+        syst_tools.add_L1Prefire_unc_hists(
+            results,
+            df_BG,
+            [
+                axis_mll,
+                a1,
+                axis_eta,
+                a2,
+                axis_eta_copy,
+            ],
+            [
+                f"{mass_name}_mll",
+                pt_1,
+                eta_1,
+                pt_2,
+                eta_2,
+            ],
+            helper_stat=muon_prefiring_helper_stat_BG,
+            helper_syst=muon_prefiring_helper_syst_BG,
+            storage_type=hist.storage.Double(),
+            base_name=name + "_BG",
+            weight="weight",
+        )
+
+        syst_tools.add_L1Prefire_unc_hists(
+            results,
+            df_H,
+            [
+                axis_mll,
+                a1,
+                axis_eta,
+                a2,
+                axis_eta_copy,
+            ],
+            [
+                f"{mass_name}_mll",
+                pt_1,
+                eta_1,
+                pt_2,
+                eta_2,
+            ],
+            helper_stat=muon_prefiring_helper_stat_H,
+            helper_syst=muon_prefiring_helper_syst_H,
+            storage_type=hist.storage.Double(),
+            base_name=name + "_H",
+            weight="weight",
+        )
+    else:
+        a1 = axis_pt_low
+        pt_1 = "Muon_pt"
+        eta_1 = "Muon_eta"
+
+        h_weights = df_H.HistoBoost(
+            f"{name}_H",
+            [
+                axis_mll,
+                a1,
+                axis_eta,
+            ],
+            [
+                f"{mass_name}_mll",
+                pt_1,
+                eta_1,
+                "weight",
+            ],
+        )
+        bg_weights = df_BG.HistoBoost(
+            f"{name}_BG",
+            [
+                axis_mll,
+                a1,
+                axis_eta,
+            ],
+            [
+                f"{mass_name}_mll",
+                pt_1,
+                eta_1,
+                "weight",
+            ],
+        )
+
+        syst_tools.add_L1Prefire_unc_hists(
+            results,
+            df_BG,
+            [
+                axis_mll,
+                a1,
+                axis_eta,
+            ],
+            [
+                f"{mass_name}_mll",
+                pt_1,
+                eta_1,
+            ],
+            helper_stat=muon_prefiring_helper_stat_BG,
+            helper_syst=muon_prefiring_helper_syst_BG,
+            storage_type=hist.storage.Double(),
+            base_name=name + "_BG",
+            weight="weight",
+        )
+
+        syst_tools.add_L1Prefire_unc_hists(
+            results,
+            df_H,
+            [
+                axis_mll,
+                a1,
+                axis_eta,
+            ],
+            [
+                f"{mass_name}_mll",
+                pt_1,
+                eta_1,
+            ],
+            helper_stat=muon_prefiring_helper_stat_H,
+            helper_syst=muon_prefiring_helper_syst_H,
+            storage_type=hist.storage.Double(),
+            base_name=name + "_H",
+            weight="weight",
+        )
     results.append(h_weights)
     results.append(bg_weights)
-
-    syst_tools.add_L1Prefire_unc_hists(
-        results,
-        df_BG,
-        [
-            axis_mll,
-            a1,
-            axis_eta,
-            a2,
-            axis_eta_copy,
-        ],
-        [
-            "goodLoose_mll",
-            pt_1,
-            eta_1,
-            pt_2,
-            eta_2,
-        ],
-        helper_stat=muon_prefiring_helper_stat_BG,
-        helper_syst=muon_prefiring_helper_syst_BG,
-        storage_type=hist.storage.Double(),
-        base_name=name + "_BG",
-        weight="weight",
-    )
-
-    syst_tools.add_L1Prefire_unc_hists(
-        results,
-        df_H,
-        [
-            axis_mll,
-            a1,
-            axis_eta,
-            a2,
-            axis_eta_copy,
-        ],
-        [
-            "goodLoose_mll",
-            pt_1,
-            eta_1,
-            pt_2,
-            eta_2,
-        ],
-        helper_stat=muon_prefiring_helper_stat_H,
-        helper_syst=muon_prefiring_helper_syst_H,
-        storage_type=hist.storage.Double(),
-        base_name=name + "_H",
-        weight="weight",
-    )
-
     return bg_weights, h_weights
 
 
@@ -286,97 +356,100 @@ axis_sbil = hist.axis.Regular(
     24, 9e-7, 3e-8, name="sbil", overflow=False, underflow=False
 )
 
-axis_eta = hist.axis.Variable(
-    [-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name="eta_probe"
-)
-axis_eta_copy = hist.axis.Variable(
-    [-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name="eta_tag"
-)
+# axis_eta = hist.axis.Variable(
+#     [-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name="eta_probe"
+# )
+# axis_eta_copy = hist.axis.Variable(
+#     [-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name="eta_tag"
+# )
+
+axis_eta = hist.axis.Variable([-2.4, -1.4, -0.7, 0, 0.7, 1.4, 2.4], name="eta_probe")
+axis_eta_copy = hist.axis.Variable([-2.4, -1.4, -0.7, 0, 0.7, 1.4, 2.4], name="eta_tag")
 
 
 axis_pt_high = hist.axis.Variable(
-    [
-        15,
-        # 21,
-        25,
-        32.35393,
-        35.70991,
-        38.30856,
-        40.43642,
-        42.22635,
-        43.92092,
-        45.87573,
-        48.56281,
-        53.1789,
-        80,
-    ],
+    [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80],
+    # [
+    #     15,
+    #     25,
+    #     32.35393,
+    #     35.70991,
+    #     38.30856,
+    #     40.43642,
+    #     42.22635,
+    #     43.92092,
+    #     45.87573,
+    #     48.56281,
+    #     53.1789,
+    #     80,
+    # ],
     name="pt_tag",
 )
 
 axis_pt_high_copy = hist.axis.Variable(
-    [
-        15,
-        # 21,
-        25,
-        32.35393,
-        35.70991,
-        38.30856,
-        40.43642,
-        42.22635,
-        43.92092,
-        45.87573,
-        48.56281,
-        53.1789,
-        80,
-    ],
+    [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80],
+    # [
+    #     15,
+    #     25,
+    #     32.35393,
+    #     35.70991,
+    #     38.30856,
+    #     40.43642,
+    #     42.22635,
+    #     43.92092,
+    #     45.87573,
+    #     48.56281,
+    #     53.1789,
+    #     80,
+    # ],
     name="pt_tag",
 )
 
 axis_pt_low = hist.axis.Variable(
-    [
-        15,
-        # 21,
-        25,
-        32.35393,
-        35.70991,
-        38.30856,
-        40.43642,
-        42.22635,
-        43.92092,
-        45.87573,
-        48.56281,
-        53.1789,
-        80,
-    ],
+    [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80],
+    # [
+    #     15,
+    #     25,
+    #     32.35393,
+    #     35.70991,
+    #     38.30856,
+    #     40.43642,
+    #     42.22635,
+    #     43.92092,
+    #     45.87573,
+    #     48.56281,
+    #     53.1789,
+    #     80,
+    # ],
     name="pt_probe",
 )
 
 axis_pt_low_copy = hist.axis.Variable(
-    [
-        15,
-        # 21,
-        25,
-        32.35393,
-        35.70991,
-        38.30856,
-        40.43642,
-        42.22635,
-        43.92092,
-        45.87573,
-        48.56281,
-        53.1789,
-        80,
-    ],
+    [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80],
+    # [
+    #     15,
+    #     25,
+    #     32.35393,
+    #     35.70991,
+    #     38.30856,
+    #     40.43642,
+    #     42.22635,
+    #     43.92092,
+    #     45.87573,
+    #     48.56281,
+    #     53.1789,
+    #     80,
+    # ],
     name="pt_probe",
 )
 
+# [25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80]
 axis_mll = hist.axis.Variable(
     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="mll"
 )
 axis_mll_copy = hist.axis.Variable(
     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="goodLoose_mll"
 )
-
 
 axis_weight = hist.axis.Regular(50, 0.5, 1, name="weight")
 
@@ -483,7 +556,7 @@ def build_graph_lumi(df, dataset):
 def build_graph(df, dataset):
     isoThreshold = args.isolationThreshold
 
-    isoBranch = muon_selections.getIsoBranch(args.isolationDefinition)
+    isoBranch = muon_selections.getIsoBranch("iso04vtxAgn")
 
     logger.info(f"fomrbuild graph for dataset: {dataset.name}")
     era = args.era
@@ -506,15 +579,6 @@ def build_graph(df, dataset):
     )
     #
 
-    #### THIS IS WHAT CAUSES THE DIFFERENCE
-    df = df.Filter("Sum(Muon_isGoodGlobal) == 2")
-
-    ###     okay so this is already built in. im confused why the isolation is less than but seems to already be in place
-
-    df = df.Filter(
-        "Muon_charge[Muon_isGoodGlobal][0] != Muon_charge[Muon_isGoodGlobal][1]"
-    )
-
     df = df.Define(
         "Muon_isGoodMedium",
         f"Muon_isGoodGlobal && Muon_mediumId && abs(Muon_dxybs) < 0.05",  # && {isoBranch} < {isoThreshold}",
@@ -529,10 +593,22 @@ def build_graph(df, dataset):
         "Muon_isGoodTrigger",
         "Muon_pt>=25 && Muon_isGoodMedium && wrem::hasTriggerMatch(Muon_eta,Muon_phi,TrigObj_eta[goodTrigObjs],TrigObj_phi[goodTrigObjs])",
     )
-    # df = df.Define(
-    #     "low_pt_isolation",
-    #     "Muon_pt <= 25 && Muon_isGoodMedium == 1 && Muon_passIsoTrig == 1"
-    # )
+
+    df = df.Define("Muon_passIso", f"({isoBranch} < 0.15)")
+
+    df_positive = df.Filter(
+        "Sum(Muon_isGoodGlobal) > 0 "
+    )  ## just so i can count how many are in each
+    df_positive = df_positive.Define(
+        "Muon_isPositive", "Muon_charge == -1"
+    )  # df_positive = df_positive.Filter("Sum(Muon_isPositive) > 0 ") ## just so i can count how many are in each
+
+    # df_positive = df_positive.Filter("Muon_isGoodTrigger[Muon_positive] == 1")
+
+    df = df.Filter("Sum(Muon_isGoodGlobal) == 2")
+    df = df.Filter(
+        "Muon_charge[Muon_isGoodGlobal][0] != Muon_charge[Muon_isGoodGlobal][1]"
+    )
 
     #### filter to ensure that at least one muon passes HLT
     df = df.Filter(
@@ -564,7 +640,6 @@ def build_graph(df, dataset):
     df = df.Define(
         "eta_tag", "mu_probe == 0 ? goodLoose_smu_mom4.eta() :goodLoose_mu_mom4.eta()"
     )
-    df = df.Define("Muon_passIso", f"({isoBranch} < {isoThreshold})")
 
     df = df.Define(
         "Muon_passIsoTrig", "(Muon_isGoodTrigger == 1) && (Muon_passIso == 1)"
@@ -574,21 +649,74 @@ def build_graph(df, dataset):
 
     if not dataset.is_data:
         df = theory_tools.define_postfsr_vars(df)
-
         df = df.Define(
             "reco_scalefactor_weight",
             muon_reco_efficiency_helper,
             ["Muon_eta", "Muon_pt"],
         )
-
         df = df.Define(
             "tracking_scalefactor_weight",
             muon_tracking_efficiency_helper,
             ["Muon_standaloneEta", "Muon_standalonePt"],
         )
-
         df = df.Redefine(
             "weight", "weight * reco_scalefactor_weight* tracking_scalefactor_weight"
+        )
+
+        df_positive = theory_tools.define_postfsr_vars(df_positive)
+        df_positive = df_positive.Define(
+            "reco_scalefactor_weight",
+            muon_reco_efficiency_helper,
+            ["Muon_eta", "Muon_pt"],
+        )
+        df_positive = df_positive.Define(
+            "tracking_scalefactor_weight",
+            muon_tracking_efficiency_helper,
+            ["Muon_standaloneEta", "Muon_standalonePt"],
+        )
+        df_positive = df_positive.Redefine(
+            "weight", "weight * reco_scalefactor_weight* tracking_scalefactor_weight"
+        )
+
+        df_positive = df_positive.Define(
+            "PosMuon_trig", "Muon_isPositive && Muon_isGoodTrigger && Muon_isGoodGlobal"
+        )
+
+        df_positive = df_positive.Define(
+            "PosMuon_trig_iso",
+            "Muon_isPositive && Muon_isGoodTrigger && Muon_isGoodGlobal && (Muon_passIso == 1)",
+        )
+
+        df_positive = df_positive.Define("Trig_pt", "Muon_pt[PosMuon_trig]")
+        df_positive = df_positive.Define("Trig_eta", "Muon_eta[PosMuon_trig]")
+
+        df_positive = df_positive.Define("Iso_pt", "Muon_pt[PosMuon_trig_iso]")
+        df_positive = df_positive.Define("Iso_eta", "Muon_eta[PosMuon_trig_iso]")
+
+        pos_trig = df_positive.HistoBoost(
+            "pos_trig",
+            [
+                axis_pt_low,
+                axis_eta,
+            ],
+            [
+                "Trig_pt",
+                "Trig_eta",
+                "weight",
+            ],
+        )
+
+        pos_iso = df_positive.HistoBoost(
+            "pos_iso",
+            [
+                axis_pt_low,
+                axis_eta,
+            ],
+            [
+                "Iso_pt",
+                "Iso_eta",
+                "weight",
+            ],
         )
 
         df = df.Define(
@@ -599,6 +727,7 @@ def build_graph(df, dataset):
         #### THIS IS HTE PROBLEM, THIS CRITERION DOES NOT MATCH ALL THE SELECTION CASES I DONT THINK
 
         df = mass_extraction(df, "gen_", "GenPart", "postfsrMuons_loose")
+
         # df_loose = df.Filter("gen_pass")
         df_loose = df
         hist_pass_gen = df.HistoBoost(
@@ -655,12 +784,13 @@ def build_graph(df, dataset):
             results.append(fine_bin_mll)
 
         results.append(hist_pass_gen)
+        results.append(pos_trig)
+        results.append(pos_iso)
 
         make_prefire_hists(df_iso, results, "pass_iso")
         make_prefire_hists(df_trig, results, "dtdt_prpg")
         make_prefire_hists(df_tight, results, "dtst_prpg")
         make_prefire_hists(df_loose, results, "stst_prpg")
-
         make_prefire_hists(df_trig_fg, results, "dtdt_prfg")
         make_prefire_hists(df_tight_fg, results, "dtst_prfg")
         make_prefire_hists(df_loose_fg, results, "stst_prfg")

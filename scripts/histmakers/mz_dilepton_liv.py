@@ -356,12 +356,6 @@ axis_sbil = hist.axis.Regular(
     24, 9e-7, 3e-8, name="sbil", overflow=False, underflow=False
 )
 
-# axis_eta = hist.axis.Variable(
-#     [-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name="eta_probe"
-# )
-# axis_eta_copy = hist.axis.Variable(
-#     [-2.4, -1.40655, -0.68156, -0.00848, 0.66796, 1.4006, 2.4], name="eta_tag"
-# )
 
 axis_eta = hist.axis.Variable([-2.4, -1.4, -0.7, 0, 0.7, 1.4, 2.4], name="eta_probe")
 axis_eta_copy = hist.axis.Variable([-2.4, -1.4, -0.7, 0, 0.7, 1.4, 2.4], name="eta_tag")
@@ -369,77 +363,21 @@ axis_eta_copy = hist.axis.Variable([-2.4, -1.4, -0.7, 0, 0.7, 1.4, 2.4], name="e
 
 axis_pt_high = hist.axis.Variable(
     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80],
-    # [
-    #     15,
-    #     25,
-    #     32.35393,
-    #     35.70991,
-    #     38.30856,
-    #     40.43642,
-    #     42.22635,
-    #     43.92092,
-    #     45.87573,
-    #     48.56281,
-    #     53.1789,
-    #     80,
-    # ],
     name="pt_tag",
 )
 
 axis_pt_high_copy = hist.axis.Variable(
     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80],
-    # [
-    #     15,
-    #     25,
-    #     32.35393,
-    #     35.70991,
-    #     38.30856,
-    #     40.43642,
-    #     42.22635,
-    #     43.92092,
-    #     45.87573,
-    #     48.56281,
-    #     53.1789,
-    #     80,
-    # ],
     name="pt_tag",
 )
 
 axis_pt_low = hist.axis.Variable(
     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80],
-    # [
-    #     15,
-    #     25,
-    #     32.35393,
-    #     35.70991,
-    #     38.30856,
-    #     40.43642,
-    #     42.22635,
-    #     43.92092,
-    #     45.87573,
-    #     48.56281,
-    #     53.1789,
-    #     80,
-    # ],
     name="pt_probe",
 )
 
 axis_pt_low_copy = hist.axis.Variable(
     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80],
-    # [
-    #     15,
-    #     25,
-    #     32.35393,
-    #     35.70991,
-    #     38.30856,
-    #     40.43642,
-    #     42.22635,
-    #     43.92092,
-    #     45.87573,
-    #     48.56281,
-    #     53.1789,
-    #     80,
-    # ],
     name="pt_probe",
 )
 
@@ -596,34 +534,33 @@ def build_graph(df, dataset):
 
     df = df.Define("Muon_passIso", f"({isoBranch} < 0.15)")
 
+    df = df.Define(
+        "Muon_passIsoTrig", "(Muon_isGoodTrigger == 1) && (Muon_passIso == 1)"
+    )
+
     df_positive = df.Filter(
         "Sum(Muon_isGoodGlobal) > 0 "
     )  ## just so i can count how many are in each
-    df_positive = df_positive.Define(
-        "Muon_isPositive", "Muon_charge == -1"
-    )  # df_positive = df_positive.Filter("Sum(Muon_isPositive) > 0 ") ## just so i can count how many are in each
-
-    # df_positive = df_positive.Filter("Muon_isGoodTrigger[Muon_positive] == 1")
+    df_positive = df_positive.Define("Muon_isPositive", "Muon_charge == -1")
 
     df = df.Filter("Sum(Muon_isGoodGlobal) == 2")
     df = df.Filter(
         "Muon_charge[Muon_isGoodGlobal][0] != Muon_charge[Muon_isGoodGlobal][1]"
     )
-
     #### filter to ensure that at least one muon passes HLT
     df = df.Filter(
-        "(Muon_isGoodTrigger[Muon_isGoodGlobal][0] == 1) || (Muon_isGoodTrigger[Muon_isGoodGlobal][1] == 1)"
+        "(Muon_passIsoTrig[Muon_isGoodGlobal][0] == 1) || (Muon_passIsoTrig[Muon_isGoodGlobal][1] == 1)"
     )
-    df = mass_extraction(df, "goodLoose_", "Muon", "Muon_isGoodGlobal")
-    # df = df.Filter("goodLoose_pass")
 
-    ## define the muon that does not pass as the probe
-
-    # if muon0 passes trigger & tight id (if muon1 passes trigger and tight id: then randomly select 0 vs 1, if muon1 fails, make it the probe), if muon0 fails make it 0
     df = df.Define(
         "mu_probe",
-        "Muon_isGoodTrigger[Muon_isGoodGlobal][0] == 1 && Muon_isGoodMedium[Muon_isGoodGlobal][0] == 1 ? (Muon_isGoodTrigger[Muon_isGoodGlobal][1] == 1 && Muon_isGoodMedium[Muon_isGoodGlobal][1] == 1 ? abs(rand()%2): 1) : 0",
-    )  ## looked through nanoaod for event number, couldnt find it. genEventcount did not work. i checked and this does evenly split it.
+        "Muon_passIsoTrig[Muon_isGoodGlobal][0] == 1 ? (Muon_passIsoTrig[Muon_isGoodGlobal][1] == 1 ? abs(rand()%2): 1) : 0",
+    )
+
+    # if muon0 passes trigger & tight id (if muon1 passes trigger and tight id: then randomly select 0 vs 1, if muon1 fails, make it the probe), if muon0 fails make it 0
+    # ## looked through nanoaod for event number, couldnt find it. genEventcount did not work. i checked and this does evenly split it.
+    df = mass_extraction(df, "goodLoose_", "Muon", "Muon_isGoodGlobal")
+
     df = df.Define("mu_tag", "mu_probe == 0 ? 1: 0")
     ### isEvenEvent is the thing that i could use
     df = df.Define(
@@ -640,12 +577,6 @@ def build_graph(df, dataset):
     df = df.Define(
         "eta_tag", "mu_probe == 0 ? goodLoose_smu_mom4.eta() :goodLoose_mu_mom4.eta()"
     )
-
-    df = df.Define(
-        "Muon_passIsoTrig", "(Muon_isGoodTrigger == 1) && (Muon_passIso == 1)"
-    )
-
-    df = df.Filter("Muon_passIsoTrig[Muon_isGoodGlobal][mu_tag] == 1")
 
     if not dataset.is_data:
         df = theory_tools.define_postfsr_vars(df)
@@ -679,19 +610,57 @@ def build_graph(df, dataset):
         )
 
         df_positive = df_positive.Define(
-            "PosMuon_trig", "Muon_isPositive && Muon_isGoodTrigger && Muon_isGoodGlobal"
+            "PosMuon_Global", "Muon_isPositive && Muon_isGoodGlobal"
+        )
+        df_positive = df_positive.Define(
+            "PosMuon_ID", "PosMuon_Global && (Muon_isGoodMedium == 1)"
+        )
+        df_positive = df_positive.Define(
+            "PosMuon_trig", "PosMuon_ID && Muon_isGoodTrigger"
         )
 
         df_positive = df_positive.Define(
-            "PosMuon_trig_iso",
-            "Muon_isPositive && Muon_isGoodTrigger && Muon_isGoodGlobal && (Muon_passIso == 1)",
+            "PosMuon_iso",
+            "(PosMuon_trig && (Muon_passIso == 1))",
         )
+
+        df_positive = df_positive.Define("Global_pt", "Muon_pt[PosMuon_Global]")
+        df_positive = df_positive.Define("Global_eta", "Muon_eta[PosMuon_Global]")
+
+        df_positive = df_positive.Define("ID_pt", "Muon_pt[PosMuon_ID]")
+        df_positive = df_positive.Define("ID_eta", "Muon_eta[PosMuon_ID]")
 
         df_positive = df_positive.Define("Trig_pt", "Muon_pt[PosMuon_trig]")
         df_positive = df_positive.Define("Trig_eta", "Muon_eta[PosMuon_trig]")
 
-        df_positive = df_positive.Define("Iso_pt", "Muon_pt[PosMuon_trig_iso]")
-        df_positive = df_positive.Define("Iso_eta", "Muon_eta[PosMuon_trig_iso]")
+        df_positive = df_positive.Define("Iso_pt", "Muon_pt[PosMuon_iso]")
+        df_positive = df_positive.Define("Iso_eta", "Muon_eta[PosMuon_iso]")
+
+        pos_global = df_positive.HistoBoost(
+            "pos_global",
+            [
+                axis_pt_low,
+                axis_eta,
+            ],
+            [
+                "Global_pt",
+                "Global_eta",
+                "weight",
+            ],
+        )
+
+        pos_ID = df_positive.HistoBoost(
+            "pos_ID",
+            [
+                axis_pt_low,
+                axis_eta,
+            ],
+            [
+                "ID_pt",
+                "ID_eta",
+                "weight",
+            ],
+        )
 
         pos_trig = df_positive.HistoBoost(
             "pos_trig",
@@ -784,6 +753,8 @@ def build_graph(df, dataset):
             results.append(fine_bin_mll)
 
         results.append(hist_pass_gen)
+        results.append(pos_global)
+        results.append(pos_ID)
         results.append(pos_trig)
         results.append(pos_iso)
 

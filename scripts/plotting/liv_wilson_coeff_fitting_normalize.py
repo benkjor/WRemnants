@@ -1,4 +1,5 @@
 import argparse
+import pdb
 
 import h5py
 import hist
@@ -33,6 +34,7 @@ data_cov = results_data["results_asimov"]["physics_models"]["Select"][
     "hist_postfit_inclusive_cov"
 ].get()
 
+pdb.set_trace()
 # pdb.set_trace()
 indir_liv_model = "/home/submit/jbenke/LIV/coupling_models/"
 # mass_dependence_down = np.load(indir_liv_model + "mass_dependence_down.npy")
@@ -49,8 +51,9 @@ num_mass_bins = len(data[0, :].values())
 amplitudes_in = np.load(
     "/work/submit/jbenke/WRemnants/scripts/corrections/liv_fit_final_amplitudes.npy"
 )
-amplitudes_in = np.zeros([num_mass_bins, 4, 2, 2])
+# amplitudes_in = np.zeros([num_mass_bins, 4, 2, 2])
 
+pdb.set_trace()
 for j in range(num_mass_bins):
     channel = f"ch{channel_name}_mass_{j}"
     process = f"liv_fit_mass_{j}"
@@ -113,14 +116,16 @@ for j in range(num_mass_bins):
         constrained=False,
         noi=True,
     )
-    writer.add_systematic(
-        addHists(flat_line, down_quark_left_scaled),
-        f"{coeff_name[coeff_num]}_l,d",
-        process,
-        channel,
-        constrained=False,
-        noi=True,
-    )
+
+    # writer.add_systematic(
+    #     addHists(flat_line, down_quark_left_scaled),
+    #     f"{coeff_name[coeff_num]}_l,d",
+    #     process,
+    #     channel,
+    #     constrained=False,
+    #     noi=True,
+    # )
+
     writer.add_systematic(
         addHists(flat_line, down_quark_right_scaled),
         f"{coeff_name[coeff_num]}_r,d",

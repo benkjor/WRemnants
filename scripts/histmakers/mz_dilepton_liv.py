@@ -621,7 +621,7 @@ def build_graph(df, dataset):
 
         df_positive = df_positive.Define(
             "PosMuon_iso",
-            "(PosMuon_trig && (Muon_passIso == 1))",
+            "(PosMuon_trig && (Muon_passIso == 1) && Muon_pt >= 25) || ((Muon_passIso == 1) && Muon_pt < 25 && PosMuon_ID)",
         )
 
         df_positive = df_positive.Define("Global_pt", "Muon_pt[PosMuon_Global]")

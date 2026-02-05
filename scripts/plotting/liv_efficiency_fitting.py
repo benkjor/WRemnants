@@ -55,13 +55,14 @@ background_proc = [
 # DATA IMPORTS #
 
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
-file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturboCorr.hdf5"  # _maxFiles_20
+file_in_name = (
+    file_in + "mz_dilepton_liv_scetlib_dyturbo_CT18Z_N3p0LL_N2LO_Corr.hdf5"
+)  # _maxFiles_20
 h5file = h5py.File(file_in_name, "r")
 results = input_tools.load_results_h5py(h5file)
-
-data_output = results["dataPostVFP"]["output"]
-lumi_output = results["dataPostVFP"]["lumi_outout"]
-MC_Zmumu = results["ZmumuPostVFP"]["output"]
+data_output = results["SingleMuon_2016PostVFP"]["output"]
+lumi_output = results["SingleMuon_2016PostVFP"]["lumi_outout"]
+MC_Zmumu = results["Zmumu_2016PostVFP"]["output"]
 
 dtdt_data = data_output["time_mll"].get()
 dtst_data = data_output["time_dtst"].get()
@@ -119,8 +120,8 @@ lumi_scaling_h = lumi_output["lumi_pre"].get()
 lumi_scaling_bg = lumi_output["lumi_post"].get()
 
 
-weightsum = results["ZmumuPostVFP"]["weight_sum"]
-cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
+weightsum = results["Zmumu_2016PostVFP"]["weight_sum"]
+cross_sec = results["Zmumu_2016PostVFP"]["dataset"]["xsec"]
 
 #### A COUPLE FIXED QUANTITIES
 nbins_mll = len(dtdt_data.axes["mll"])

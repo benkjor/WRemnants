@@ -80,7 +80,10 @@ def get_eff_hist(eps_hist, ref_hist, i, j, k, first_ind, second_ind):
 def mc_scaling(mc_results, weightsum, cross_sec):
     temp = mc_results.copy()
     temp /= weightsum
-    temp *= cross_sec
+    try:
+        temp *= cross_sec
+    except:
+        temp = multiplyHists(temp, cross_sec)
     temp *= 1000
     return temp
 

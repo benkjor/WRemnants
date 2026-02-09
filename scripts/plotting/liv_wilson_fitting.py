@@ -12,10 +12,6 @@ from uncertainty_tools import (
 
 from rabbit import tensorwriter
 from utilities.io_tools import input_tools
-from wums.boostHistHelpers import (
-    addHists,
-    expand_hist_by_duplicate_axis,
-)
 
 slope_ramses = 0.0006
 slope_hfoc = 0.0007
@@ -33,13 +29,14 @@ args = parser.parse_args()
 # data = fit_results["parms_prefit"]
 
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
-file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturboCorr.hdf5"  # _maxFiles_20
+file_in_name = (
+    file_in + "mz_dilepton_liv_scetlib_dyturbo_CT18Z_N3p0LL_N2LO_Corr.hdf5"
+)  # _maxFiles_20
 h5file = h5py.File(file_in_name, "r")
 results = input_tools.load_results_h5py(h5file)
-
-data_output = results["dataPostVFP"]["output"]
-lumi_output = results["dataPostVFP"]["lumi_outout"]
-MC_Zmumu = results["ZmumuPostVFP"]["output"]
+data_output = results["SingleMuon_2016PostVFP"]["output"]
+lumi_output = results["SingleMuon_2016PostVFP"]["lumi_outout"]
+MC_Zmumu = results["Zmumu_2016PostVFP"]["output"]
 
 dtdt_data = data_output["time_mll"].get()
 dtst_data = data_output["time_dtst"].get()
@@ -77,9 +74,8 @@ lumi_scaling = lumi_output["lumi_nom"].get()
 lumi_scaling_h = lumi_output["lumi_pre"].get()
 lumi_scaling_bg = lumi_output["lumi_post"].get()
 
-weightsum = results["ZmumuPostVFP"]["weight_sum"]
-cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
-
+weightsum = results["Zmumu_2016PostVFP"]["weight_sum"]
+cross_sec = results["Zmumu_2016PostVFP"]["dataset"]["xsec"]
 #### A COUPLE FIXED QUANTITIES
 nbins_mll = len(dtdt_data.axes["mll"])
 nbins_time = len(dtst_data.axes["time"])
@@ -106,7 +102,6 @@ lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
 #### normal
 
-
 with open(
     "/home/submit/jbenke/WRemnants/rabbit/rabbit/poi_models/precomputed_sigma/SM_15_to_120_GeV_13_bins.pkl",
     "rb",
@@ -124,9 +119,8 @@ iso, dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
     lumi_scaling,
     lumi_hists,
     weightsum,
-    sm_values_hist,
+    cross_sec,
 )
-
 
 pass_gen = all_mc_corrections(
     pass_gen.project("mll"),
@@ -140,22 +134,17 @@ n_masked = pass_gen.project("time", "mll")
 
 ###################################################################
 
-## create the tensor
-
-
-### TEMPORARY WHILE MY OTHER CODE RUNS
-
-
 # iso_unrolled = unrolledHist(iso)
 # iso_data_unrolled = unrolledHist(iso_data)
 
-iso_unrolled = iso[{"time": 0}]
-iso_data_unrolled = iso_data[{"time": 0}]
-nbins_time = 1
+iso_unrolled = iso[{"mll": 9}]
+iso_data_unrolled = iso_data[{"mll": 9}]
+nbins_mll = 1
+n_masked_unrolled = n_masked[{"mll": 9}]
 
 writer = tensorwriter.TensorWriter()
-# writer.add_channel(n_masked.axes, "ch_masked", masked=True)  ## is this still correct?
-# writer.add_process(divideHists(n_masked, lumi_scaling), "Zmumu pass gen", "ch_masked")
+# writer.add_channel(n_masked_unrolled.axes, "ch_masked", masked=True)  ## is this still correct?
+# writer.add_process(divideHists(n_masked_unrolled, lumi_scaling), "background", "ch_masked") ## not sure if this should be in the same process?
 
 writer.add_channel(iso_unrolled.axes, "ch_iso")
 writer.add_data(iso_data_unrolled, "ch_iso")
@@ -163,26 +152,35 @@ writer.add_process(
     iso_unrolled, "Zmumu pass gen", "ch_iso", signal=True
 )  ### not quite sure where Zmumu pass gen came from
 
-
 ## unrolled is mass then time so indexing will go [i*nbins_mll + j] where i is the time bin and j is the mass bin
-iso_unrolled_exp = expand_hist_by_duplicate_axis(
-    iso_unrolled, "mll", "unrolled_ax"
-)  ## for unrolled it is ""
-var_size = 0.1
+# iso_unrolled_exp = expand_hist_by_duplicate_axis(
+#     iso_unrolled, "time", "unrolled_ax"
+# )  ## for unrolled it is ""
+# var_size = 0.05
 
-for i in range(nbins_time):
-    for j in range(nbins_mll):
-        v = iso_unrolled_exp[{"unrolled_ax": i * nbins_mll + j}]
+# for i in range(nbins_time):
+#     for j in range(1):
+#         ## currently i think the only thing this does is fit a normalization
+#         v = iso_unrolled_exp[{"unrolled_ax": (i * nbins_mll) + j}]
 
-        var = addHists(var_size * v, iso_unrolled)
-        writer.add_systematic(
-            var,
-            f"c",
-            "Zmumu pass gen",
-            "ch_iso",
-            constrained=False,
-            groups=["cxx"],
-        )
+#         var = addHists(var_size * v, iso_unrolled)
+# writer.add_systematic(
+#     var,
+#     f"norm_{i}",
+#     "Zmumu pass gen",
+#     "ch_iso",
+#     constrained=False,
+#     groups=["nz"],
+# )
+
+# writer.add_systematic(
+#     var,
+#     f"c",
+#     "Zmumu pass gen",
+#     "ch_iso",
+#     constrained=False,
+#     groups=["cxx"],
+# )
 
 
 writer.write(outfolder="./", outfilename="wilson")

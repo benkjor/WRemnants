@@ -149,6 +149,11 @@ dtst_prpg_BG = dtst_prpg_BG[{"mll": mass_bin}]
 stst_prpg_BG = stst_prpg_BG[{"mll": mass_bin}]
 
 
+dtdt_data = dtdt_data[{"mll": mass_bin}]
+dtst_data = dtst_data[{"mll": mass_bin}]
+stst_data = stst_data[{"mll": mass_bin}]
+iso_data = iso_data[{"mll": mass_bin}]
+
 prpg_all = [
     iso_H,
     dtdt_prpg_H,

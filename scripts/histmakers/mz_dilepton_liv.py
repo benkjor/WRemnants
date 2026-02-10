@@ -552,9 +552,10 @@ def build_graph(df, dataset):
         "(Muon_passIsoTrig[Muon_isGoodGlobal][0] == 1) || (Muon_passIsoTrig[Muon_isGoodGlobal][1] == 1)"
     )
 
+    df = df.Define("eventEven", "event % 2")
     df = df.Define(
         "mu_probe",
-        "Muon_passIsoTrig[Muon_isGoodGlobal][0] == 1 ? (Muon_passIsoTrig[Muon_isGoodGlobal][1] == 1 ? abs(rand()%2): 1) : 0",
+        "Muon_passIsoTrig[Muon_isGoodGlobal][0] == 1 ? (Muon_passIsoTrig[Muon_isGoodGlobal][1] == 1 ? eventEven: 1) : 0",
     )
 
     # if muon0 passes trigger & tight id (if muon1 passes trigger and tight id: then randomly select 0 vs 1, if muon1 fails, make it the probe), if muon0 fails make it 0

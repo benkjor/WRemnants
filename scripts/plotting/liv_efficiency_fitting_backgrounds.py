@@ -68,8 +68,6 @@ stst_data = data_output["time_stst"].get()
 iso_data = data_output["time_iso"].get()
 
 time_proj_low = data_output["time_proj"].get()
-# time_proj_hlt_all = data_output["time_proj"].get()
-
 
 ### should loop over these instead of calling them explicitly
 
@@ -194,9 +192,6 @@ iso_hfoc, dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
     cross_sec,
 )
 
-iso_hfoc, dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = make_mutually_exclusive(
-    iso_hfoc, dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc
-)
 
 iso_pcc, dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
     prpg_all,
@@ -207,10 +202,6 @@ iso_pcc, dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
     cross_sec,
 )
 
-iso_pcc, dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = make_mutually_exclusive(
-    iso_pcc, dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc
-)
-
 iso_ramses, dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
     prpg_all,
     time_proj_low,
@@ -218,12 +209,6 @@ iso_ramses, dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
     lumi_hists,
     weightsum,
     cross_sec,
-)
-
-iso_ramses, dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = (
-    make_mutually_exclusive(
-        iso_ramses, dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses
-    )
 )
 
 
@@ -250,12 +235,6 @@ iso_sbil_hfoc, dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = (
     )
 )
 
-iso_sbil_hfoc, dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = (
-    make_mutually_exclusive(
-        iso_sbil_hfoc, dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc
-    )
-)
-
 iso_sbil_ramses, dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ramses = (
     get_mc_lumis(
         prpg_all,
@@ -267,14 +246,6 @@ iso_sbil_ramses, dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ra
     )
 )
 
-iso_sbil_ramses, dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_hfoc = (
-    make_mutually_exclusive(
-        iso_sbil_ramses,
-        dtdt_prpg_sbil_ramses,
-        dtst_prpg_sbil_ramses,
-        stst_prpg_sbil_ramses,
-    )
-)
 
 #### normal
 iso, dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
@@ -301,9 +272,6 @@ iso_data, dtdt_data, dtst_data, stst_data = make_mutually_exclusive(
     iso_data, dtdt_data, dtst_data, stst_data
 )
 
-iso, dtdt_prpg, dtst_prpg, stst_prpg = make_mutually_exclusive(
-    iso, dtdt_prpg, dtst_prpg, stst_prpg
-)
 
 test_nmasked = addHists(pass_gen, scaleHist(dtdt_data, -1))
 
@@ -478,20 +446,20 @@ luminometer_syst(
     "stability",
 )
 
-# # #### RAMSES cross detector
-luminometer_syst(
-    writer,
-    "ramses",
-    iso_ramses,
-    dtdt_prpg_ramses,
-    dtst_prpg_ramses,
-    stst_prpg_ramses,
-    "stability",
-)
+# # # #### RAMSES cross detector
+# luminometer_syst(
+#     writer,
+#     "ramses",
+#     iso_ramses,
+#     dtdt_prpg_ramses,
+#     dtst_prpg_ramses,
+#     stst_prpg_ramses,
+#     "stability",
+# )
 
 
 ### YEAH THESE ARE 100% COUPLED. CRAP.
-#### HFOC linearity
+# #### HFOC linearity
 luminometer_syst(
     writer,
     "hfoc",
@@ -502,16 +470,16 @@ luminometer_syst(
     "linearity",
 )
 
-#### RAMSES linearity
-luminometer_syst(
-    writer,
-    "ramses",
-    iso_sbil_ramses,
-    dtdt_prpg_sbil_ramses,
-    dtst_prpg_sbil_ramses,
-    stst_prpg_sbil_ramses,
-    "linearity",
-)
+# #### RAMSES linearity
+# luminometer_syst(
+#     writer,
+#     "ramses",
+#     iso_sbil_ramses,
+#     dtdt_prpg_sbil_ramses,
+#     dtst_prpg_sbil_ramses,
+#     stst_prpg_sbil_ramses,
+#     "linearity",
+# )
 
 writer.write(outfolder="./", outfilename="background")
 # writer.write(outfolder="./")

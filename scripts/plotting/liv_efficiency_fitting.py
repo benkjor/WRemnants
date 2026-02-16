@@ -174,7 +174,7 @@ prpg_all = [
 # ]
 
 
-time_hists = [time_proj_hlt, time_proj_low]
+time_hists = time_proj_low
 lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
 iso_hfoc, dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
@@ -274,6 +274,7 @@ n_masked = pass_gen.project("time", "pt_probe", "eta_probe")
 # )
 
 ### making it one
+## before i migrate mutually exclusive i need to redefine these so that they aren't mutually exclusive
 iso_var_nom = divideHists(
     iso.project("time", "pt_probe", "eta_probe"),
     iso.project("time", "pt_probe", "eta_probe"),

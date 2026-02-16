@@ -80,10 +80,7 @@ def get_eff_hist(eps_hist, ref_hist, i, j, k, first_ind, second_ind):
 def mc_scaling(mc_results, weightsum, cross_sec):
     temp = mc_results.copy()
     temp /= weightsum
-    try:
-        temp *= cross_sec
-    except:
-        temp = multiplyHists(temp, cross_sec)
+    temp *= cross_sec
     temp *= 1000
     return temp
 
@@ -103,7 +100,6 @@ def mc_corrections_all_cases(
     dtdt_mc,
     dtst_mc,
     stst_mc,
-    hist_proj_hlt,
     hist_proj_low,
     lumi_scaling,
     weightsum,
@@ -134,15 +130,13 @@ def make_ones_hist(hist_ref):
 
 def get_mc_lumis(
     input_data,
-    time_hists,
+    time_proj_low,
     scaling,
     lumi_hists,
     weightsum,
     cross_sec,
 ):
-
     iso_h, dtdt_h, dtst_h, stst_h, iso_bg, dtdt_bg, dtst_bg, stst_bg = input_data
-    time_proj_hlt, time_proj_low = time_hists
 
     lumi_h, lumi_bg = lumi_hists
     sum_lumis = addHists(lumi_bg, lumi_h)
@@ -153,7 +147,6 @@ def get_mc_lumis(
         dtdt_h,
         dtst_h,
         stst_h,
-        time_proj_hlt,
         time_proj_low,
         multiplyHists(lumi_scaling_h, scaling),
         weightsum,
@@ -165,7 +158,6 @@ def get_mc_lumis(
         dtdt_bg,
         dtst_bg,
         stst_bg,
-        time_proj_hlt,
         time_proj_low,
         multiplyHists(lumi_scaling_bg, scaling),
         weightsum,
@@ -177,6 +169,7 @@ def get_mc_lumis(
     dtst = addHists(dtst_bg, dtst_h)
     stst = addHists(stst_bg, stst_h)
 
+    # iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
     return iso, dtdt, dtst, stst
 
 
@@ -204,7 +197,7 @@ def eta_phi_systematic(
     # dtdt_stat = remove_low_bins(dtdt_stat.copy())
 
     writer.add_systematic(
-        dtdt_stat.project("time", "pt_probe", "eta_probe"),
+        dtdt_stat.project("time", "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu pass gen",
         "ch_dtdt_5d",
@@ -212,7 +205,7 @@ def eta_phi_systematic(
         groups=["prefiring_stat"],
     )
     writer.add_systematic(
-        dtst_stat.project("time", "pt_probe", "eta_probe"),
+        dtst_stat.project("time", "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu pass gen",
         "ch_dtst_5d",
@@ -220,7 +213,7 @@ def eta_phi_systematic(
         groups=["prefiring_stat"],
     )
     writer.add_systematic(
-        stst_stat.project("time", "pt_probe", "eta_probe"),
+        stst_stat.project("time", "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu pass gen",
         "ch_stst_5d",
@@ -252,29 +245,37 @@ def get_era_vals(mc, trigger_cut, era, type_gen="pass", iso=False):
         )
 
 
-def luminometer_syst(writer, luminometer, dtdt, dtst, stst, syst):
+def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
     # dtdt = remove_low_bins(dtdt.copy())
     writer.add_systematic(
-        dtdt.project("time", "mll"),
+        iso.project("time"),
         f"{luminometer}_{syst}",
         "Zmumu pass gen",
-        "ch_dtdt_2d",
+        "ch_iso",
         constrained=True,
         groups=[f"{syst}"],
     )
     writer.add_systematic(
-        dtst.project("time", "mll"),
+        dtdt.project("time"),
         f"{luminometer}_{syst}",
         "Zmumu pass gen",
-        "ch_dtst_2d",
+        "ch_dtdt",
         constrained=True,
         groups=[f"{syst}"],
     )
     writer.add_systematic(
-        stst.project("time", "mll"),
+        dtst.project("time"),
         f"{luminometer}_{syst}",
         "Zmumu pass gen",
-        "ch_stst_2d",
+        "ch_dtst",
+        constrained=True,
+        groups=[f"{syst}"],
+    )
+    writer.add_systematic(
+        stst.project("time"),
+        f"{luminometer}_{syst}",
+        "Zmumu pass gen",
+        "ch_stst",
         constrained=True,
         groups=[f"{syst}"],
     )
@@ -355,11 +356,11 @@ def background_syst(
         weightsum,
         cross_sec,
     )
-    iso_proc = iso.project("time", "pt_probe", "eta_probe")
+    iso_proc = iso.project("time", "mll")
 
-    dtdt_proc = dtdt.project("time", "pt_probe", "eta_probe")
-    dtst_proc = dtst.project("time", "pt_probe", "eta_probe")
-    stst_proc = stst.project("time", "pt_probe", "eta_probe")
+    dtdt_proc = dtdt.project("time", "mll")
+    dtst_proc = dtst.project("time", "mll")
+    stst_proc = stst.project("time", "mll")
 
     iso_proc, dtdt_proc, dtst_proc, stst_proc = make_mutually_exclusive(
         iso_proc, dtdt_proc, dtst_proc, stst_proc

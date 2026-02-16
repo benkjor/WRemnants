@@ -1,5 +1,4 @@
 import argparse
-import pdb
 
 import h5py
 import hist
@@ -31,19 +30,6 @@ else:
 
 parser = argparse.ArgumentParser()
 args = parser.parse_args()
-
-indir_data = "/work/submit/jbenke/WRemnants/scripts/plotting/"
-infile_data = indir_data + "fitresults_wilson.hdf5"
-h5file = h5py.File(infile_data, "r")
-results_data = input_tools.load_results_h5py(h5file)
-indir_liv_model = "/home/submit/jbenke/LIV/coupling_models/"
-
-# data = results_data["results_asimov"]["physics_models"]["Project ch_masked time"][
-#     "channels"
-# ]["ch_masked"]["hist_postfit_inclusive"].get()
-# data_cov = results_data["results_asimov"]["physics_models"]["Project ch_masked time"][
-#     "hist_postfit_inclusive_cov"
-# ].get()
 
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
 file_in_name = (
@@ -111,14 +97,11 @@ prpg_all = [
     dtst_prpg_BG.project("mll"),
     stst_prpg_BG.project("mll"),
 ]
-time_hists = [
-    time_proj_hlt.project("time", "mll"),
-    time_proj_low.project("time", "mll"),
-]
+time_hists = time_proj_low.project("time", "mll")
+
 lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
 #### normal
-
 
 iso, dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
     prpg_all,
@@ -137,8 +120,6 @@ pass_gen = all_mc_corrections(
     cross_sec,
 )
 n_masked = pass_gen.project("time", "mll")
-
-
 ###################################################################
 
 iso_unrolled = iso[{"mll": 9}]
@@ -154,12 +135,23 @@ flat_line = hist.Hist(
     data=np.ones(24) * data_int / 24,  ## this finds the average
 )
 
+
+indir_liv_model = "/home/submit/jbenke/LIV/coupling_models/"
+infile_liv_model = indir_liv_model + "coupling_before_cxx.npy"
+vals = np.load(infile_liv_model)  # (SM+LV)/SM = 1 + LV/SM
+var = hist.Hist(
+    hist.axis.Regular(24, 0, 24, metadata="time", underflow=False, overflow=False),
+    data=vals[:] - 1,
+)
+
+iso_injection = addHists(iso_data_unrolled, multiplyHists(var, iso_data_unrolled))
+
+
 ##generator channel
 writer = tensorwriter.TensorWriter()
 writer.add_channel(data.axes, f"ch{channel_name}")
 writer.add_data(iso_data_unrolled, f"ch{channel_name}")
 writer.add_process(flat_line, "liv_fit", f"ch{channel_name}", signal=True)
-pdb.set_trace()
 
 for i in range(1):
     infile_liv_model = indir_liv_model + "coupling_before_cxx.npy"

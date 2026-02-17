@@ -7,6 +7,7 @@ from uncertainty_tools import (
     all_mc_corrections,
     get_era_vals,
     get_mc_lumis,
+    make_mutually_exclusive,
 )
 
 from rabbit import tensorwriter
@@ -98,7 +99,6 @@ prpg_all = [
     stst_prpg_BG.project("mll"),
 ]
 time_hists = time_proj_low.project("time", "mll")
-
 lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
 #### normal
@@ -112,6 +112,14 @@ iso, dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
     cross_sec,
 )
 
+iso, dtdt_prpg, dtst_prpg, stst_prpg = make_mutually_exclusive(
+    iso, dtdt_prpg, dtst_prpg, stst_prpg
+)
+
+iso_data, dtdt_data, dtst_data, stst_data = make_mutually_exclusive(
+    iso_data, dtdt_data, dtst_data, stst_data
+)
+
 pass_gen = all_mc_corrections(
     pass_gen.project("mll"),
     time_proj_low,
@@ -121,15 +129,13 @@ pass_gen = all_mc_corrections(
 )
 n_masked = pass_gen.project("time", "mll")
 ###################################################################
-
 iso_unrolled = iso[{"mll": 9}]
 iso_data_unrolled = iso_data[{"mll": 9}]
 nbins_mll = 1
 n_masked_unrolled = n_masked[{"mll": 9}]
 
-data = iso_unrolled
 
-data_int = np.sum(data.values())
+data_int = np.sum(iso_unrolled.values())
 flat_line = hist.Hist(
     hist.axis.Regular(24, 0, 24, metadata="time", overflow=False, underflow=False),
     data=np.ones(24) * data_int / 24,  ## this finds the average
@@ -149,9 +155,9 @@ iso_injection = addHists(iso_data_unrolled, multiplyHists(var, iso_data_unrolled
 
 ##generator channel
 writer = tensorwriter.TensorWriter()
-writer.add_channel(data.axes, f"ch{channel_name}")
+writer.add_channel(iso_data_unrolled.axes, f"ch{channel_name}")
 writer.add_data(iso_data_unrolled, f"ch{channel_name}")
-writer.add_process(flat_line, "liv_fit", f"ch{channel_name}", signal=True)
+writer.add_process(iso_unrolled, "liv_fit", f"ch{channel_name}", signal=True)
 
 for i in range(1):
     infile_liv_model = indir_liv_model + "coupling_before_cxx.npy"
@@ -161,13 +167,10 @@ for i in range(1):
         data=vals[:] - 1,
     )
 
-    print(var.values())
-
-    var = multiplyHists(var, flat_line)  # LV
-    print("---------")
+    var = multiplyHists(var, iso_unrolled)  # LV
 
     writer.add_systematic(
-        addHists(flat_line, var),
+        addHists(iso_unrolled, var),
         f"{coeff_name[i]}",
         "liv_fit",
         f"ch{channel_name}",

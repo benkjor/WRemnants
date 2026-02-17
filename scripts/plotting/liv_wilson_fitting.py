@@ -1,5 +1,4 @@
 import argparse
-import pickle
 
 import h5py
 import hist
@@ -8,25 +7,19 @@ from uncertainty_tools import (
     all_mc_corrections,
     get_era_vals,
     get_mc_lumis,
+    make_mutually_exclusive,
 )
 
 from rabbit import tensorwriter
 from utilities.io_tools import input_tools
-
-slope_ramses = 0.0006
-slope_hfoc = 0.0007
-
+from wums.boostHistHelpers import (
+    addHists,
+    multiplyHists,
+)
 
 parser = argparse.ArgumentParser()
 args = parser.parse_args()
 
-# indir_data = "/work/submit/jbenke/WRemnants/scripts/plotting/"
-# infile_data = indir_data + "fitresults.hdf5"
-# h5file = h5py.File(infile_data, "r")
-# fit_results = input_tools.load_results_h5py(h5file)
-
-# ### prefit is MC, postfit is data
-# data = fit_results["parms_prefit"]
 
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
 file_in_name = (
@@ -44,10 +37,8 @@ stst_data = data_output["time_stst"].get()
 iso_data = data_output["time_iso"].get()
 
 time_proj_low_all = data_output["time_proj"].get()
-time_proj_hlt_all = data_output["time_proj"].get()
 
 time_proj_low = time_proj_low_all
-time_proj_hlt = time_proj_hlt_all
 
 dtdt_prpg_BG, dtdt_prpg_BG_syst, dtdt_prpg_BG_stat = get_era_vals(
     MC_Zmumu, "dtdt", "BG"
@@ -94,24 +85,10 @@ prpg_all = [
     dtst_prpg_BG.project("mll"),
     stst_prpg_BG.project("mll"),
 ]
-time_hists = [
-    time_proj_hlt.project("time", "mll"),
-    time_proj_low.project("time", "mll"),
-]
+time_hists = time_proj_low.project("time", "mll")
 lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
 #### normal
-
-with open(
-    "/home/submit/jbenke/WRemnants/rabbit/rabbit/poi_models/precomputed_sigma/SM_15_to_120_GeV_13_bins.pkl",
-    "rb",
-) as f:
-    precomputed_sm = pickle.load(f)
-
-sm_values = np.array(precomputed_sm["values"])  ## should be in pb, as should 2001
-test_ax = time_proj_hlt.copy().project("mll")
-
-sm_values_hist = hist.Hist(*test_ax.axes, data=sm_values)
 
 iso, dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
     prpg_all,
@@ -121,6 +98,15 @@ iso, dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
     weightsum,
     cross_sec,
 )
+
+iso, dtdt_prpg, dtst_prpg, stst_prpg = make_mutually_exclusive(
+    iso, dtdt_prpg, dtst_prpg, stst_prpg
+)
+
+iso_data, dtdt_data, dtst_data, stst_data = make_mutually_exclusive(
+    iso_data, dtdt_data, dtst_data, stst_data
+)
+
 
 pass_gen = all_mc_corrections(
     pass_gen.project("mll"),
@@ -146,41 +132,24 @@ writer = tensorwriter.TensorWriter()
 # writer.add_channel(n_masked_unrolled.axes, "ch_masked", masked=True)  ## is this still correct?
 # writer.add_process(divideHists(n_masked_unrolled, lumi_scaling), "background", "ch_masked") ## not sure if this should be in the same process?
 
+### injection test ####
+indir_liv_model = "/home/submit/jbenke/LIV/coupling_models/"
+infile_liv_model = indir_liv_model + "coupling_before_cxx.npy"
+vals = np.load(infile_liv_model)  # (SM+LV)/SM = 1 + LV/SM
+var = hist.Hist(
+    hist.axis.Regular(24, 0, 24, metadata="time", underflow=False, overflow=False),
+    data=vals[:] - 1,
+)
+
+iso_injection = addHists(iso_unrolled, multiplyHists(var, iso_unrolled))
+# pdb.set_trace()
+# adding it to the mc/process histogram reudced the uncertainty by a factor of 10 but didn't change the fitted value
+
 writer.add_channel(iso_unrolled.axes, "ch_iso")
 writer.add_data(iso_data_unrolled, "ch_iso")
 writer.add_process(
     iso_unrolled, "Zmumu pass gen", "ch_iso", signal=True
 )  ### not quite sure where Zmumu pass gen came from
-
-## unrolled is mass then time so indexing will go [i*nbins_mll + j] where i is the time bin and j is the mass bin
-# iso_unrolled_exp = expand_hist_by_duplicate_axis(
-#     iso_unrolled, "time", "unrolled_ax"
-# )  ## for unrolled it is ""
-# var_size = 0.05
-
-# for i in range(nbins_time):
-#     for j in range(1):
-#         ## currently i think the only thing this does is fit a normalization
-#         v = iso_unrolled_exp[{"unrolled_ax": (i * nbins_mll) + j}]
-
-#         var = addHists(var_size * v, iso_unrolled)
-# writer.add_systematic(
-#     var,
-#     f"norm_{i}",
-#     "Zmumu pass gen",
-#     "ch_iso",
-#     constrained=False,
-#     groups=["nz"],
-# )
-
-# writer.add_systematic(
-#     var,
-#     f"c",
-#     "Zmumu pass gen",
-#     "ch_iso",
-#     constrained=False,
-#     groups=["cxx"],
-# )
 
 
 writer.write(outfolder="./", outfilename="wilson")

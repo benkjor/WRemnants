@@ -112,10 +112,6 @@ iso, dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
     cross_sec,
 )
 
-iso, dtdt_prpg, dtst_prpg, stst_prpg = make_mutually_exclusive(
-    iso, dtdt_prpg, dtst_prpg, stst_prpg
-)
-
 iso_data, dtdt_data, dtst_data, stst_data = make_mutually_exclusive(
     iso_data, dtdt_data, dtst_data, stst_data
 )

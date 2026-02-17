@@ -169,7 +169,7 @@ def get_mc_lumis(
     dtst = addHists(dtst_bg, dtst_h)
     stst = addHists(stst_bg, stst_h)
 
-    # iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
+    iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
     return iso, dtdt, dtst, stst
 
 

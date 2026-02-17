@@ -268,26 +268,24 @@ pass_gen = all_mc_corrections(
 )
 
 n_masked = pass_gen.project("time", "pt_probe", "eta_probe")
-# iso_var_nom = divideHists(
-#     iso.project("time", "pt_probe", "eta_probe"),
-#     dtdt_prpg.project("time", "pt_probe", "eta_probe"),
-# )
 
-### making it one
-## before i migrate mutually exclusive i need to redefine these so that they aren't mutually exclusive
 iso_var_nom = divideHists(
     iso.project("time", "pt_probe", "eta_probe"),
     iso.project("time", "pt_probe", "eta_probe"),
-)
+)  ## just want this to be one
+
+dtdt_all = addHists(iso, dtdt_prpg)
+dtst_all = addHists(dtdt_all, dtst_prpg)
+stst_all = addHists(dtst_all, stst_prpg)
 
 hlt_var_nom = divideHists(
-    dtdt_prpg.project("time", "pt_probe", "eta_probe"),
-    dtst_prpg.project("time", "pt_probe", "eta_probe"),
+    dtdt_all.project("time", "pt_probe", "eta_probe"),
+    dtst_all.project("time", "pt_probe", "eta_probe"),
 )
 
 id_var_nom = divideHists(
-    dtst_prpg.project("time", "pt_probe", "eta_probe"),
-    stst_prpg.project("time", "pt_probe", "eta_probe"),
+    dtst_all.project("time", "pt_probe", "eta_probe"),
+    stst_all.project("time", "pt_probe", "eta_probe"),
 )
 hlt_var_nom_h2 = remove_low_bins(hlt_var_nom)
 iso_var_nom_h2 = remove_low_bins(iso_var_nom)
@@ -296,28 +294,20 @@ iso_var_nom_h2 = remove_low_bins(iso_var_nom)
 iso_data, dtdt_data, dtst_data, stst_data = make_mutually_exclusive(
     iso_data, dtdt_data, dtst_data, stst_data
 )
-iso_mc, dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = make_mutually_exclusive(
-    iso, dtdt_prpg, dtst_prpg, stst_prpg
-)
+# iso_mc, dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = make_mutually_exclusive(
+#     iso, dtdt_prpg, dtst_prpg, stst_prpg
+# )
+iso_mc, dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = iso, dtdt_prpg, dtst_prpg, stst_prpg
+
 
 dtdt_prpg_mc = remove_low_bins(dtdt_prpg_mc)
-# with open("mutually_exclusive_iso.pkl", "wb") as f:
-#     pickle.dump(iso_mc, f)
-# with open("mutually_exclusive_dtdt.pkl", "wb") as f:
-#     pickle.dump(dtdt_prpg_mc, f)
-# with open("mutually_exclusive_dtst.pkl", "wb") as f:
-#     pickle.dump(dtst_prpg_mc, f)
-# with open("mutually_exclusive_stst.pkl", "wb") as f:
-#     pickle.dump(stst_prpg_mc, f)
-
+dtdt_data = remove_low_bins(dtdt_data)
 
 h3 = iso_mc.project("time", "pt_probe", "eta_probe")
-
 h2 = dtdt_prpg_mc.project("time", "pt_probe", "eta_probe")
 h1 = dtst_prpg_mc.project("time", "pt_probe", "eta_probe")
 h0 = stst_prpg_mc.project("time", "pt_probe", "eta_probe")
 
-dtdt_data = remove_low_bins(dtdt_data)
 
 h3_data = iso_data.project("time", "pt_probe", "eta_probe")
 h2_data = dtdt_data.project("time", "pt_probe", "eta_probe")

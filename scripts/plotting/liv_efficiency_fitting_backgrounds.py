@@ -213,17 +213,15 @@ iso_ramses, dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
 
 
 avg_sbil_pcc = scaleHist(divideHists(sbil_pcc, count_pcc), 1e9)
+sbil_ones = make_ones_hist(avg_sbil_pcc)
 
 sbil_hfoc_fit = scaleHist(avg_sbil_pcc, slope_hfoc)
-sbil_ones = make_ones_hist(sbil_hfoc_fit)
-
 sbil_hfoc_fit = addHists(sbil_hfoc_fit, sbil_ones)
 sbil_hfoc_fit = multiplyHists(sbil_hfoc_fit, lumi_scaling)
 
 sbil_ramses_fit = scaleHist(avg_sbil_pcc, slope_ramses)
 sbil_ramses_fit = addHists(sbil_ramses_fit, sbil_ones)
 sbil_ramses_fit = multiplyHists(sbil_ramses_fit, lumi_scaling)
-
 iso_sbil_hfoc, dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = (
     get_mc_lumis(
         prpg_all,
@@ -285,31 +283,29 @@ dtdt_prpg_hfoc = remove_low_bins(dtdt_prpg_hfoc)
 
 
 # can't do this later because i redefine iso_data
-try:
-    iso_data_time_mll = iso_data.project("time", "mll")
-    dtdt_data_time_mll = dtdt_data.project("time", "mll")
-    dtst_data_time_mll = dtst_data.project("time", "mll")
-    stst_data_time_mll = stst_data.project("time", "mll")
+# iso_data_time_mll = iso_data.project("time", "mll")
+# dtdt_data_time_mll = dtdt_data.project("time", "mll")
+# dtst_data_time_mll = dtst_data.project("time", "mll")
+# stst_data_time_mll = stst_data.project("time", "mll")
 
-    iso_mc_time_mll = iso.project("time", "mll")
-    dtdt_mc_time_mll = dtdt_prpg.project("time", "mll")
-    dtst_mc_time_mll = dtst_prpg.project("time", "mll")
-    stst_mc_time_mll = stst_prpg.project("time", "mll")
+# iso_mc_time_mll = iso.project("time", "mll")
+# dtdt_mc_time_mll = dtdt_prpg.project("time", "mll")
+# dtst_mc_time_mll = dtst_prpg.project("time", "mll")
+# stst_mc_time_mll = stst_prpg.project("time", "mll")
 
-    n_masked = test_nmasked.project("time", "mll")
+# n_masked = test_nmasked.project("time", "mll")
 
-except:
-    iso_data_time_mll = iso_data.project("time")
-    dtdt_data_time_mll = dtdt_data.project("time")
-    dtst_data_time_mll = dtst_data.project("time")
-    stst_data_time_mll = stst_data.project("time")
+iso_data_time_mll = iso_data.project("time")
+dtdt_data_time_mll = dtdt_data.project("time")
+dtst_data_time_mll = dtst_data.project("time")
+stst_data_time_mll = stst_data.project("time")
 
-    iso_mc_time_mll = iso.project("time")
-    dtdt_mc_time_mll = dtdt_prpg.project("time")
-    dtst_mc_time_mll = dtst_prpg.project("time")
-    stst_mc_time_mll = stst_prpg.project("time")
+iso_mc_time_mll = iso.project("time")
+dtdt_mc_time_mll = dtdt_prpg.project("time")
+dtst_mc_time_mll = dtst_prpg.project("time")
+stst_mc_time_mll = stst_prpg.project("time")
 
-    n_masked = test_nmasked.project("time")
+n_masked = test_nmasked.project("time")
 
 
 ###################################################################
@@ -433,20 +429,31 @@ writer.add_process(stst_mc_time_mll, "Zmumu pass gen", "ch_stst", signal=False)
 luminometer_syst(
     writer, "pcc", iso_pcc, dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc, "stability"
 )
-# ## HFOC cross detector
+# pdb.set_trace()
+
+## HFOC cross detector
+# luminometer_syst(
+#     writer,
+#     "hfoc",
+#     iso_sbil_hfoc,
+#     dtdt_prpg_sbil_hfoc,
+#     dtst_prpg_sbil_hfoc,
+#     stst_prpg_sbil_hfoc,
+#     "linearity",
+# )
 
 
-luminometer_syst(
-    writer,
-    "hfoc",
-    iso_hfoc,
-    dtdt_prpg_hfoc,
-    dtst_prpg_hfoc,
-    stst_prpg_hfoc,
-    "stability",
-)
+# luminometer_syst(
+#     writer,
+#     "hfoc",
+#     iso_hfoc,
+#     dtdt_prpg_hfoc,
+#     dtst_prpg_hfoc,
+#     stst_prpg_hfoc,
+#     "stability",
+# )
 
-# # # #### RAMSES cross detector
+# # #### RAMSES cross detector
 # luminometer_syst(
 #     writer,
 #     "ramses",
@@ -460,26 +467,17 @@ luminometer_syst(
 
 ### YEAH THESE ARE 100% COUPLED. CRAP.
 # #### HFOC linearity
+
+### RAMSES linearity
 luminometer_syst(
     writer,
-    "hfoc",
-    iso_sbil_hfoc,
-    dtdt_prpg_sbil_hfoc,
-    dtst_prpg_sbil_hfoc,
-    stst_prpg_sbil_hfoc,
+    "ramses",
+    iso_sbil_ramses,
+    dtdt_prpg_sbil_ramses,
+    dtst_prpg_sbil_ramses,
+    stst_prpg_sbil_ramses,
     "linearity",
 )
-
-# #### RAMSES linearity
-# luminometer_syst(
-#     writer,
-#     "ramses",
-#     iso_sbil_ramses,
-#     dtdt_prpg_sbil_ramses,
-#     dtst_prpg_sbil_ramses,
-#     stst_prpg_sbil_ramses,
-#     "linearity",
-# )
 
 writer.write(outfolder="./", outfilename="background")
 # writer.write(outfolder="./")

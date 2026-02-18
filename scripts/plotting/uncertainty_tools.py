@@ -185,7 +185,7 @@ def eta_phi_systematic(
     etaphi_num,
 ):
 
-    dtdt_stat, dtst_stat, stst_stat = get_mc_lumis(
+    iso_stat, dtdt_stat, dtst_stat, stst_stat = get_mc_lumis(
         input_data,
         time_hists,
         lumi_scaling,
@@ -195,28 +195,36 @@ def eta_phi_systematic(
     )
 
     # dtdt_stat = remove_low_bins(dtdt_stat.copy())
-
     writer.add_systematic(
-        dtdt_stat.project("time", "mll"),
+        iso_stat.project("time", "pt_probe", "eta_probe"),  # , "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu pass gen",
-        "ch_dtdt_5d",
+        "ch_iso",
+        constrained=True,
+        groups=["prefiring_stat"],
+    )
+    dtdt_stat = remove_low_bins(dtdt_stat)
+    writer.add_systematic(
+        dtdt_stat.project("time", "pt_probe", "eta_probe"),  # , "mll"),
+        f"prefiring_stat_etaphi_{etaphi_num}",
+        "Zmumu pass gen",
+        "ch_dtdt",
         constrained=True,
         groups=["prefiring_stat"],
     )
     writer.add_systematic(
-        dtst_stat.project("time", "mll"),
+        dtst_stat.project("time", "pt_probe", "eta_probe"),  # , "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu pass gen",
-        "ch_dtst_5d",
+        "ch_dtst",
         constrained=True,
         groups=["prefiring_stat"],
     )
     writer.add_systematic(
-        stst_stat.project("time", "mll"),
+        stst_stat.project("time", "pt_probe", "eta_probe"),  # , "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu pass gen",
-        "ch_stst_5d",
+        "ch_stst",
         constrained=True,
         groups=["prefiring_stat"],
     )
@@ -246,17 +254,18 @@ def get_era_vals(mc, trigger_cut, era, type_gen="pass", iso=False):
 
 
 def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
-    # dtdt = remove_low_bins(dtdt.copy())
+    dtdt = remove_low_bins(dtdt)
     writer.add_systematic(
-        iso.project("time"),
+        iso.project("time", "pt_probe", "eta_probe"),
         f"{luminometer}_{syst}",
         "Zmumu pass gen",
         "ch_iso",
         constrained=True,
         groups=[f"{syst}"],
     )
+
     writer.add_systematic(
-        dtdt.project("time"),
+        dtdt.project("time", "pt_probe", "eta_probe"),
         f"{luminometer}_{syst}",
         "Zmumu pass gen",
         "ch_dtdt",
@@ -264,7 +273,7 @@ def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
         groups=[f"{syst}"],
     )
     writer.add_systematic(
-        dtst.project("time"),
+        dtst.project("time", "pt_probe", "eta_probe"),
         f"{luminometer}_{syst}",
         "Zmumu pass gen",
         "ch_dtst",
@@ -272,7 +281,7 @@ def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
         groups=[f"{syst}"],
     )
     writer.add_systematic(
-        stst.project("time"),
+        stst.project("time", "pt_probe", "eta_probe"),
         f"{luminometer}_{syst}",
         "Zmumu pass gen",
         "ch_stst",
@@ -285,7 +294,6 @@ def background_syst(
     writer,
     results,
     res_str,
-    time_proj_hlt,
     time_proj_low,
     lumi_scaling,
     lumi_hists,
@@ -296,17 +304,16 @@ def background_syst(
 ):
 
     MC = results[res_str]["output"]
-
     try:
-        weightsum = results[proc_name]["weight_sum"]
-        cross_sec = results[proc_name]["dataset"]["xsec"]
+        weightsum = results[res_str]["weight_sum"]
+        cross_sec = results[res_str]["dataset"]["xsec"]
     except:
-        weightsum = results["ZmumuPostVFP"]["weight_sum"]
-        cross_sec = results["ZmumuPostVFP"]["dataset"]["xsec"]
+        weightsum = results["SingleMuon_2016PostVFP"]["weight_sum"]
+        cross_sec = results["SingleMuon_2016PostVFP"]["dataset"]["xsec"]
+    print(res_str)
 
     ### MAKE THIS IMPLEMENTATION NOT STUPID
     if fail_gen:
-
         dtdt_prpg_BG, _, _ = get_era_vals(MC, "dtdt", "BG", "fail")
         dtst_prpg_BG, _, _ = get_era_vals(MC, "dtst", "BG", "fail")
         stst_prpg_BG, _, _ = get_era_vals(MC, "stst", "BG", "fail")
@@ -346,7 +353,7 @@ def background_syst(
         stst_prpg_BG,
     ]
 
-    time_hists = [time_proj_hlt, time_proj_low]
+    time_hists = time_proj_low
 
     iso, dtdt, dtst, stst = get_mc_lumis(
         prpg_all,
@@ -356,34 +363,37 @@ def background_syst(
         weightsum,
         cross_sec,
     )
-    iso_proc = iso.project("time", "mll")
+    dtdt = remove_low_bins(dtdt)
 
-    dtdt_proc = dtdt.project("time", "mll")
-    dtst_proc = dtst.project("time", "mll")
-    stst_proc = stst.project("time", "mll")
+    iso_proc = iso.project("time", "pt_probe", "eta_probe")  # , "mll")
+    dtdt_proc = dtdt.project("time", "pt_probe", "eta_probe")  # , "mll")
+    dtst_proc = dtst.project("time", "pt_probe", "eta_probe")  # , "mll")
+    stst_proc = stst.project("time", "pt_probe", "eta_probe")  # , "mll")
 
-    iso_proc, dtdt_proc, dtst_proc, stst_proc = make_mutually_exclusive(
-        iso_proc, dtdt_proc, dtst_proc, stst_proc
-    )
-    iso_proc = remove_low_bins(iso_proc)
-    dtdt_proc = remove_low_bins(dtdt_proc)
+    # iso_proc, dtdt_proc, dtst_proc, stst_proc = make_mutually_exclusive(
+    #     iso_proc, dtdt_proc, dtst_proc, stst_proc
+    # )
+    # iso_proc = remove_low_bins(iso_proc)
 
     writer.add_process(iso_proc, f"{proc_name}", "ch_iso", signal=False)
     writer.add_process(dtdt_proc, f"{proc_name}", "ch_dtdt", signal=False)
     writer.add_process(dtst_proc, f"{proc_name}", "ch_dtst", signal=False)
     writer.add_process(stst_proc, f"{proc_name}", "ch_stst", signal=False)
 
+    var = 1.01
+    if proc_name == "W":
+        var = 1.001
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_iso", 1.01, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_iso", var, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_dtdt", 1.01, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_dtdt", var, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_dtst", 1.01, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_dtst", var, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_stst", 1.01, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_stst", var, groups=["bkg"]
     )
 
 

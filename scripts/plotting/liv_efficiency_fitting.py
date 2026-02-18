@@ -3,9 +3,12 @@ import argparse
 import h5py
 from uncertainty_tools import (
     all_mc_corrections,
+    background_syst,
     create_variation,
+    eta_phi_systematic,
     get_era_vals,
     get_mc_lumis,
+    luminometer_syst,
     make_mutually_exclusive,
     make_ones_hist,
     remove_low_bins,
@@ -34,11 +37,11 @@ background_syst_names = [
     # "ZmumuPostVFP",
     "Top",
     "Diboson",
-    "GGToLLPostVFP",
-    "QCDmuEnrichPt15PostVFP",
-    "WplusmunuPostVFP",
-    "QGToDYQTo2LPostVFP",
-    "QGToWQToLNuPostVFP",
+    "GGToLL_2016PostVFP",
+    "QCDmuEnrichPt15_2016PostVFP",
+    # "Wplusmunu_2016PostVFP",
+    "QGToDYQTo2L_2016PostVFP",
+    "QGToWQToLNu_2016PostVFP",
 ]
 background_proc = [
     # "Zmumu fail gen",
@@ -46,7 +49,7 @@ background_proc = [
     "Diboson",
     "GG",
     "QCD",
-    "W",
+    # "W",
     "QG_2L",
     "QG_Lnu",
 ]
@@ -69,11 +72,7 @@ dtst_data = data_output["time_dtst"].get()
 stst_data = data_output["time_stst"].get()
 iso_data = data_output["time_iso"].get()
 
-time_proj_low_all = data_output["time_proj"].get()
-time_proj_hlt_all = data_output["time_proj"].get()
-
-time_proj_low = time_proj_low_all[{"mll": mass_bin}]
-time_proj_hlt = time_proj_hlt_all[{"mll": mass_bin}]
+time_proj_low = data_output["time_proj"].get()
 
 ### should loop over these instead of calling them explicitly
 
@@ -138,6 +137,7 @@ pcc_scaling = multiplyHists(pcc_scaling, lumi_scaling)
 ramses_scaling = divideHists(lumi_ramses, lumi_ramses_nom)
 ramses_scaling = multiplyHists(ramses_scaling, lumi_scaling)
 
+time_proj_low = time_proj_low[{"mll": mass_bin}]
 iso_H = iso_H[{"mll": mass_bin}]
 dtdt_prpg_H = dtdt_prpg_H[{"mll": mass_bin}]
 dtst_prpg_H = dtst_prpg_H[{"mll": mass_bin}]
@@ -164,22 +164,22 @@ prpg_all = [
     dtst_prpg_BG,
     stst_prpg_BG,
 ]
-# prpg_syst = [
-#     dtdt_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-#     dtst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-#     stst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-#     dtdt_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-#     dtst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-#     stst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}],
-# ]
+prpg_syst = [
+    iso_H_syst[{"downUpVar": 0, "mll": mass_bin}],
+    dtdt_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin}],
+    dtst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin}],
+    stst_prpg_H_syst[{"downUpVar": 0, "mll": mass_bin}],
+    iso_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
+    dtdt_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
+    dtst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
+    stst_prpg_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
+]
 
-
-time_hists = time_proj_low
 lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 
 iso_hfoc, dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
     prpg_all,
-    time_hists,
+    time_proj_low,
     hfoc_scaling,
     lumi_hists,
     weightsum,
@@ -188,7 +188,7 @@ iso_hfoc, dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc = get_mc_lumis(
 
 iso_pcc, dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
     prpg_all,
-    time_hists,
+    time_proj_low,
     pcc_scaling,
     lumi_hists,
     weightsum,
@@ -197,7 +197,7 @@ iso_pcc, dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc = get_mc_lumis(
 
 iso_ramses, dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
     prpg_all,
-    time_hists,
+    time_proj_low,
     ramses_scaling,
     lumi_hists,
     weightsum,
@@ -205,7 +205,6 @@ iso_ramses, dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses = get_mc_lumis(
 )
 
 avg_sbil_pcc = scaleHist(divideHists(sbil_pcc, count_pcc), 1e9)
-
 sbil_hfoc_fit = scaleHist(avg_sbil_pcc, slope_hfoc)
 
 sbil_ones = make_ones_hist(sbil_hfoc_fit)
@@ -219,7 +218,7 @@ sbil_ramses_fit = multiplyHists(sbil_ramses_fit, lumi_scaling)
 iso_sbil_hfoc, dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = (
     get_mc_lumis(
         prpg_all,
-        time_hists,
+        time_proj_low,
         sbil_hfoc_fit,
         lumi_hists,
         weightsum,
@@ -230,7 +229,7 @@ iso_sbil_hfoc, dtdt_prpg_sbil_hfoc, dtst_prpg_sbil_hfoc, stst_prpg_sbil_hfoc = (
 iso_sbil_ramses, dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ramses = (
     get_mc_lumis(
         prpg_all,
-        time_hists,
+        time_proj_low,
         sbil_ramses_fit,
         lumi_hists,
         weightsum,
@@ -241,23 +240,26 @@ iso_sbil_ramses, dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ra
 #### normal
 iso, dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
     prpg_all,
-    time_hists,
+    time_proj_low,
     lumi_scaling,
     lumi_hists,
     weightsum,
     cross_sec,
 )
 
-# (dtdt_prpg_prefiring_syst, dtst_prpg_prefiring_syst, stst_prpg_prefiring_syst) = (
-#     get_mc_lumis(
-#         prpg_syst,
-#         time_hists,
-#         lumi_scaling,
-#         lumi_hists,
-#         weightsum,
-#         cross_sec,
-#     )
-# )
+(
+    iso_prefiring_syst,
+    dtdt_prpg_prefiring_syst,
+    dtst_prpg_prefiring_syst,
+    stst_prpg_prefiring_syst,
+) = get_mc_lumis(
+    prpg_syst,
+    time_proj_low,
+    lumi_scaling,
+    lumi_hists,
+    weightsum,
+    cross_sec,
+)
 
 pass_gen = all_mc_corrections(
     pass_gen[{"mll": mass_bin}],
@@ -663,133 +665,148 @@ for i in range(nbins_pt):  # pt
             )
 
 
-# for i in range(len(background_syst_names)):
-#     proc_name = background_proc[i]
-#     if proc_name == "Zmumu fail gen":
-#         fgen = True
-#     else:
-#         fgen = False
-#     print("proc_name: %s" % proc_name)
-#     background_syst(
-#         writer,
-#         results,
-#         background_syst_names[i],
-#         time_proj_hlt,
-#         time_proj_low,
-#         lumi_scaling,
-#         [lumi_scaling_h, lumi_scaling_bg],
-#         proc_name,
-#         f"bkg_{proc_name}",
-#         fail_gen=fgen,
-#     )
+for i in range(len(background_syst_names)):
+    proc_name = background_proc[i]
+    if proc_name == "Zmumu fail gen":
+        fgen = True
+    else:
+        fgen = False
+    print("proc_name: %s" % proc_name)
+    background_syst(
+        writer,
+        results,
+        background_syst_names[i],
+        time_proj_low,
+        lumi_scaling,
+        [lumi_scaling_h, lumi_scaling_bg],
+        proc_name,
+        f"bkg_{proc_name}",
+        fail_gen=fgen,
+    )
 
 
 ### SO THESE SHOULD BE DONE ACROSS ALL MASS BINS
 # ##### NONE OF THIS IS MASS DEPENDENT ## may be linked to statistical uncertainty becuase the eta region? do i still need this or am i double counting
 # lowers stability uncetainty increase linearity uncertainty.
-# num_etaphi = len(dtdt_prpg_H_stat.project("etaPhiRegion").values())
-# for i in range(num_etaphi):
-#     prpg_stat = [
-#         dtdt_prpg_H_stat[
-#             {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
-#         ],
-#         dtst_prpg_H_stat[
-#             {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
-#         ],
-#         stst_prpg_H_stat[
-#             {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
-#         ],
-#         dtdt_prpg_BG_stat[
-#             {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
-#         ],
-#         dtst_prpg_BG_stat[
-#             {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
-#         ],
-#         stst_prpg_BG_stat[
-#             {"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin, "gen_mll": mass_bin}
-#         ],
-#     ]
+num_etaphi = len(dtdt_prpg_H_stat.project("etaPhiRegion").values())
+for i in range(num_etaphi):
+    prpg_stat = [
+        iso_H_stat[{"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin}],
+        dtdt_prpg_H_stat[{"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin}],
+        dtst_prpg_H_stat[{"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin}],
+        stst_prpg_H_stat[{"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin}],
+        iso_BG_stat[{"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin}],
+        dtdt_prpg_BG_stat[{"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin}],
+        dtst_prpg_BG_stat[{"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin}],
+        stst_prpg_BG_stat[{"etaPhiRegion": i, "downUpVar": 0, "mll": mass_bin}],
+    ]
 
-#     eta_phi_systematic(
-#         writer,
-#         prpg_stat,
-#         time_hists,
-#         lumi_scaling,
-#         lumi_hists,
-#         weightsum,
-#         cross_sec,
-#         i,
-#     )
-
+    eta_phi_systematic(
+        writer,
+        prpg_stat,
+        time_proj_low,
+        lumi_scaling,
+        lumi_hists,
+        weightsum,
+        cross_sec,
+        i,
+    )
 
 ### these slightly increase the statistical uncertainty but dont contribute to the stability/linearity
-# dtdt_prpg_prefiring_syst = dtdt_prpg_prefiring_syst.project("time", "pt_probe", "eta_probe")
-# writer.add_systematic(
-#     remove_low_bins(dtdt_prpg_prefiring_syst),
-#     f"prefiring_syst",
-#     "Zmumu pass gen",
-#     "ch_dtdt",
-#     constrained=True,
-#     groups=["prefiring_syst"],
-# )
-# writer.add_systematic(
-#     dtst_prpg_prefiring_syst.project("time", "pt_tag", "eta_tag"),
-#     f"prefiring_syst",
-#     "Zmumu pass gen",
-#     "ch_dtst",
-#     constrained=True,
-#     groups=["prefiring_syst"],
-# )
-# writer.add_systematic(
-#     stst_prpg_prefiring_syst.project("time", "pt_tag", "eta_tag"),
-#     f"prefiring_syst",
-#     "Zmumu pass gen",
-#     "ch_stst",
-#     constrained=True,
-#     groups=["prefiring_syst"],
-# )
+
+writer.add_systematic(
+    iso_prefiring_syst.project("time", "pt_probe", "eta_probe"),
+    f"prefiring_syst",
+    "Zmumu pass gen",
+    "ch_iso",
+    constrained=True,
+    groups=["prefiring_syst"],
+)
+dtdt_prpg_prefiring_syst = remove_low_bins(dtdt_prpg_prefiring_syst)
+writer.add_systematic(
+    dtdt_prpg_prefiring_syst.project(
+        "time", "pt_probe", "eta_probe"
+    ),  # used to be mll as well
+    f"prefiring_syst",
+    "Zmumu pass gen",
+    "ch_dtdt",
+    constrained=True,
+    groups=["prefiring_syst"],
+)
+writer.add_systematic(
+    dtst_prpg_prefiring_syst.project(
+        "time", "pt_probe", "eta_probe"
+    ),  # used to be tag pt and eta
+    f"prefiring_syst",
+    "Zmumu pass gen",
+    "ch_dtst",
+    constrained=True,
+    groups=["prefiring_syst"],
+)
+writer.add_systematic(
+    stst_prpg_prefiring_syst.project(
+        "time", "pt_probe", "eta_probe"
+    ),  # used to be tag pt and eta
+    f"prefiring_syst",
+    "Zmumu pass gen",
+    "ch_stst",
+    constrained=True,
+    groups=["prefiring_syst"],
+)
+
 
 ### statistical uncertainty and the stability and linearity still slightly linked (~0.003%)
+luminometer_syst(
+    writer, "pcc", iso_pcc, dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc, "stability"
+)
+
+## HFOC cross detector
+luminometer_syst(
+    writer,
+    "hfoc",
+    iso_sbil_hfoc,
+    dtdt_prpg_sbil_hfoc,
+    dtst_prpg_sbil_hfoc,
+    stst_prpg_sbil_hfoc,
+    "linearity",
+)
 
 
-### stability cross detector seems to generate hte majority of that
-# ## PCC cross detector
-# luminometer_syst(
-#     writer, "pcc", dtdt_prpg_pcc, dtst_prpg_pcc, stst_prpg_pcc, "stability"
-# )
-# # ## HFOC cross detector
-# luminometer_syst(
-#     writer, "hfoc", dtdt_prpg_hfoc, dtst_prpg_hfoc, stst_prpg_hfoc, "stability"
-# )
+luminometer_syst(
+    writer,
+    "hfoc",
+    iso_hfoc,
+    dtdt_prpg_hfoc,
+    dtst_prpg_hfoc,
+    stst_prpg_hfoc,
+    "stability",
+)
 
 # #### RAMSES cross detector
-# luminometer_syst(
-#     writer, "ramses", dtdt_prpg_ramses, dtst_prpg_ramses, stst_prpg_ramses, "stability"
-# )
+luminometer_syst(
+    writer,
+    "ramses",
+    iso_ramses,
+    dtdt_prpg_ramses,
+    dtst_prpg_ramses,
+    stst_prpg_ramses,
+    "stability",
+)
 
-
-## seems to generate about the same amount of statistical uncertainty and together the uncertainties on each are higher so they are somehow linked which is a problem
 
 ### YEAH THESE ARE 100% COUPLED. CRAP.
-#### HFOC linearity
-# luminometer_syst(
-#     writer,
-#     "hfoc",
-#     dtdt_prpg_sbil_hfoc,
-#     dtst_prpg_sbil_hfoc,
-#     stst_prpg_sbil_hfoc,
-#     "linearity",
-# )
+# #### HFOC linearity
 
-# #### RAMSES linearity
-# luminometer_syst(
-#     writer,
-#     "ramses",
-#     dtdt_prpg_sbil_ramses,
-#     dtst_prpg_sbil_ramses,
-#     stst_prpg_sbil_ramses,
-#     "linearity",
-# )
+### RAMSES linearity
+luminometer_syst(
+    writer,
+    "ramses",
+    iso_sbil_ramses,
+    dtdt_prpg_sbil_ramses,
+    dtst_prpg_sbil_ramses,
+    stst_prpg_sbil_ramses,
+    "linearity",
+)
 
 writer.write(outfolder="./", outfilename="liv")
 # writer.write(outfolder="./")

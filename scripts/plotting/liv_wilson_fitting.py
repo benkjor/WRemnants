@@ -36,9 +36,7 @@ dtst_data = data_output["time_dtst"].get()
 stst_data = data_output["time_stst"].get()
 iso_data = data_output["time_iso"].get()
 
-time_proj_low_all = data_output["time_proj"].get()
-
-time_proj_low = time_proj_low_all
+time_proj_low = data_output["time_proj"].get()
 
 dtdt_prpg_BG, dtdt_prpg_BG_syst, dtdt_prpg_BG_stat = get_era_vals(
     MC_Zmumu, "dtdt", "BG"

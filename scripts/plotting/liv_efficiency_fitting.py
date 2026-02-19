@@ -238,7 +238,7 @@ iso_sbil_ramses, dtdt_prpg_sbil_ramses, dtst_prpg_sbil_ramses, stst_prpg_sbil_ra
 )
 
 #### normal
-iso, dtdt_prpg, dtst_prpg, stst_prpg = get_mc_lumis(
+iso_mc, dtdt_mc, dtst_mc, stst_mc = get_mc_lumis(
     prpg_all,
     time_proj_low,
     lumi_scaling,
@@ -272,13 +272,13 @@ pass_gen = all_mc_corrections(
 n_masked = pass_gen.project("time", "pt_probe", "eta_probe")
 
 iso_var_nom = divideHists(
-    iso.project("time", "pt_probe", "eta_probe"),
-    iso.project("time", "pt_probe", "eta_probe"),
+    iso_mc.project("time", "pt_probe", "eta_probe"),
+    iso_mc.project("time", "pt_probe", "eta_probe"),
 )  ## just want this to be one
 
-dtdt_all = addHists(iso, dtdt_prpg)
-dtst_all = addHists(dtdt_all, dtst_prpg)
-stst_all = addHists(dtst_all, stst_prpg)
+dtdt_all = addHists(iso_mc, dtdt_mc)
+dtst_all = addHists(dtdt_all, dtst_mc)
+stst_all = addHists(dtst_all, stst_mc)
 
 hlt_var_nom = divideHists(
     dtdt_all.project("time", "pt_probe", "eta_probe"),
@@ -296,19 +296,15 @@ iso_var_nom_h2 = remove_low_bins(iso_var_nom)
 iso_data, dtdt_data, dtst_data, stst_data = make_mutually_exclusive(
     iso_data, dtdt_data, dtst_data, stst_data
 )
-# iso_mc, dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = make_mutually_exclusive(
-#     iso, dtdt_prpg, dtst_prpg, stst_prpg
-# )
-iso_mc, dtdt_prpg_mc, dtst_prpg_mc, stst_prpg_mc = iso, dtdt_prpg, dtst_prpg, stst_prpg
 
 
-dtdt_prpg_mc = remove_low_bins(dtdt_prpg_mc)
+dtdt_mc = remove_low_bins(dtdt_mc)
 dtdt_data = remove_low_bins(dtdt_data)
 
 h3 = iso_mc.project("time", "pt_probe", "eta_probe")
-h2 = dtdt_prpg_mc.project("time", "pt_probe", "eta_probe")
-h1 = dtst_prpg_mc.project("time", "pt_probe", "eta_probe")
-h0 = stst_prpg_mc.project("time", "pt_probe", "eta_probe")
+h2 = dtdt_mc.project("time", "pt_probe", "eta_probe")
+h1 = dtst_mc.project("time", "pt_probe", "eta_probe")
+h0 = stst_mc.project("time", "pt_probe", "eta_probe")
 
 
 h3_data = iso_data.project("time", "pt_probe", "eta_probe")
@@ -422,10 +418,10 @@ for i in range(nbins_pt):  # pt
                 )
 
                 hlt_var_tag_h2 = create_variation(
-                    hlt_var_nom_h2, dtdt_prpg_mc, i, j, k, nbins_h2, h2=True
+                    hlt_var_nom_h2, dtdt_mc, i, j, k, nbins_h2, h2=True
                 )
                 hlt_probe_h2 = create_variation(
-                    hlt_var_nom_h2, dtdt_prpg_mc, i, j, k, 0, "probe", h2=True
+                    hlt_var_nom_h2, dtdt_mc, i, j, k, 0, "probe", h2=True
                 )
                 hlt_probe_h2 = multiplyHists(scaleHist(hlt_probe_h2, var_size), h2)
                 hlt_var_total_h2 = scaleHist(addHists(hlt_var_tag_h2, hlt_probe_h2), 2)
@@ -440,10 +436,10 @@ for i in range(nbins_pt):  # pt
                 )
 
                 hlt_var_tag_h1 = create_variation(
-                    hlt_var_nom, dtst_prpg_mc, i, j, k, nbins_h1
+                    hlt_var_nom, dtst_mc, i, j, k, nbins_h1
                 )
                 hlt_probe_h1 = create_variation(
-                    hlt_var_nom, dtst_prpg_mc, i, j, k, 0, "probe"
+                    hlt_var_nom, dtst_mc, i, j, k, 0, "probe"
                 )
                 hlt_probe_h1 = multiplyHists(scaleHist(hlt_probe_h1, var_size), h1)
                 hlt_var_total_h1 = scaleHist(
@@ -460,7 +456,7 @@ for i in range(nbins_pt):  # pt
                 )
 
                 hlt_var_tag_h0 = create_variation(
-                    hlt_var_nom, stst_prpg_mc, i, j, k, nbins_h1
+                    hlt_var_nom, stst_mc, i, j, k, nbins_h1
                 )
                 hlt_var_total_h0 = 2 * hlt_var_tag_h0
 
@@ -476,10 +472,10 @@ for i in range(nbins_pt):  # pt
                 #### ID ######
 
                 id_var_tag_h2 = create_variation(
-                    id_var_h2, dtdt_prpg_mc, i, j, k, nbins_h2, h2=True
+                    id_var_h2, dtdt_mc, i, j, k, nbins_h2, h2=True
                 )
                 id_probe_h2 = create_variation(
-                    id_var_h2, dtdt_prpg_mc, i, j, k, 0, "probe", h2=True
+                    id_var_h2, dtdt_mc, i, j, k, 0, "probe", h2=True
                 )
                 id_probe_h2 = multiplyHists(scaleHist(id_probe_h2, var_size), h2)
                 id_var_total_h2 = addHists(id_var_tag_h2, id_probe_h2)
@@ -496,10 +492,10 @@ for i in range(nbins_pt):  # pt
                 ### ISOLATION ### --> can only be valid when hlt is valid
 
                 iso_var_tag_h2 = create_variation(
-                    iso_var_nom_h2, dtdt_prpg_mc, i, j, k, nbins_h2, h2=True
+                    iso_var_nom_h2, dtdt_mc, i, j, k, nbins_h2, h2=True
                 )
                 iso_probe_h2 = create_variation(
-                    iso_var_nom_h2, dtdt_prpg_mc, i, j, k, 0, "probe", h2=True
+                    iso_var_nom_h2, dtdt_mc, i, j, k, 0, "probe", h2=True
                 )
                 iso_probe_h2 = multiplyHists(scaleHist(iso_probe_h2, var_size), h2)
                 iso_var_total_h2 = scaleHist(
@@ -530,12 +526,8 @@ for i in range(nbins_pt):  # pt
                 groups=["eff_trig"],
             )
 
-            iso_var_tag_h1 = create_variation(
-                iso_var_nom, dtst_prpg_mc, i, j, k, nbins_h1
-            )
-            iso_probe_h1 = create_variation(
-                iso_var_nom, dtst_prpg_mc, i, j, k, 0, "probe"
-            )
+            iso_var_tag_h1 = create_variation(iso_var_nom, dtst_mc, i, j, k, nbins_h1)
+            iso_probe_h1 = create_variation(iso_var_nom, dtst_mc, i, j, k, 0, "probe")
             iso_probe_h1 = multiplyHists(scaleHist(iso_probe_h1, var_size), h1)
             iso_var_total_h1 = scaleHist(addHists(iso_var_tag_h1, -1 * iso_probe_h1), 2)
 
@@ -548,9 +540,7 @@ for i in range(nbins_pt):  # pt
                 groups=["eff_trig"],
             )
 
-            iso_var_tag_h0 = create_variation(
-                iso_var_nom, stst_prpg_mc, i, j, k, nbins_h1
-            )
+            iso_var_tag_h0 = create_variation(iso_var_nom, stst_mc, i, j, k, nbins_h1)
             iso_var_total_h0 = 2 * iso_var_tag_h0
 
             writer.add_systematic(
@@ -628,12 +618,8 @@ for i in range(nbins_pt):  # pt
                 groups=["eff_id"],
             )
 
-            id_var_tag_h1 = create_variation(
-                id_var_nom, dtst_prpg_mc, i, j, k, nbins_h1
-            )
-            id_probe_h1 = create_variation(
-                id_var_nom, dtst_prpg_mc, i, j, k, 0, "probe"
-            )
+            id_var_tag_h1 = create_variation(id_var_nom, dtst_mc, i, j, k, nbins_h1)
+            id_probe_h1 = create_variation(id_var_nom, dtst_mc, i, j, k, 0, "probe")
             id_probe_h1 = multiplyHists(scaleHist(id_probe_h1, var_size), h1)
             id_var_total_h1 = addHists(id_var_tag_h1, id_probe_h1)
 
@@ -646,12 +632,8 @@ for i in range(nbins_pt):  # pt
                 groups=["eff_id"],
             )
 
-            id_var_tag_h0 = create_variation(
-                id_var_nom, stst_prpg_mc, i, j, k, nbins_h1
-            )
-            id_probe_h0 = create_variation(
-                id_var_nom, stst_prpg_mc, i, j, k, 0, "probe"
-            )
+            id_var_tag_h0 = create_variation(id_var_nom, stst_mc, i, j, k, nbins_h1)
+            id_probe_h0 = create_variation(id_var_nom, stst_mc, i, j, k, 0, "probe")
             id_probe_h0 = multiplyHists(scaleHist(id_probe_h0, var_size), h0)
             id_var_total_h0 = addHists(id_var_tag_h0, -1 * id_probe_h0)
 

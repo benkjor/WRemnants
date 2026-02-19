@@ -140,13 +140,13 @@ flat_line = hist.Hist(
 
 indir_liv_model = "/home/submit/jbenke/LIV/coupling_models/"
 infile_liv_model = indir_liv_model + "coupling_before_cxx.npy"
-vals = np.load(infile_liv_model)  # (SM+LV)/SM = 1 + LV/SM
-var = hist.Hist(
-    hist.axis.Regular(24, 0, 24, metadata="time", underflow=False, overflow=False),
-    data=vals[:] - 1,
-)
+# vals = np.load(infile_liv_model)  # (SM+LV)/SM = 1 + LV/SM
+# var = hist.Hist(
+#     hist.axis.Regular(24, 0, 24, metadata="time", underflow=False, overflow=False),
+#     data=vals[:] - 1,
+# )
 
-iso_injection = addHists(iso_data_unrolled, multiplyHists(var, iso_data_unrolled))
+# iso_injection = addHists(iso_data_unrolled, multiplyHists(var, iso_data_unrolled))
 
 
 ##generator channel

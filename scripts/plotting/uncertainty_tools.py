@@ -134,9 +134,11 @@ def eta_phi_systematic(
         weightsum,
         cross_sec,
     )
-
+    iso_stat, dtdt_stat, dtst_stat, stst_stat = make_mutually_exclusive(
+        iso_stat, dtdt_stat, dtst_stat, stst_stat
+    )
     writer.add_systematic(
-        iso_stat.project("time", "mll", "pt_probe", "eta_probe"),  # , "mll"),
+        iso_stat.project("time", "mll", "pt_probe", "eta_probe"),  # ),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu",
         "ch_iso",
@@ -303,6 +305,7 @@ def background_syst(
         weightsum,
         cross_sec,
     )
+    iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
     dtdt = remove_low_bins(dtdt)
 
     iso_proc = iso.project("time", "mll", "pt_probe", "eta_probe")  # , "mll")
@@ -369,10 +372,10 @@ def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
             old_hist.axes[0],
             new_pt_axis,
             old_hist.axes[2],
-            old_hist.axes[3],
+            new_pt_axis_2,
             old_hist.axes[4],
         )
-        new_hist.values()[...] = old_hist.values()[:, nbins:, :, :, :]
+        new_hist.values()[...] = old_hist.values()[:, nbins:, :, nbins:, :]
 
     elif len(old_hist.axes) == 6:  # time, mass, pt, eta, pt, eta
         new_hist = hist.Hist(
@@ -380,17 +383,17 @@ def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
             old_hist.axes[1],
             new_pt_axis,
             old_hist.axes[3],
-            old_hist.axes[4],
+            new_pt_axis_2,
             old_hist.axes[5],
         )
-        new_hist.values()[...] = old_hist.values()[:, :, nbins:, :, :, :]
+        new_hist.values()[...] = old_hist.values()[:, :, nbins:, :, nbins:, :]
     elif (
         len(old_hist.axes) == 8
     ):  # eta_tag, pt_eta, gen_mll, gen_time, time, mll, pt_probe, eta
         # pdb.set_trace()
         new_hist = hist.Hist(
             old_hist.axes[0],
-            old_hist.axes[1],
+            new_pt_axis_2,
             old_hist.axes[2],
             old_hist.axes[3],
             old_hist.axes[4],
@@ -398,7 +401,7 @@ def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
             new_pt_axis,
             old_hist.axes[7],
         )
-        new_hist.values()[...] = old_hist.values()[:, :, :, :, :, :, nbins:, :]
+        new_hist.values()[...] = old_hist.values()[:, nbins:, :, :, :, :, nbins:, :]
 
     return new_hist
 
@@ -433,9 +436,9 @@ def create_variation(
         {"gen_mll": mass_bin, "gen_time": k, f"pt_{not_muon}": i, f"eta_{not_muon}": j}
     ]
 
-    if muon == "tag":
+    if muon == "tag":  # "mll",
         var = var.project("time", "mll", f"pt_{muon}", f"eta_{muon}")
         var = broadcastSystHist(var, refererence_hist)
         var = multiplyHists(scaleHist(var, var_size / (nbins_total)), refererence_hist)
-        var = var.project("time", "mll", "pt_probe", "eta_probe")
+        var = var.project("time", "mll", "pt_probe", "eta_probe")  # "mll",
     return var

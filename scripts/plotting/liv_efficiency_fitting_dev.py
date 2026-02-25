@@ -4,6 +4,7 @@ import h5py
 from uncertainty_tools import (
     background_syst,
     create_variation,
+    eta_phi_systematic,
     get_era_vals,
     get_mc_lumis,
     luminometer_syst,
@@ -22,6 +23,7 @@ from wums.boostHistHelpers import (
     expand_hist_by_duplicate_axis,
     multiplyHists,
     scaleHist,
+    unrolledHist,
 )
 
 parser = argparse.ArgumentParser()
@@ -57,9 +59,7 @@ background_proc = [
 # DATA IMPORTS #
 
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
-file_in_name = (
-    file_in + "mz_dilepton_liv_scetlib_dyturbo_CT18Z_N3p0LL_N2LO_Corr.hdf5"
-)  # _maxFiles_20
+file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturbo_CT18Z_N3p0LL_N2LO_Corr.hdf5"
 h5file = h5py.File(file_in_name, "r")
 results = input_tools.load_results_h5py(h5file)
 data_output = results["SingleMuon_2016PostVFP"]["output"]
@@ -198,14 +198,6 @@ def get_corrected_mc(
     print("through nominal corrections")
     if luminometers:
         ### i think the way these should work is i do it in a single mass bin then project it across all the rest?
-        # iso_hfoc, dtdt_hfoc, dtst_hfoc, stst_hfoc = get_mc_lumis(
-        #     prpg_all,
-        #     time_proj_low,
-        #     hfoc_scaling,
-        #     lumi_hists,
-        #     weightsum,
-        #     xsec,
-        # )
 
         hfoc_rescale = divideHists(hfoc_scaling, lumi_scaling)
         iso_hfoc = multiplyHists(hfoc_rescale, iso)
@@ -242,44 +234,6 @@ def get_corrected_mc(
         stst_sbil_ramses = multiplyHists(ramses_sbil_rescale, stst)
         print("ramses linearity")
 
-        # iso_pcc, dtdt_pcc, dtst_pcc, stst_pcc = get_mc_lumis(
-        #     prpg_all,
-        #     time_proj_low,
-        #     pcc_scaling,
-        #     lumi_hists,
-        #     weightsum,
-        #     xsec,
-        # )
-
-        # iso_ramses, dtdt_ramses, dtst_ramses, stst_ramses = get_mc_lumis(
-        #     prpg_all,
-        #     time_proj_low,
-        #     ramses_scaling,
-        #     lumi_hists,
-        #     weightsum,
-        #     xsec,
-        # )
-
-        # iso_sbil_hfoc, dtdt_sbil_hfoc, dtst_sbil_hfoc, stst_sbil_hfoc = get_mc_lumis(
-        #     prpg_all,
-        #     time_proj_low,
-        #     hfoc_sbil,
-        #     lumi_hists,
-        #     weightsum,
-        #     xsec,
-        # )
-
-        # iso_sbil_ramses, dtdt_sbil_ramses, dtst_sbil_ramses, stst_sbil_ramses = (
-        #     get_mc_lumis(
-        #         prpg_all,
-        #         time_proj_low,
-        #         ramses_sbil,
-        #         lumi_hists,
-        #         weightsum,
-        #         xsec,
-        #     )
-        # )
-
         iso_pcc, dtdt_pcc, dtst_pcc, stst_pcc = make_mutually_exclusive(
             iso_pcc, dtdt_pcc, dtst_pcc, stst_pcc
         )
@@ -296,8 +250,6 @@ def get_corrected_mc(
                 iso_sbil_ramses, dtdt_sbil_ramses, dtst_sbil_ramses, stst_sbil_ramses
             )
         )
-
-    # iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
 
     ### dtdt was negative from before this was all passed into a single function. need to investigate further
     iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire = get_mc_lumis(
@@ -321,7 +273,7 @@ def get_corrected_mc(
         weightsum,
         xsec,
     )
-
+    iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
     corrected_mc = [iso, dtdt, dtst, stst]
     corrected_prefiring = [iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire]
 
@@ -452,16 +404,7 @@ stst_prpg_proj = expand_hist_by_duplicate_axes(
     ["time", "mll", "pt_probe", "eta_probe"],
     ["gen_time", "gen_mll", "pt_tag", "eta_tag"],
 )
-# hlt_var_nom_h2 = remove_low_bins(hlt_var_nom)
-# iso_var_nom_h2 = remove_low_bins(iso_var_nom)
 
-# id_var_h2 = remove_low_bins(id_var_nom.copy())
-# iso_var_h2 = remove_low_bins(iso_var_nom.copy())
-## need to be consistent about how many bins iso has
-
-# hlt_var_nom_h2 = expand_hist_by_duplicate_axes(
-#     hlt_var_nom_h2, ["time", "mll","pt_probe", "eta_probe"], ["gen_time", "gen_mll", "pt_tag", "eta_tag"]
-# )
 hlt_var_nom = expand_hist_by_duplicate_axes(
     hlt_var_nom,
     ["time", "mll", "pt_probe", "eta_probe"],
@@ -482,13 +425,9 @@ iso_var_nom = expand_hist_by_duplicate_axes(
 
 
 id_var_h2 = remove_low_bins(id_var_nom.copy())
-# id_var_h2 = expand_hist_by_duplicate_axes(
-#     id_var_h2, ["time", "mll","pt_probe", "eta_probe"], ["gen_time", "gen_mll", "pt_tag", "eta_tag"]
-# )
+
 iso_var_nom_h2 = remove_low_bins(iso_var_nom.copy())
-# iso_var_nom_h2 = expand_hist_by_duplicate_axes(
-#     iso_var_h2, ["time", "mll","pt_probe", "eta_probe"], ["gen_time", "gen_mll", "pt_tag", "eta_tag"]
-# )
+
 hlt_var_nom_h2 = remove_low_bins(hlt_var_nom.copy())
 
 
@@ -497,6 +436,18 @@ hlt_var_nom_h2 = remove_low_bins(hlt_var_nom.copy())
 ## create the tensor
 writer = tensorwriter.TensorWriter()
 ##generator channel --> MAY BE WRONG BECAUSE THIS ISN'T MUTUTALLY EXCLUSIVE
+### unrolling
+# n_masked = unrolledHist(n_masked)
+# h3_data = unrolledHist(h3_data)
+# h2_data = unrolledHist(h2_data)
+# h1_data = unrolledHist(h1_data)
+# h0_data = unrolledHist(h0_data)
+
+h3_unrolled = unrolledHist(h3)
+h2_unrolled = unrolledHist(h2)
+h1_unrolled = unrolledHist(h1)
+h0_unrolled = unrolledHist(h0)
+
 writer.add_channel(n_masked.axes, "ch_masked", masked=True)  ## is this still correct?
 writer.add_process(divideHists(n_masked, lumi_scaling), "Zmumu", "ch_masked")
 
@@ -825,21 +776,21 @@ for i in range(len(background_syst_names)):
     )
 
 ### SO THESE SHOULD BE DONE ACROSS ALL MASS BINS
-# ##### NONE OF THIS IS MASS DEPENDENT ## may be linked to statistical uncertainty becuase the eta region? do i still need this or am i double counting
+##### NONE OF THIS IS MASS DEPENDENT ## may be linked to statistical uncertainty becuase the eta region? do i still need this or am i double counting
 # lowers stability uncetainty increase linearity uncertainty.
-# num_etaphi = len(Zmumu_stat[0].project("etaPhiRegion").values())
-# for i in range(num_etaphi):
-#     eta_phi_systematic(
-#         writer,
-#         Zmumu_stat,
-#         time_proj_low,
-#         lumi_scaling,
-#         lumi_hists,
-#         weightsum,
-#         cross_sec,
-#         i,
-#         mass_bin,
-#     )
+num_etaphi = len(Zmumu_stat[0].project("etaPhiRegion").values())
+for i in range(num_etaphi):
+    eta_phi_systematic(
+        writer,
+        Zmumu_stat,
+        time_proj_low,
+        lumi_scaling,
+        lumi_hists,
+        weightsum,
+        cross_sec,
+        i,
+        mass_bin,
+    )
 
 ### these slightly increase the statistical uncertainty but dont contribute to the stability/linearity
 

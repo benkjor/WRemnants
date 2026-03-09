@@ -69,27 +69,21 @@ iso_data = data_output["time_iso"].get()
 nbins_mll = len(dtdt_data.axes["mll"])
 
 iso_data, dtdt_data, dtst_data, stst_data = make_mutually_exclusive(
-    iso_data[{"mll": mass_bin}],
-    dtdt_data[{"mll": mass_bin}],
-    dtst_data[{"mll": mass_bin}],
-    stst_data[{"mll": mass_bin}],
+    iso_data,
+    dtdt_data,
+    dtst_data,
+    stst_data,
 )
 
 
 dtdt_data = remove_low_bins(dtdt_data)
 
-# h3_data = iso_data.project("time", "mll", "pt_probe", "eta_probe")
-# h2_data = dtdt_data.project("time", "mll", "pt_probe", "eta_probe")
-# h1_data = dtst_data.project("time", "mll", "pt_probe", "eta_probe")
-# h0_data = stst_data.project("time", "mll", "pt_probe", "eta_probe")
+h3_data = iso_data.project("time", "mll", "pt_probe", "eta_probe")
+h2_data = dtdt_data.project("time", "mll", "pt_probe", "eta_probe")
+h1_data = dtst_data.project("time", "mll", "pt_probe", "eta_probe")
+h0_data = stst_data.project("time", "mll", "pt_probe", "eta_probe")
 
-h3_data = iso_data.project("time", "pt_probe", "eta_probe")
-h2_data = dtdt_data.project("time", "pt_probe", "eta_probe")
-h1_data = dtst_data.project("time", "pt_probe", "eta_probe")
-h0_data = stst_data.project("time", "pt_probe", "eta_probe")
-
-
-time_proj_low = data_output["time_proj"].get()[{"mll": mass_bin}]
+time_proj_low = data_output["time_proj"].get()
 
 ### STABILITY
 lumi_hfoc = lumi_output["lumi_hfoc"].get()
@@ -139,7 +133,7 @@ sbil_ramses_fit = scaleHist(avg_sbil_pcc, slope_ramses)
 sbil_ramses_fit = addHists(sbil_ramses_fit, sbil_ones)
 ramses_sbil = multiplyHists(sbil_ramses_fit, lumi_scaling)
 
-# time_proj_low = time_proj_low[{"mll": mass_bin}]
+# time_proj_low = time_proj_low
 
 
 def get_corrected_mc(
@@ -166,35 +160,35 @@ def get_corrected_mc(
     dtst_H, dtst_H_syst, dtst_H_stat = get_era_vals(MC, "dtst", "H")
     stst_H, stst_H_syst, stst_H_stat = get_era_vals(MC, "stst", "H")
     syst = [
-        iso_H_syst[{"downUpVar": 0, "mll": mass_bin}],
-        dtdt_H_syst[{"downUpVar": 0, "mll": mass_bin}],
-        dtst_H_syst[{"downUpVar": 0, "mll": mass_bin}],
-        stst_H_syst[{"downUpVar": 0, "mll": mass_bin}],
-        iso_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
-        dtdt_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
-        dtst_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
-        stst_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
+        iso_H_syst[{"downUpVar": 0}],
+        dtdt_H_syst[{"downUpVar": 0}],
+        dtst_H_syst[{"downUpVar": 0}],
+        stst_H_syst[{"downUpVar": 0}],
+        iso_BG_syst[{"downUpVar": 0}],
+        dtdt_BG_syst[{"downUpVar": 0}],
+        dtst_BG_syst[{"downUpVar": 0}],
+        stst_BG_syst[{"downUpVar": 0}],
     ]
     stat = [
-        iso_H_stat[{"downUpVar": 0, "mll": mass_bin}],
-        dtdt_H_stat[{"downUpVar": 0, "mll": mass_bin}],
-        dtst_H_stat[{"downUpVar": 0, "mll": mass_bin}],
-        stst_H_stat[{"downUpVar": 0, "mll": mass_bin}],
-        iso_BG_stat[{"downUpVar": 0, "mll": mass_bin}],
-        dtdt_BG_stat[{"downUpVar": 0, "mll": mass_bin}],
-        dtst_BG_stat[{"downUpVar": 0, "mll": mass_bin}],
-        stst_BG_stat[{"downUpVar": 0, "mll": mass_bin}],
+        iso_H_stat[{"downUpVar": 0}],
+        dtdt_H_stat[{"downUpVar": 0}],
+        dtst_H_stat[{"downUpVar": 0}],
+        stst_H_stat[{"downUpVar": 0}],
+        iso_BG_stat[{"downUpVar": 0}],
+        dtdt_BG_stat[{"downUpVar": 0}],
+        dtst_BG_stat[{"downUpVar": 0}],
+        stst_BG_stat[{"downUpVar": 0}],
     ]
 
     prpg_all = [
-        iso_H[{"mll": mass_bin}],
-        dtdt_H[{"mll": mass_bin}],
-        dtst_H[{"mll": mass_bin}],
-        stst_H[{"mll": mass_bin}],
-        iso_BG[{"mll": mass_bin}],
-        dtdt_BG[{"mll": mass_bin}],
-        dtst_BG[{"mll": mass_bin}],
-        stst_BG[{"mll": mass_bin}],
+        iso_H,
+        dtdt_H,
+        dtst_H,
+        stst_H,
+        iso_BG,
+        dtdt_BG,
+        dtst_BG,
+        stst_BG,
     ]
 
     weightsum = results[process]["weight_sum"]
@@ -282,7 +276,7 @@ def get_corrected_mc(
     )
 
     pass_gen = mc_scaling(
-        pass_gen[{"mll": mass_bin}],
+        pass_gen,
         time_proj_low,
         lumi_scaling,
         weightsum,
@@ -360,9 +354,7 @@ iso_ramses, dtdt_ramses, dtst_ramses, stst_ramses = ramses_stability
 
 iso_sbil_hfoc, dtdt_sbil_hfoc, dtst_sbil_hfoc, stst_sbil_hfoc = hfoc_linearity
 
-n_masked = pass_gen.project("time", "pt_probe", "eta_probe")
-
-# n_masked = pass_gen.project("time", "mll", "pt_probe", "eta_probe")
+n_masked = pass_gen.project("time", "mll", "pt_probe", "eta_probe")
 
 iso_var_nom = divideHists(
     iso_mc.project("time", "pt_probe", "eta_probe"),
@@ -384,15 +376,10 @@ id_var_nom = divideHists(
 )
 dtdt_mc = remove_low_bins(dtdt_mc)
 
-# h3 = iso_mc.project("time", "mll", "pt_probe", "eta_probe")
-# h2 = dtdt_mc.project("time", "mll", "pt_probe", "eta_probe")
-# h1 = dtst_mc.project("time", "mll", "pt_probe", "eta_probe")
-# h0 = stst_mc.project("time", "mll", "pt_probe", "eta_probe")
-
-h3 = iso_mc.project("time", "pt_probe", "eta_probe")
-h2 = dtdt_mc.project("time", "pt_probe", "eta_probe")
-h1 = dtst_mc.project("time", "pt_probe", "eta_probe")
-h0 = stst_mc.project("time", "pt_probe", "eta_probe")
+h3 = iso_mc.project("time", "mll", "pt_probe", "eta_probe")
+h2 = dtdt_mc.project("time", "mll", "pt_probe", "eta_probe")
+h1 = dtst_mc.project("time", "mll", "pt_probe", "eta_probe")
+h0 = stst_mc.project("time", "mll", "pt_probe", "eta_probe")
 
 
 ###################################################################
@@ -433,14 +420,14 @@ writer.add_process((divideHists(n_masked, lumi_scaling)), "Zmumu", "ch_masked")
 # writer.add_process(h0_unrolled, "Zmumu", "ch_stst_poi")
 
 
-# h3_data = h3_data[{"mll": mass_bin}]
-# h3 = h3[{"mll": mass_bin}]
-# h2_data = h2_data[{"mll": mass_bin}]
-# h2 = h2[{"mll": mass_bin}]
-# h1_data = h1_data[{"mll": mass_bin}]
-# h1 = h1[{"mll": mass_bin}]
-# h0_data = h0_data[{"mll": mass_bin}]
-# h0 = h0[{"mll": mass_bin}]
+h3_data = h3_data[{"mll": 9}]
+h3 = h3[{"mll": 9}]
+h2_data = h2_data[{"mll": 9}]
+h2 = h2[{"mll": 9}]
+h1_data = h1_data[{"mll": 9}]
+h1 = h1[{"mll": 9}]
+h0_data = h0_data[{"mll": 9}]
+h0 = h0[{"mll": 9}]
 
 print("begin expanding")
 
@@ -490,6 +477,7 @@ id_var_h2 = remove_low_bins(id_var_nom)
 iso_var_nom_h2 = remove_low_bins(iso_var_nom)
 hlt_var_nom_h2 = remove_low_bins(hlt_var_nom)
 
+
 writer.add_channel(h3_data.axes, "ch_iso_eff")
 writer.add_data(h3_data, "ch_iso_eff")
 writer.add_process(h3, "Zmumu", "ch_iso_eff")
@@ -513,15 +501,15 @@ nbins_h2 = (nbins_pt - 1) + nbins_eta + nbins_time
 nbins_h1 = nbins_pt + nbins_eta + nbins_time
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
 
-for i in range(nbins_pt):  # pt
-    # for i in range(0, 3): #pt
+# for i in range(nbins_pt):  # pt
+for i in range(0, 3):  # pt
     print(f"pt bin: {i}")
-    # for j in range(4, 6):  # eta
-    for j in range(nbins_eta):  # eta
+    for j in range(4, 6):  # eta
+        # for j in range(nbins_eta):  # eta
 
         print(f"eta_bin: {j}")
-        for k in range(nbins_time):  #  time
-            # for k in range(22, 24):  #  time
+        # for k in range(nbins_time):  #  time
+        for k in range(22, 24):  #  time
 
             if i > 0:  ## we only have 1 bin beneath 25 GeV
                 #### NORMALIZATION #####

@@ -354,97 +354,32 @@ def background_syst(
 
 def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
 
-    if len(old_hist.axes) != 6 and len(old_hist.axes) != 4:
-        org_pt_axis = old_hist.axes[1]
-    elif len(old_hist.axes) == 8:
-        org_pt_axis = old_hist.axes[6]
-    else:
-        if len(old_hist.axes) == 6 and "mll" not in old_hist.axes.name:
-            org_pt_axis = old_hist.axes[1]
-        else:
-            org_pt_axis = old_hist.axes[2]
-    edges = org_pt_axis.edges
-    new_pt_edges = edges[nbins:]
+    if ax_name == "pt_probe":
+        nbins = old_hist.axes[ax_name].index(25)
 
-    new_pt_axis = hist.axis.Variable(new_pt_edges, name=ax_name)
-    new_pt_axis_2 = hist.axis.Variable(new_pt_edges, name="pt_tag")
-    new_eta_axis = hist.axis.Variable(
-        old_hist.axes[2].edges, name="eta_probe"
-    )  ## actually a regular axis but whatever
+    new_edges = old_hist.axes[ax_name].edges[nbins:]
 
-    if len(old_hist.axes) == 3:  ## time, pt, eta
-        new_hist = hist.Hist(old_hist.axes[0], new_pt_axis, new_eta_axis)
-        new_hist.values()[...] = old_hist.values()[:, nbins:, :]
+    new_axis = hist.axis.Variable(new_edges, name=ax_name)
+    ax_name_ind = old_hist.axes.name.index(ax_name)
 
-    elif len(old_hist.axes) == 4:  ## time, mass, pt, eta
-        new_hist = hist.Hist(
-            old_hist.axes[0],
-            old_hist.axes[1],
-            new_pt_axis,
-            old_hist.axes[3],
-        )
-        new_hist.values()[...] = old_hist.values()[:, :, nbins:, :]
+    axes = list(old_hist.axes)
+    axes[ax_name_ind] = new_axis
 
-    elif len(old_hist.axes) == 5:  ## time, pt, eta, pt, eta
-        new_hist = hist.Hist(
-            old_hist.axes[0],
-            new_pt_axis,
-            old_hist.axes[2],
-            new_pt_axis_2,
-            old_hist.axes[4],
-        )
-        new_hist.values()[...] = old_hist.values()[:, nbins:, :, nbins:, :]
+    slices = [slice(None)] * old_hist.ndim
+    slices[ax_name_ind] = slice(nbins, None)
 
-    elif len(old_hist.axes) == 6:
-        if "mll" in old_hist.axes.name:  # time, mass, pt, eta, pt, eta
-            new_hist = hist.Hist(
-                old_hist.axes[0],
-                old_hist.axes[1],
-                new_pt_axis,
-                old_hist.axes[3],
-                new_pt_axis_2,
-                old_hist.axes[5],
-            )
-            new_hist.values()[...] = old_hist.values()[:, :, nbins:, :, nbins:, :]
-        elif (
-            "mll" not in old_hist.axes.name
-        ):  # eta tag, pt tag, gen_time, time, pt_probe, eta_tag
-            new_hist = hist.Hist(
-                old_hist.axes[0],
-                new_pt_axis_2,
-                old_hist.axes[2],
-                old_hist.axes[3],
-                new_pt_axis,
-                old_hist.axes[5],
-            )
-            new_hist.values()[...] = old_hist.values()[:, nbins:, :, :, nbins:, :]
-    elif (
-        len(old_hist.axes) == 7
-    ):  # eta_tag, pt_tag, gen_time, time, mll, pt_probe, eta_probe
-        new_hist = hist.Hist(
-            old_hist.axes[0],
-            new_pt_axis_2,
-            old_hist.axes[2],
-            old_hist.axes[3],
-            old_hist.axes[4],
-            new_pt_axis,
-            old_hist.axes[6],
-        )
-        new_hist.values()[...] = old_hist.values()[:, nbins:, :, :, :, nbins:, :]
-    elif (
-        len(old_hist.axes) == 8
-    ):  # eta_tag, pt_eta, gen_mll, gen_time, time, mll, pt_probe, eta
-        new_hist = hist.Hist(
-            old_hist.axes[0],
-            new_pt_axis_2,
-            old_hist.axes[2],
-            old_hist.axes[3],
-            old_hist.axes[4],
-            old_hist.axes[5],
-            new_pt_axis,
-            old_hist.axes[7],
-        )
-        new_hist.values()[...] = old_hist.values()[:, nbins:, :, :, :, :, nbins:, :]
+    if "probe" in ax_name:
+        try:
+            new_tag_axis = hist.axis.Variable(new_edges, name=f"{ax_name[:-5]}tag")
+            tag_ind = old_hist.axes.name.index(f"{ax_name[:-5]}tag")
+            axes[tag_ind] = new_tag_axis
+            slices[tag_ind] = slice(nbins, None)
+        except:  ## if there is no tag access for some reason
+            pass
+
+    new_hist = hist.Hist(*axes)
+    new_hist.values()[...] = old_hist.values()[tuple(slices)]
+
     return new_hist
 
 

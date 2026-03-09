@@ -4,10 +4,8 @@ import matplotlib.pyplot as plt
 
 from utilities.io_tools import input_tools
 from wums.boostHistHelpers import (
-    addHists,
     divideHists,
     multiplyHists,
-    scaleHist,
 )
 
 mass_bin = 9
@@ -77,56 +75,63 @@ lumi_pcc = lumi_output["lumi_pcc"].get()
 lumi_ramses = lumi_output["lumi_ramses"].get()
 
 ## LINEARITY
-sbil_pcc = lumi_output["sbil_pcc"].get()
-count_pcc = lumi_output["count_pcc"].get()
-
-
-lumi_hfoc_nom = lumi_output["lumi_in_hfoc"].get()
-lumi_pcc_nom = lumi_output["lumi_in_pcc"].get()
-lumi_ramses_nom = lumi_output["lumi_in_ramses"].get()
+#### not sure what this is yet
+lumi_physics_and_hfoc = lumi_output["lumi_in_hfoc"].get()
+lumi_physics_and_pcc = lumi_output["lumi_in_pcc"].get()
+lumi_physics_and_ramses = lumi_output["lumi_in_ramses"].get()
 
 lumi_scaling = lumi_output["lumi_nom"].get()
 lumi_scaling_h = lumi_output["lumi_pre"].get()
 lumi_scaling_bg = lumi_output["lumi_post"].get()
 
 
-hfoc_scaling = divideHists(lumi_hfoc, lumi_hfoc_nom)
+hfoc_scaling = divideHists(lumi_hfoc, lumi_physics_and_hfoc)  ## this is the stability
+# scale by this becuase we assume this includes all physics events and we don't discriminate for events that were just detected by one in the histograms
 hfoc_scaling = multiplyHists(hfoc_scaling, lumi_scaling)
 
-pcc_scaling = divideHists(lumi_pcc, lumi_pcc_nom)
+pcc_scaling = divideHists(lumi_pcc, lumi_physics_and_pcc)
 pcc_scaling = multiplyHists(pcc_scaling, lumi_scaling)
 
-ramses_scaling = divideHists(lumi_ramses, lumi_ramses_nom)
+ramses_scaling = divideHists(lumi_ramses, lumi_physics_and_ramses)
 ramses_scaling = multiplyHists(ramses_scaling, lumi_scaling)
 
-hfoc_stability = 0.99117
-ramses_stability = 0.81021
+# hfoc_stability = 0.99117
+# ramses_stability = 0.81021
+
+# pdb.set_trace()
+
+hfoc_scaling = divideHists(lumi_hfoc, lumi_physics_and_hfoc)
+pcc_scaling = divideHists(lumi_pcc, lumi_physics_and_pcc)
+ramses_scaling = divideHists(lumi_ramses, lumi_physics_and_ramses)
 
 
-hfoc_scaling = divideHists(lumi_hfoc, lumi_hfoc_nom)
-pcc_scaling = divideHists(lumi_pcc, lumi_pcc_nom)
-ramses_scaling = divideHists(lumi_ramses, lumi_ramses_nom)
-ones_hist = divideHists(hfoc_scaling, hfoc_scaling)
+### percent of events detected by each
 
-hfoc_fitted = addHists(
-    scaleHist(addHists(hfoc_scaling, scaleHist(ones_hist, -1)), hfoc_stability),
-    ones_hist,
-)
-ramses_fitted = addHists(
-    scaleHist(addHists(ramses_scaling, scaleHist(ones_hist, -1)), ramses_stability),
-    ones_hist,
-)
+hfoc_scaling = divideHists(lumi_physics_and_hfoc, lumi_scaling)
+pcc_scaling = divideHists(lumi_physics_and_pcc, lumi_scaling)
+ramses_scaling = divideHists(lumi_physics_and_ramses, lumi_scaling)
+
+
+# ones_hist = divideHists(hfoc_scaling, hfoc_scaling)
+# hfoc_fitted = addHists(
+#     scaleHist(addHists(hfoc_scaling, scaleHist(ones_hist, -1)), hfoc_stability),
+#     ones_hist,
+# )
+# ramses_fitted = addHists(
+#     scaleHist(addHists(ramses_scaling, scaleHist(ones_hist, -1)), ramses_stability),
+#     ones_hist,
+# )
 # hfoc_fitted = divideHists(scaleHist(hfoc_scaling, hfoc_stability), pcc_scaling)
 # ramses_fitted = divideHists(scaleHist(ramses_scaling, ramses_stability), pcc_scaling)
 make_plot(
-    [pcc_scaling, hfoc_fitted, ramses_fitted],
+    [pcc_scaling, hfoc_scaling, ramses_scaling],
     "lumi_ratios fitted",
     ["PCC", "HFOC", "RAMSES"],
-    [0.999, 1.001],
+    [0.9, 1.1],
     False,
-    "ratio of inst. lumi to PHYSICS",
-    colors=["black", "red", "blue"],
-    file_out_modifier="liv_uncert/lumi/2026-02-17/",
+    "ratio lumis (all events)",
+    colors=["blue", "green", "red"],
+    file_out_modifier="liv_uncert/lumi/2026-02-26/",
 )
 
 

@@ -7,6 +7,7 @@ from wums.boostHistHelpers import (
     divideHists,
     multiplyHists,
     scaleHist,
+    unrolledHist,
 )
 
 
@@ -138,7 +139,7 @@ def eta_phi_systematic(
         iso_stat, dtdt_stat, dtst_stat, stst_stat
     )
     writer.add_systematic(
-        iso_stat.project("time", "mll", "pt_probe", "eta_probe"),  # ),
+        unrolledHist(iso_stat.project("time", "mll", "pt_probe", "eta_probe")),  # ),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu",
         "ch_iso",
@@ -147,7 +148,9 @@ def eta_phi_systematic(
     )
     dtdt_stat = remove_low_bins(dtdt_stat)
     writer.add_systematic(
-        dtdt_stat.project("time", "mll", "pt_probe", "eta_probe"),  # , "mll"),
+        unrolledHist(
+            dtdt_stat.project("time", "mll", "pt_probe", "eta_probe")
+        ),  # , "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu",
         "ch_dtdt",
@@ -155,7 +158,9 @@ def eta_phi_systematic(
         groups=["prefiring_stat"],
     )
     writer.add_systematic(
-        dtst_stat.project("time", "mll", "pt_probe", "eta_probe"),  # , "mll"),
+        unrolledHist(
+            dtst_stat.project("time", "mll", "pt_probe", "eta_probe")
+        ),  # , "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu",
         "ch_dtst",
@@ -163,7 +168,9 @@ def eta_phi_systematic(
         groups=["prefiring_stat"],
     )
     writer.add_systematic(
-        stst_stat.project("time", "mll", "pt_probe", "eta_probe"),  # , "mll"),
+        unrolledHist(
+            stst_stat.project("time", "mll", "pt_probe", "eta_probe")
+        ),  # , "mll"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu",
         "ch_stst",
@@ -198,7 +205,7 @@ def get_era_vals(mc, trigger_cut, era, type_gen="pass", iso=False):
 def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
     dtdt = remove_low_bins(dtdt)
     writer.add_systematic(
-        iso.project("time", "mll", "pt_probe", "eta_probe"),
+        unrolledHist(iso.project("time", "mll", "pt_probe", "eta_probe")),
         f"{luminometer}_{syst}",
         "Zmumu",
         "ch_iso",
@@ -207,7 +214,7 @@ def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
     )
 
     writer.add_systematic(
-        dtdt.project("time", "mll", "pt_probe", "eta_probe"),
+        unrolledHist(dtdt.project("time", "mll", "pt_probe", "eta_probe")),
         f"{luminometer}_{syst}",
         "Zmumu",
         "ch_dtdt",
@@ -215,7 +222,7 @@ def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
         groups=[f"{syst}"],
     )
     writer.add_systematic(
-        dtst.project("time", "mll", "pt_probe", "eta_probe"),
+        unrolledHist(dtst.project("time", "mll", "pt_probe", "eta_probe")),
         f"{luminometer}_{syst}",
         "Zmumu",
         "ch_dtst",
@@ -223,7 +230,7 @@ def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
         groups=[f"{syst}"],
     )
     writer.add_systematic(
-        stst.project("time", "mll", "pt_probe", "eta_probe"),
+        unrolledHist(stst.project("time", "mll", "pt_probe", "eta_probe")),
         f"{luminometer}_{syst}",
         "Zmumu",
         "ch_stst",
@@ -308,10 +315,18 @@ def background_syst(
     iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
     dtdt = remove_low_bins(dtdt)
 
-    iso_proc = iso.project("time", "mll", "pt_probe", "eta_probe")  # , "mll")
-    dtdt_proc = dtdt.project("time", "mll", "pt_probe", "eta_probe")  # , "mll")
-    dtst_proc = dtst.project("time", "mll", "pt_probe", "eta_probe")  # , "mll")
-    stst_proc = stst.project("time", "mll", "pt_probe", "eta_probe")  # , "mll")
+    iso_proc = unrolledHist(
+        iso.project("time", "mll", "pt_probe", "eta_probe")
+    )  # , "mll")
+    dtdt_proc = unrolledHist(
+        dtdt.project("time", "mll", "pt_probe", "eta_probe")
+    )  # , "mll")
+    dtst_proc = unrolledHist(
+        dtst.project("time", "mll", "pt_probe", "eta_probe")
+    )  # , "mll")
+    stst_proc = unrolledHist(
+        stst.project("time", "mll", "pt_probe", "eta_probe")
+    )  # , "mll")
 
     # iso_proc = remove_low_bins(iso_proc)
 
@@ -344,7 +359,10 @@ def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
     elif len(old_hist.axes) == 8:
         org_pt_axis = old_hist.axes[6]
     else:
-        org_pt_axis = old_hist.axes[2]
+        if len(old_hist.axes) == 6 and "mll" not in old_hist.axes.name:
+            org_pt_axis = old_hist.axes[1]
+        else:
+            org_pt_axis = old_hist.axes[2]
     edges = org_pt_axis.edges
     new_pt_edges = edges[nbins:]
 
@@ -377,20 +395,45 @@ def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
         )
         new_hist.values()[...] = old_hist.values()[:, nbins:, :, nbins:, :]
 
-    elif len(old_hist.axes) == 6:  # time, mass, pt, eta, pt, eta
+    elif len(old_hist.axes) == 6:
+        if "mll" in old_hist.axes.name:  # time, mass, pt, eta, pt, eta
+            new_hist = hist.Hist(
+                old_hist.axes[0],
+                old_hist.axes[1],
+                new_pt_axis,
+                old_hist.axes[3],
+                new_pt_axis_2,
+                old_hist.axes[5],
+            )
+            new_hist.values()[...] = old_hist.values()[:, :, nbins:, :, nbins:, :]
+        elif (
+            "mll" not in old_hist.axes.name
+        ):  # eta tag, pt tag, gen_time, time, pt_probe, eta_tag
+            new_hist = hist.Hist(
+                old_hist.axes[0],
+                new_pt_axis_2,
+                old_hist.axes[2],
+                old_hist.axes[3],
+                new_pt_axis,
+                old_hist.axes[5],
+            )
+            new_hist.values()[...] = old_hist.values()[:, nbins:, :, :, nbins:, :]
+    elif (
+        len(old_hist.axes) == 7
+    ):  # eta_tag, pt_tag, gen_time, time, mll, pt_probe, eta_probe
         new_hist = hist.Hist(
             old_hist.axes[0],
-            old_hist.axes[1],
-            new_pt_axis,
-            old_hist.axes[3],
             new_pt_axis_2,
-            old_hist.axes[5],
+            old_hist.axes[2],
+            old_hist.axes[3],
+            old_hist.axes[4],
+            new_pt_axis,
+            old_hist.axes[6],
         )
-        new_hist.values()[...] = old_hist.values()[:, :, nbins:, :, nbins:, :]
+        new_hist.values()[...] = old_hist.values()[:, nbins:, :, :, :, nbins:, :]
     elif (
         len(old_hist.axes) == 8
     ):  # eta_tag, pt_eta, gen_mll, gen_time, time, mll, pt_probe, eta
-        # pdb.set_trace()
         new_hist = hist.Hist(
             old_hist.axes[0],
             new_pt_axis_2,
@@ -402,7 +445,6 @@ def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
             old_hist.axes[7],
         )
         new_hist.values()[...] = old_hist.values()[:, nbins:, :, :, :, :, nbins:, :]
-
     return new_hist
 
 
@@ -424,7 +466,6 @@ def create_variation(
     muon="tag",
     h2=False,
     var_size=0.01,
-    mass_bin=-1,  # 9,
 ):
     if h2:
         i -= 1
@@ -432,13 +473,11 @@ def create_variation(
     if muon == "probe":
         not_muon = "tag"
 
-    var = variation_hist[
-        {"gen_mll": mass_bin, "gen_time": k, f"pt_{not_muon}": i, f"eta_{not_muon}": j}
-    ]
+    var = variation_hist[{"gen_time": k, f"pt_{not_muon}": i, f"eta_{not_muon}": j}]
 
-    if muon == "tag":  # "mll",
-        var = var.project("time", "mll", f"pt_{muon}", f"eta_{muon}")
+    if muon == "tag":
+        var = var.project("time", f"pt_{muon}", f"eta_{muon}")
         var = broadcastSystHist(var, refererence_hist)
         var = multiplyHists(scaleHist(var, var_size / (nbins_total)), refererence_hist)
-        var = var.project("time", "mll", "pt_probe", "eta_probe")  # "mll",
+        var = var.project("time", "pt_probe", "eta_probe")
     return var

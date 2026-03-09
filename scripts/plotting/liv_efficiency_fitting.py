@@ -2,12 +2,9 @@ import argparse
 
 import h5py
 from uncertainty_tools import (
-    background_syst,
     create_variation,
-    eta_phi_systematic,
     get_era_vals,
     get_mc_lumis,
-    luminometer_syst,
     make_mutually_exclusive,
     make_ones_hist,
     mc_scaling,
@@ -23,7 +20,6 @@ from wums.boostHistHelpers import (
     expand_hist_by_duplicate_axis,
     multiplyHists,
     scaleHist,
-    unrolledHist,
 )
 
 parser = argparse.ArgumentParser()
@@ -31,7 +27,7 @@ args = parser.parse_args()
 
 slope_ramses = 0.0006
 slope_hfoc = 0.0007
-mass_bin = -1
+mass_bin = 9
 var_size = 0.01
 
 background_syst_names = [
@@ -70,12 +66,30 @@ dtdt_data = data_output["time_mll"].get()
 dtst_data = data_output["time_dtst"].get()
 stst_data = data_output["time_stst"].get()
 iso_data = data_output["time_iso"].get()
+nbins_mll = len(dtdt_data.axes["mll"])
 
 iso_data, dtdt_data, dtst_data, stst_data = make_mutually_exclusive(
-    iso_data, dtdt_data, dtst_data, stst_data
+    iso_data[{"mll": mass_bin}],
+    dtdt_data[{"mll": mass_bin}],
+    dtst_data[{"mll": mass_bin}],
+    stst_data[{"mll": mass_bin}],
 )
 
-time_proj_low = data_output["time_proj"].get()
+
+dtdt_data = remove_low_bins(dtdt_data)
+
+# h3_data = iso_data.project("time", "mll", "pt_probe", "eta_probe")
+# h2_data = dtdt_data.project("time", "mll", "pt_probe", "eta_probe")
+# h1_data = dtst_data.project("time", "mll", "pt_probe", "eta_probe")
+# h0_data = stst_data.project("time", "mll", "pt_probe", "eta_probe")
+
+h3_data = iso_data.project("time", "pt_probe", "eta_probe")
+h2_data = dtdt_data.project("time", "pt_probe", "eta_probe")
+h1_data = dtst_data.project("time", "pt_probe", "eta_probe")
+h0_data = stst_data.project("time", "pt_probe", "eta_probe")
+
+
+time_proj_low = data_output["time_proj"].get()[{"mll": mass_bin}]
 
 ### STABILITY
 lumi_hfoc = lumi_output["lumi_hfoc"].get()
@@ -86,6 +100,8 @@ lumi_ramses = lumi_output["lumi_ramses"].get()
 sbil_pcc = lumi_output["sbil_pcc"].get()
 count_pcc = lumi_output["count_pcc"].get()
 
+
+### these are the instantaneous luminosities
 lumi_hfoc_nom = lumi_output["lumi_in_hfoc"].get()
 lumi_pcc_nom = lumi_output["lumi_in_pcc"].get()
 lumi_ramses_nom = lumi_output["lumi_in_ramses"].get()
@@ -95,7 +111,7 @@ lumi_scaling_h = lumi_output["lumi_pre"].get()
 lumi_scaling_bg = lumi_output["lumi_post"].get()
 
 #### A COUPLE FIXED QUANTITIES
-nbins_mll = len(dtdt_data.axes["mll"])
+# nbins_mll = len(dtdt_data.axes["mll"])
 nbins_time = len(dtst_data.axes["time"])
 nbins_pt = len(dtst_data.axes["pt_probe"])
 nbins_eta = len(dtdt_data.axes["eta_probe"])
@@ -103,6 +119,7 @@ nbins_eta = len(dtdt_data.axes["eta_probe"])
 hfoc_scaling = divideHists(lumi_hfoc, lumi_hfoc_nom)
 hfoc_scaling = multiplyHists(hfoc_scaling, lumi_scaling)
 
+# lumi scaling is presumably the nominal instantaneous
 pcc_scaling = divideHists(lumi_pcc, lumi_pcc_nom)
 pcc_scaling = multiplyHists(pcc_scaling, lumi_scaling)
 
@@ -149,35 +166,35 @@ def get_corrected_mc(
     dtst_H, dtst_H_syst, dtst_H_stat = get_era_vals(MC, "dtst", "H")
     stst_H, stst_H_syst, stst_H_stat = get_era_vals(MC, "stst", "H")
     syst = [
-        iso_H_syst[{"downUpVar": 0}],
-        dtdt_H_syst[{"downUpVar": 0}],
-        dtst_H_syst[{"downUpVar": 0}],
-        stst_H_syst[{"downUpVar": 0}],
-        iso_BG_syst[{"downUpVar": 0}],
-        dtdt_BG_syst[{"downUpVar": 0}],
-        dtst_BG_syst[{"downUpVar": 0}],
-        stst_BG_syst[{"downUpVar": 0}],
+        iso_H_syst[{"downUpVar": 0, "mll": mass_bin}],
+        dtdt_H_syst[{"downUpVar": 0, "mll": mass_bin}],
+        dtst_H_syst[{"downUpVar": 0, "mll": mass_bin}],
+        stst_H_syst[{"downUpVar": 0, "mll": mass_bin}],
+        iso_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
+        dtdt_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
+        dtst_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
+        stst_BG_syst[{"downUpVar": 0, "mll": mass_bin}],
     ]
     stat = [
-        iso_H_stat[{"downUpVar": 0}],
-        dtdt_H_stat[{"downUpVar": 0}],
-        dtst_H_stat[{"downUpVar": 0}],
-        stst_H_stat[{"downUpVar": 0}],
-        iso_BG_stat[{"downUpVar": 0}],
-        dtdt_BG_stat[{"downUpVar": 0}],
-        dtst_BG_stat[{"downUpVar": 0}],
-        stst_BG_stat[{"downUpVar": 0}],
+        iso_H_stat[{"downUpVar": 0, "mll": mass_bin}],
+        dtdt_H_stat[{"downUpVar": 0, "mll": mass_bin}],
+        dtst_H_stat[{"downUpVar": 0, "mll": mass_bin}],
+        stst_H_stat[{"downUpVar": 0, "mll": mass_bin}],
+        iso_BG_stat[{"downUpVar": 0, "mll": mass_bin}],
+        dtdt_BG_stat[{"downUpVar": 0, "mll": mass_bin}],
+        dtst_BG_stat[{"downUpVar": 0, "mll": mass_bin}],
+        stst_BG_stat[{"downUpVar": 0, "mll": mass_bin}],
     ]
 
     prpg_all = [
-        iso_H,
-        dtdt_H,
-        dtst_H,
-        stst_H,
-        iso_BG,
-        dtdt_BG,
-        dtst_BG,
-        stst_BG,
+        iso_H[{"mll": mass_bin}],
+        dtdt_H[{"mll": mass_bin}],
+        dtst_H[{"mll": mass_bin}],
+        stst_H[{"mll": mass_bin}],
+        iso_BG[{"mll": mass_bin}],
+        dtdt_BG[{"mll": mass_bin}],
+        dtst_BG[{"mll": mass_bin}],
+        stst_BG[{"mll": mass_bin}],
     ]
 
     weightsum = results[process]["weight_sum"]
@@ -343,12 +360,13 @@ iso_ramses, dtdt_ramses, dtst_ramses, stst_ramses = ramses_stability
 
 iso_sbil_hfoc, dtdt_sbil_hfoc, dtst_sbil_hfoc, stst_sbil_hfoc = hfoc_linearity
 
+n_masked = pass_gen.project("time", "pt_probe", "eta_probe")
 
-n_masked = pass_gen.project("time", "mll", "pt_probe", "eta_probe")
+# n_masked = pass_gen.project("time", "mll", "pt_probe", "eta_probe")
 
 iso_var_nom = divideHists(
-    iso_mc.project("time", "mll", "pt_probe", "eta_probe"),
-    iso_mc.project("time", "mll", "pt_probe", "eta_probe"),
+    iso_mc.project("time", "pt_probe", "eta_probe"),
+    iso_mc.project("time", "pt_probe", "eta_probe"),
 )  ## just want this to be one
 
 dtdt_all = addHists(iso_mc, dtdt_mc)
@@ -356,119 +374,143 @@ dtst_all = addHists(dtdt_all, dtst_mc)
 stst_all = addHists(dtst_all, stst_mc)
 
 hlt_var_nom = divideHists(
-    dtdt_all.project("time", "mll", "pt_probe", "eta_probe"),
-    dtst_all.project("time", "mll", "pt_probe", "eta_probe"),
+    dtdt_all.project("time", "pt_probe", "eta_probe"),
+    dtst_all.project("time", "pt_probe", "eta_probe"),
 )
 
 id_var_nom = divideHists(
-    dtst_all.project("time", "mll", "pt_probe", "eta_probe"),
-    stst_all.project("time", "mll", "pt_probe", "eta_probe"),
+    dtst_all.project("time", "pt_probe", "eta_probe"),
+    stst_all.project("time", "pt_probe", "eta_probe"),
 )
-
 dtdt_mc = remove_low_bins(dtdt_mc)
-dtdt_data = remove_low_bins(dtdt_data)
 
-h3 = iso_mc.project("time", "mll", "pt_probe", "eta_probe")
-h2 = dtdt_mc.project("time", "mll", "pt_probe", "eta_probe")
-h1 = dtst_mc.project("time", "mll", "pt_probe", "eta_probe")
-h0 = stst_mc.project("time", "mll", "pt_probe", "eta_probe")
+# h3 = iso_mc.project("time", "mll", "pt_probe", "eta_probe")
+# h2 = dtdt_mc.project("time", "mll", "pt_probe", "eta_probe")
+# h1 = dtst_mc.project("time", "mll", "pt_probe", "eta_probe")
+# h0 = stst_mc.project("time", "mll", "pt_probe", "eta_probe")
+
+h3 = iso_mc.project("time", "pt_probe", "eta_probe")
+h2 = dtdt_mc.project("time", "pt_probe", "eta_probe")
+h1 = dtst_mc.project("time", "pt_probe", "eta_probe")
+h0 = stst_mc.project("time", "pt_probe", "eta_probe")
 
 
-h3_data = iso_data.project("time", "mll", "pt_probe", "eta_probe")
-h2_data = dtdt_data.project("time", "mll", "pt_probe", "eta_probe")
-h1_data = dtst_data.project("time", "mll", "pt_probe", "eta_probe")
-h0_data = stst_data.project("time", "mll", "pt_probe", "eta_probe")
+###################################################################
+## create the tensor
+writer = tensorwriter.TensorWriter()
+##generator channel --> MAY BE WRONG BECAUSE THIS ISN'T MUTUTALLY EXCLUSIVE
+### unrolling
+
+# n_masked_ref = unrolledHist(n_masked)
+# h3_data_unrolled = unrolledHist(h3_data)
+# h2_data_unrolled = unrolledHist(h2_data)
+# h1_data_unrolled = unrolledHist(h1_data)
+# h0_data_unrolled = unrolledHist(h0_data)
+
+# h3_unrolled = unrolledHist(h3)
+# h2_unrolled = unrolledHist(h2)
+# h1_unrolled = unrolledHist(h1)
+# h0_unrolled = unrolledHist(h0)
+# n_masked = n_masked[{"mll": 9}]
+# pass_gen = pass_gen[{"mll": 9}]
+writer.add_channel(n_masked.axes, "ch_masked", masked=True)  ## is this still correct?
+writer.add_process((divideHists(n_masked, lumi_scaling)), "Zmumu", "ch_masked")
+
+# writer.add_channel(h3_data_unrolled.axes, "ch_iso_poi")
+# writer.add_data(h3_data_unrolled, "ch_iso_poi")
+# writer.add_process(h3_unrolled, "Zmumu", "ch_iso_poi")
+
+# writer.add_channel(h2_data_unrolled.axes, "ch_dtdt_poi")
+# writer.add_data(h2_data_unrolled, "ch_dtdt_poi")
+# writer.add_process(h2_unrolled, "Zmumu", "ch_dtdt_poi")
+
+# writer.add_channel(h1_data_unrolled.axes, "ch_dtst_poi")
+# writer.add_data(h1_data_unrolled, "ch_dtst_poi")
+# writer.add_process(h1_unrolled, "Zmumu", "ch_dtst_poi")
+
+# writer.add_channel(h0_data_unrolled.axes, "ch_stst_poi")
+# writer.add_data(h0_data_unrolled, "ch_stst_poi")
+# writer.add_process(h0_unrolled, "Zmumu", "ch_stst_poi")
+
+
+# h3_data = h3_data[{"mll": mass_bin}]
+# h3 = h3[{"mll": mass_bin}]
+# h2_data = h2_data[{"mll": mass_bin}]
+# h2 = h2[{"mll": mass_bin}]
+# h1_data = h1_data[{"mll": mass_bin}]
+# h1 = h1[{"mll": mass_bin}]
+# h0_data = h0_data[{"mll": mass_bin}]
+# h0 = h0[{"mll": mass_bin}]
 
 print("begin expanding")
 
+
 iso_proj = expand_hist_by_duplicate_axes(
     h3,
-    ["time", "mll", "pt_probe", "eta_probe"],
-    ["gen_time", "gen_mll", "pt_tag", "eta_tag"],
+    ["time", "pt_probe", "eta_probe"],
+    ["gen_time", "pt_tag", "eta_tag"],
 )
 
 dtdt_prpg_proj = expand_hist_by_duplicate_axes(
     h2,
-    ["time", "mll", "pt_probe", "eta_probe"],
-    ["gen_time", "gen_mll", "pt_tag", "eta_tag"],
+    ["time", "pt_probe", "eta_probe"],
+    ["gen_time", "pt_tag", "eta_tag"],
 )
 dtst_prpg_proj = expand_hist_by_duplicate_axes(
     h1,
-    ["time", "mll", "pt_probe", "eta_probe"],
-    ["gen_time", "gen_mll", "pt_tag", "eta_tag"],
+    ["time", "pt_probe", "eta_probe"],
+    ["gen_time", "pt_tag", "eta_tag"],
 )
 stst_prpg_proj = expand_hist_by_duplicate_axes(
     h0,
-    ["time", "mll", "pt_probe", "eta_probe"],
-    ["gen_time", "gen_mll", "pt_tag", "eta_tag"],
+    ["time", "pt_probe", "eta_probe"],
+    ["gen_time", "pt_tag", "eta_tag"],
 )
 
 hlt_var_nom = expand_hist_by_duplicate_axes(
     hlt_var_nom,
-    ["time", "mll", "pt_probe", "eta_probe"],
-    ["gen_time", "gen_mll", "pt_tag", "eta_tag"],
+    ["time", "pt_probe", "eta_probe"],
+    ["gen_time", "pt_tag", "eta_tag"],
 )
 print("halfway through expanding")
 
 id_var_nom = expand_hist_by_duplicate_axes(
     id_var_nom,
-    ["time", "mll", "pt_probe", "eta_probe"],
-    ["gen_time", "gen_mll", "pt_tag", "eta_tag"],
+    ["time", "pt_probe", "eta_probe"],
+    ["gen_time", "pt_tag", "eta_tag"],
 )
 iso_var_nom = expand_hist_by_duplicate_axes(
     iso_var_nom,
-    ["time", "mll", "pt_probe", "eta_probe"],
-    ["gen_time", "gen_mll", "pt_tag", "eta_tag"],
+    ["time", "pt_probe", "eta_probe"],
+    ["gen_time", "pt_tag", "eta_tag"],
 )
 
 
-id_var_h2 = remove_low_bins(id_var_nom.copy())
+id_var_h2 = remove_low_bins(id_var_nom)
+iso_var_nom_h2 = remove_low_bins(iso_var_nom)
+hlt_var_nom_h2 = remove_low_bins(hlt_var_nom)
 
-iso_var_nom_h2 = remove_low_bins(iso_var_nom.copy())
+writer.add_channel(h3_data.axes, "ch_iso_eff")
+writer.add_data(h3_data, "ch_iso_eff")
+writer.add_process(h3, "Zmumu", "ch_iso_eff")
 
-hlt_var_nom_h2 = remove_low_bins(hlt_var_nom.copy())
+writer.add_channel(h2_data.axes, "ch_dtdt_eff")
+writer.add_data(h2_data, "ch_dtdt_eff")
+writer.add_process(h2, "Zmumu", "ch_dtdt_eff")
 
+writer.add_channel(h1_data.axes, "ch_dtst_eff")
+writer.add_data(h1_data, "ch_dtst_eff")
+writer.add_process(h1, "Zmumu", "ch_dtst_eff")
 
-###################################################################
+writer.add_channel(h0_data.axes, "ch_stst_eff")
+writer.add_data(h0_data, "ch_stst_eff")
+writer.add_process(h0, "Zmumu", "ch_stst_eff")
 
-## create the tensor
-writer = tensorwriter.TensorWriter()
-##generator channel --> MAY BE WRONG BECAUSE THIS ISN'T MUTUTALLY EXCLUSIVE
-### unrolling
-# n_masked = unrolledHist(n_masked)
-# h3_data = unrolledHist(h3_data)
-# h2_data = unrolledHist(h2_data)
-# h1_data = unrolledHist(h1_data)
-# h0_data = unrolledHist(h0_data)
-
-h3_unrolled = unrolledHist(h3)
-h2_unrolled = unrolledHist(h2)
-h1_unrolled = unrolledHist(h1)
-h0_unrolled = unrolledHist(h0)
-
-writer.add_channel(n_masked.axes, "ch_masked", masked=True)  ## is this still correct?
-writer.add_process(divideHists(n_masked, lumi_scaling), "Zmumu", "ch_masked")
-
-writer.add_channel(h3_data.axes, "ch_iso")
-writer.add_data(h3_data, "ch_iso")
-writer.add_process(h3, "Zmumu", "ch_iso")
-
-writer.add_channel(h2_data.axes, "ch_dtdt")
-writer.add_data(h2_data, "ch_dtdt")
-writer.add_process(h2, "Zmumu", "ch_dtdt")
-
-writer.add_channel(h1_data.axes, "ch_dtst")
-writer.add_data(h1_data, "ch_dtst")
-writer.add_process(h1, "Zmumu", "ch_dtst")
-
-writer.add_channel(h0_data.axes, "ch_stst")
-writer.add_data(h0_data, "ch_stst")
-writer.add_process(h0, "Zmumu", "ch_stst")
 
 pass_gen = expand_hist_by_duplicate_axis(pass_gen, "time", "gen_time")
-pass_gen = expand_hist_by_duplicate_axis(pass_gen, "mll", "gen_mll")
-nbins_h2 = (nbins_pt - 1) + nbins_eta + nbins_time + nbins_mll
-nbins_h1 = nbins_pt + nbins_eta + nbins_time + nbins_mll
+# pass_gen = expand_hist_by_duplicate_axis(pass_gen, "mll", "gen_mll")
+nbins_h2 = (nbins_pt - 1) + nbins_eta + nbins_time
+nbins_h1 = nbins_pt + nbins_eta + nbins_time
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
 
 for i in range(nbins_pt):  # pt
@@ -483,16 +525,14 @@ for i in range(nbins_pt):  # pt
 
             if i > 0:  ## we only have 1 bin beneath 25 GeV
                 #### NORMALIZATION #####
-                v2 = dtdt_prpg_proj[
-                    {"gen_mll": mass_bin, "gen_time": k, "pt_tag": i - 1, "eta_tag": j}
-                ]
+                v2 = dtdt_prpg_proj[{"gen_time": k, "pt_tag": i - 1, "eta_tag": j}]
                 var2 = addHists(v2 * var_size, h2)
 
                 writer.add_systematic(
                     var2,
                     f"n_pt{i}_eta{j}_time{k}",
                     "Zmumu",
-                    "ch_dtdt",
+                    "ch_dtdt_eff",
                     constrained=False,
                     groups=["nz"],
                 )
@@ -511,7 +551,7 @@ for i in range(nbins_pt):  # pt
                     addHists(hlt_var_total_h3, h3),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
-                    "ch_iso",
+                    "ch_iso_eff",
                     constrained=False,
                     groups=["eff_trig"],
                 )
@@ -529,7 +569,7 @@ for i in range(nbins_pt):  # pt
                     addHists(hlt_var_total_h2, h2),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
-                    "ch_dtdt",
+                    "ch_dtdt_eff",
                     constrained=False,
                     groups=["eff_trig"],
                 )
@@ -549,7 +589,7 @@ for i in range(nbins_pt):  # pt
                     addHists(hlt_var_total_h1, h1),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
-                    "ch_dtst",
+                    "ch_dtst_eff",
                     constrained=False,
                     groups=["eff_trig"],
                 )
@@ -563,7 +603,7 @@ for i in range(nbins_pt):  # pt
                     addHists(hlt_var_total_h0, h0),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
-                    "ch_stst",
+                    "ch_stst_eff",
                     constrained=False,
                     groups=["eff_trig"],
                 )
@@ -583,7 +623,7 @@ for i in range(nbins_pt):  # pt
                     addHists(id_var_total_h2, h2),
                     f"id_pt{i}_eta{j}_time{k}",
                     "Zmumu",
-                    "ch_dtdt",
+                    "ch_dtdt_eff",
                     constrained=False,
                     groups=["eff_id"],
                 )
@@ -605,22 +645,20 @@ for i in range(nbins_pt):  # pt
                     addHists(iso_var_total_h2, h2),
                     f"iso_pt{i}_eta{j}_time{k}",
                     "Zmumu",
-                    "ch_dtdt",
+                    "ch_dtdt_eff",
                     constrained=False,
                     groups=["eff_trig"],
                 )
 
             iso_var_tag_h3 = create_variation(iso_var_nom, iso_mc, i, j, k, nbins_h1)
             iso_probe_h3 = create_variation(iso_var_nom, iso_mc, i, j, k, 0, "probe")
-
             iso_probe_h3 = multiplyHists(scaleHist(iso_probe_h3, var_size), h3)
             iso_var_total_h3 = addHists(iso_var_tag_h3, iso_probe_h3)
-
             writer.add_systematic(
                 addHists(iso_var_total_h3, h3),
                 f"iso_pt{i}_eta{j}_time{k}",
                 "Zmumu",
-                "ch_iso",
+                "ch_iso_eff",
                 constrained=False,
                 groups=["eff_trig"],
             )
@@ -634,7 +672,7 @@ for i in range(nbins_pt):  # pt
                 addHists(iso_var_total_h1, h1),
                 f"iso_pt{i}_eta{j}_time{k}",
                 "Zmumu",
-                "ch_dtst",
+                "ch_dtst_eff",
                 constrained=False,
                 groups=["eff_trig"],
             )
@@ -646,7 +684,7 @@ for i in range(nbins_pt):  # pt
                 addHists(iso_var_total_h0, h0),
                 f"iso_pt{i}_eta{j}_time{k}",
                 "Zmumu",
-                "ch_stst",
+                "ch_stst_eff",
                 constrained=False,
                 groups=["eff_trig"],
             )
@@ -654,50 +692,41 @@ for i in range(nbins_pt):  # pt
             #### FOR THE LOWEST PT BIN ####
 
             ##### NORMALIZATION #####
-
-            v3 = iso_proj[
-                {"gen_mll": mass_bin, "gen_time": k, "pt_tag": i, "eta_tag": j}
-            ]
+            v3 = iso_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
             var3 = addHists(v3 * var_size, h3)
 
             writer.add_systematic(
                 var3,
                 f"n_pt{i}_eta{j}_time{k}",
                 "Zmumu",
-                "ch_iso",
+                "ch_iso_eff",
                 constrained=False,
                 groups=["nz"],
             )
 
-            v1 = dtst_prpg_proj[
-                {"gen_mll": mass_bin, "gen_time": k, "pt_tag": i, "eta_tag": j}
-            ]
+            v1 = dtst_prpg_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
             var1 = addHists(v1 * var_size, h1)
             writer.add_systematic(
                 var1,
                 f"n_pt{i}_eta{j}_time{k}",
                 "Zmumu",
-                "ch_dtst",
+                "ch_dtst_eff",
                 constrained=False,
                 groups=["nz"],
             )
 
-            v0 = stst_prpg_proj[
-                {"gen_mll": mass_bin, "gen_time": k, "pt_tag": i, "eta_tag": j}
-            ]
+            v0 = stst_prpg_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
             var0 = addHists(v0 * var_size, h0)
             writer.add_systematic(
                 var0,
                 f"n_pt{i}_eta{j}_time{k}",
                 "Zmumu",
-                "ch_stst",
+                "ch_stst_eff",
                 constrained=False,
                 groups=["nz"],
             )
             # for masked channel --> IS NOT MUTUALLY EXCLUSIVE
-            v_masked = pass_gen[
-                {"gen_mll": mass_bin, "gen_time": k, "pt_tag": i, "eta_tag": j}
-            ]
+            v_masked = pass_gen[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
             var_masked = addHists(v_masked * var_size, n_masked)
             cross_section_masked = divideHists(var_masked, lumi_scaling)
 
@@ -720,7 +749,7 @@ for i in range(nbins_pt):  # pt
                 addHists(id_var_total_h3, h3),
                 f"id_pt{i}_eta{j}_time{k}",
                 "Zmumu",
-                "ch_iso",
+                "ch_iso_eff",
                 constrained=False,
                 groups=["eff_id"],
             )
@@ -734,7 +763,7 @@ for i in range(nbins_pt):  # pt
                 addHists(id_var_total_h1, h1),
                 f"id_pt{i}_eta{j}_time{k}",
                 "Zmumu",
-                "ch_dtst",
+                "ch_dtst_eff",
                 constrained=False,
                 groups=["eff_id"],
             )
@@ -748,12 +777,12 @@ for i in range(nbins_pt):  # pt
                 addHists(id_var_total_h0, h0),
                 f"id_pt{i}_eta{j}_time{k}",
                 "Zmumu",
-                "ch_stst",
+                "ch_stst_eff",
                 constrained=False,
                 groups=["eff_id"],
             )
 
-
+"""
 for i in range(len(background_syst_names)):
     proc_name = background_proc[i]
     if proc_name == "Zmumu fail gen":
@@ -793,7 +822,7 @@ for i in range(num_etaphi):
 ### these slightly increase the statistical uncertainty but dont contribute to the stability/linearity
 
 writer.add_systematic(
-    iso_prefire.project("time", "mll", "pt_probe", "eta_probe"),
+    unrolledHist(iso_prefire.project("time", "mll", "pt_probe", "eta_probe")),
     f"prefiring_syst",
     "Zmumu",
     "ch_iso",
@@ -802,9 +831,9 @@ writer.add_systematic(
 )
 dtdt_prefire = remove_low_bins(dtdt_prefire)
 writer.add_systematic(
-    dtdt_prefire.project(
+    unrolledHist(dtdt_prefire.project(
         "time", "mll", "pt_probe", "eta_probe"
-    ),  # used to be mll as well
+    )),  # used to be mll as well
     f"prefiring_syst",
     "Zmumu",
     "ch_dtdt",
@@ -812,9 +841,9 @@ writer.add_systematic(
     groups=["prefiring_syst"],
 )
 writer.add_systematic(
-    dtst_prefire.project(
+    unrolledHist(dtst_prefire.project(
         "time", "mll", "pt_probe", "eta_probe"
-    ),  # used to be tag pt and eta
+    )),  # used to be tag pt and eta
     f"prefiring_syst",
     "Zmumu",
     "ch_dtst",
@@ -822,9 +851,9 @@ writer.add_systematic(
     groups=["prefiring_syst"],
 )
 writer.add_systematic(
-    stst_prefire.project(
+    unrolledHist(stst_prefire.project(
         "time", "mll", "pt_probe", "eta_probe"
-    ),  # used to be tag pt and eta
+    )),  # used to be tag pt and eta
     f"prefiring_syst",
     "Zmumu",
     "ch_stst",
@@ -883,6 +912,6 @@ luminometer_syst(
     stst_sbil_ramses,
     "linearity",
 )
-
-writer.write(outfolder="./", outfilename="liv")
+"""
+writer.write(outfolder="./", outfilename="liv_test")
 # writer.write(outfolder="./")

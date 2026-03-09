@@ -132,10 +132,13 @@ def luminometer_filter(df, lumi_name, filter_helper, helper):
     df_filtered = df_filtered.Define(
         f"lumival_{lumi_name}", helper, ["run", "luminosityBlock"]
     )
+
+    ###
+    ### take the luminosity measured from this detector and divide it by the fill
     df_filtered = df_filtered.Define(
         f"sbilval_{lumi_name}", f"lumival_{lumi_name}/fill_count*1/24"
     )
-
+    ## take the nominal value of the luminosity and divide it by fill
     df_filtered = df_filtered.Define(
         f"sbilval_nom_{lumi_name}", "lumival/fill_count*1/24"
     )
@@ -361,6 +364,27 @@ axis_eta = hist.axis.Variable([-2.4, -1.4, -0.7, 0, 0.7, 1.4, 2.4], name="eta_pr
 axis_eta_copy = hist.axis.Variable([-2.4, -1.4, -0.7, 0, 0.7, 1.4, 2.4], name="eta_tag")
 
 
+# axis_pt_high = hist.axis.Variable(
+#     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 80],
+#     name="pt_tag",
+# )
+
+# axis_pt_high_copy = hist.axis.Variable(
+#     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 80],
+#     name="pt_tag",
+# )
+
+# axis_pt_low = hist.axis.Variable(
+#     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 80],
+#     name="pt_probe",
+# )
+
+# axis_pt_low_copy = hist.axis.Variable(
+#     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 80],
+#     name="pt_probe",
+# )
+
+
 axis_pt_high = hist.axis.Variable(
     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80],
     name="pt_tag",
@@ -381,13 +405,20 @@ axis_pt_low_copy = hist.axis.Variable(
     name="pt_probe",
 )
 
-# [25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80]
+## REMEMBER TO SWITCH BACK TO THIS
 axis_mll = hist.axis.Variable(
     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="mll"
 )
 axis_mll_copy = hist.axis.Variable(
     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="goodLoose_mll"
 )
+# axis_mll = hist.axis.Variable(
+#     [50, 91, 120], name="mll"
+# )
+# axis_mll_copy = hist.axis.Variable(
+#     [50, 91, 120], name="goodLoose_mll"
+# )
+
 
 axis_weight = hist.axis.Regular(50, 0.5, 1, name="weight")
 
@@ -407,6 +438,7 @@ brilcalc_helper = make_timehelper(lumicsv)
 lumi_no_time = make_lumihelper(lumicsv)  # post_vfp
 lumi_bunch_helper = make_brilcalc_helper(lumicsv, idx=9, action=float)
 
+### so these should be the delivered luminosity recorded by each of them
 hfoc_helper = make_lumihelper(hfoc_csv)
 pcc_helper = make_lumihelper(pcc_csv)
 ramses_helper = make_lumihelper(ramses_csv)
@@ -559,7 +591,8 @@ def build_graph(df, dataset):
     )
 
     # if muon0 passes trigger & tight id (if muon1 passes trigger and tight id: then randomly select 0 vs 1, if muon1 fails, make it the probe), if muon0 fails make it 0
-    # ## looked through nanoaod for event number, couldnt find it. genEventcount did not work. i checked and this does evenly split it.
+    # ## looked through nan
+    # oaod for event number, couldnt find it. genEventcount did not work. i checked and this does evenly split it.
     df = mass_extraction(df, "goodLoose_", "Muon", "Muon_isGoodGlobal")
 
     df = df.Define("mu_tag", "mu_probe == 0 ? 1: 0")

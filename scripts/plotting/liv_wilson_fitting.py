@@ -2,17 +2,16 @@ import argparse
 
 import h5py
 from uncertainty_tools import (
-    all_mc_corrections,
     get_era_vals,
     get_mc_lumis,
     make_mutually_exclusive,
+    mc_scaling,
 )
 
 from rabbit import tensorwriter
 from utilities.io_tools import input_tools
 from wums.boostHistHelpers import (
     addHists,
-    unrolledHist,
 )
 
 parser = argparse.ArgumentParser()
@@ -20,7 +19,7 @@ args = parser.parse_args()
 
 
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
-file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturbo_CT18Z_N3p0LL_N2LO_Corr.hdf5"
+file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturbo_all_bins.hdf5"
 
 h5file = h5py.File(file_in_name, "r")
 results = input_tools.load_results_h5py(h5file)
@@ -63,15 +62,35 @@ lumi_hists = [lumi_scaling_h, lumi_scaling_bg]
 def get_corrected_mc(results, process, time_proj_low, lumi_hists):
     MC = results[process]["output"]
 
+    iso_BG, iso_BG_syst, iso_BG_stat = get_era_vals(MC, "pass_iso", "BG", iso=True)
     dtdt_BG, dtdt_BG_syst, dtdt_BG_stat = get_era_vals(MC, "dtdt", "BG")
     dtst_BG, dtst_BG_syst, dtst_BG_stat = get_era_vals(MC, "dtst", "BG")
     stst_BG, stst_BG_syst, stst_BG_stat = get_era_vals(MC, "stst", "BG")
-    iso_BG, iso_BG_syst, iso_BG_stat = get_era_vals(MC, "pass_iso", "BG", iso=True)
 
+    iso_H, iso_H_syst, iso_H_stat = get_era_vals(MC, "pass_iso", "H", iso=True)
     dtdt_H, dtdt_H_syst, dtdt_H_stat = get_era_vals(MC, "dtdt", "H")
     dtst_H, dtst_H_syst, dtst_H_stat = get_era_vals(MC, "dtst", "H")
     stst_H, stst_H_syst, stst_H_stat = get_era_vals(MC, "stst", "H")
-    iso_H, iso_H_syst, iso_H_stat = get_era_vals(MC, "pass_iso", "H", iso=True)
+    syst = [
+        iso_H_syst[{"downUpVar": 0}],
+        dtdt_H_syst[{"downUpVar": 0}],
+        dtst_H_syst[{"downUpVar": 0}],
+        stst_H_syst[{"downUpVar": 0}],
+        iso_BG_syst[{"downUpVar": 0}],
+        dtdt_BG_syst[{"downUpVar": 0}],
+        dtst_BG_syst[{"downUpVar": 0}],
+        stst_BG_syst[{"downUpVar": 0}],
+    ]
+    stat = [
+        iso_H_stat[{"downUpVar": 0}],
+        dtdt_H_stat[{"downUpVar": 0}],
+        dtst_H_stat[{"downUpVar": 0}],
+        stst_H_stat[{"downUpVar": 0}],
+        iso_BG_stat[{"downUpVar": 0}],
+        dtdt_BG_stat[{"downUpVar": 0}],
+        dtst_BG_stat[{"downUpVar": 0}],
+        stst_BG_stat[{"downUpVar": 0}],
+    ]
 
     prpg_all = [
         iso_H.project("mll"),
@@ -98,7 +117,7 @@ def get_corrected_mc(results, process, time_proj_low, lumi_hists):
         xsec,
     )
 
-    pass_gen = all_mc_corrections(
+    pass_gen = mc_scaling(
         pass_gen.project("mll"),
         time_proj_low,
         lumi_scaling,
@@ -107,16 +126,16 @@ def get_corrected_mc(results, process, time_proj_low, lumi_hists):
     )
 
     corrected_mc = [iso, dtdt, dtst, stst]
-
     ### will need to return all the syst and stat as well but can worry about that later
-    return corrected_mc, pass_gen
+
+    return corrected_mc, pass_gen, syst, stat
 
 
-Zmumu_mc, Zmumu_pass_gen = get_corrected_mc(
+Zmumu_mc, Zmumu_pass_gen, syst, stat = get_corrected_mc(
     results, "Zmumu_2016PostVFP", time_proj_low, lumi_hists
 )
 
-DYJets_mc, DYJets_pass_gen = get_corrected_mc(
+DYJets_mc, DYJets_pass_gen, syst, stat = get_corrected_mc(
     results, "DYJetsToMuMuMass10to50_2016PostVFP", time_proj_low, lumi_hists
 )
 
@@ -133,8 +152,13 @@ stst = addHists(Zmumu_stst, DYJets_stst)
 ###################################################################
 iso_data = iso_data.project("time", "mll")
 
-iso_unrolled = unrolledHist(iso)
-iso_data_unrolled = unrolledHist(iso_data)
+# pdb.set_trace()
+# iso_unrolled = unrolledHist(iso)
+# iso_data_unrolled = unrolledHist(iso_data)
+
+iso_unrolled = iso[{"mll": 9}]
+iso_data_unrolled = iso_data[{"mll": 9}]
+
 
 writer = tensorwriter.TensorWriter()
 writer.add_channel(iso_unrolled.axes, "ch_iso")

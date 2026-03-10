@@ -321,13 +321,13 @@ def get_corrected_mc(
     Zmumu_pass_gen,
     Zmumu_prefire,
     Zmumu_stat,
-    weightsum,
-    cross_sec,
-    pcc_stability,
-    hfoc_stability,
-    ramses_stability,
-    hfoc_linearity,
-    ramses_linearity,
+    Zmumu_weightsum,
+    Zmumu_cross_sec,
+    Zmumu_pcc_stability,
+    Zmumu_hfoc_stability,
+    Zmumu_ramses_stability,
+    Zmumu_hfoc_linearity,
+    Zmumu_ramses_linearity,
 ) = get_corrected_mc(
     results,
     "Zmumu_2016PostVFP",
@@ -340,19 +340,55 @@ def get_corrected_mc(
     ramses_sbil,
     luminometers=True,
 )
+
+### need to convert this to
 iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire = Zmumu_prefire
-
-
-iso_mc, dtdt_mc, dtst_mc, stst_mc = Zmumu_mc
+Zmumu_iso_mc, Zmumu_dtdt_mc, Zmumu_dtst_mc, Zmumu_stst_mc = Zmumu_mc
 pass_gen = Zmumu_pass_gen
 
-iso_sbil_ramses, dtdt_sbil_ramses, dtst_sbil_ramses, stst_sbil_ramses = ramses_linearity
-iso_pcc, dtdt_pcc, dtst_pcc, stst_pcc = pcc_stability
+iso_sbil_ramses, dtdt_sbil_ramses, dtst_sbil_ramses, stst_sbil_ramses = (
+    Zmumu_ramses_linearity
+)
+iso_pcc, dtdt_pcc, dtst_pcc, stst_pcc = Zmumu_pcc_stability
 
-iso_hfoc, dtdt_hfoc, dtst_hfoc, stst_hfoc = hfoc_stability
-iso_ramses, dtdt_ramses, dtst_ramses, stst_ramses = ramses_stability
+iso_hfoc, dtdt_hfoc, dtst_hfoc, stst_hfoc = Zmumu_hfoc_stability
+iso_ramses, dtdt_ramses, dtst_ramses, stst_ramses = Zmumu_ramses_stability
 
-iso_sbil_hfoc, dtdt_sbil_hfoc, dtst_sbil_hfoc, stst_sbil_hfoc = hfoc_linearity
+iso_sbil_hfoc, dtdt_sbil_hfoc, dtst_sbil_hfoc, stst_sbil_hfoc = Zmumu_hfoc_linearity
+
+(
+    DYJets_mc,
+    DYJets_pass_gen,
+    DYJets_prefire,
+    DYJets_stat,
+    DYJets_weightsum,
+    DYJets_cross_sec,
+    DYJets_pcc_stability,
+    DYJets_hfoc_stability,
+    DYJets_ramses_stability,
+    DYJets_hfoc_linearity,
+    DYJets_ramses_linearity,
+) = get_corrected_mc(
+    results,
+    "DYJetsToMuMuMass10to50_2016PostVFP",
+    time_proj_low,
+    lumi_hists,
+    pcc_scaling,
+    hfoc_scaling,
+    ramses_scaling,
+    hfoc_sbil,
+    ramses_sbil,
+    luminometers=True,
+)
+
+
+DYJets_iso_mc, DYJets_dtdt_mc, DYJets_dtst_mc, DYJets_stst_mc = DYJets_mc
+
+iso_mc = addHists(Zmumu_iso_mc, DYJets_iso_mc)
+dtdt_mc = addHists(Zmumu_dtdt_mc, DYJets_dtdt_mc)
+dtst_mc = addHists(Zmumu_dtst_mc, DYJets_dtst_mc)
+stst_mc = addHists(Zmumu_stst_mc, DYJets_stst_mc)
+
 
 n_masked = pass_gen.project("time", "mll", "pt_probe", "eta_probe")
 
@@ -389,37 +425,39 @@ writer = tensorwriter.TensorWriter()
 ### unrolling
 
 # n_masked_ref = unrolledHist(n_masked)
-# h3_data_unrolled = unrolledHist(h3_data)
-# h2_data_unrolled = unrolledHist(h2_data)
-# h1_data_unrolled = unrolledHist(h1_data)
-# h0_data_unrolled = unrolledHist(h0_data)
+h3_data_unrolled = h3_data.project("time", "mll")
+h2_data_unrolled = h2_data.project("time", "mll")
+h1_data_unrolled = h1_data.project("time", "mll")
+h0_data_unrolled = h0_data.project("time", "mll")
 
-# h3_unrolled = unrolledHist(h3)
-# h2_unrolled = unrolledHist(h2)
-# h1_unrolled = unrolledHist(h1)
-# h0_unrolled = unrolledHist(h0)
+h3_unrolled = h3.project("time", "mll")
+h2_unrolled = h2.project("time", "mll")
+h1_unrolled = h1.project("time", "mll")
+h0_unrolled = h0.project("time", "mll")
+
 n_masked = n_masked[{"mll": 9}]
 pass_gen = pass_gen[{"mll": 9}]
 
 
+### so I think these go in first
 # writer.add_channel(n_masked.axes, "ch_masked", masked=True)  ## is this still correct?
 # writer.add_process((divideHists(n_masked, lumi_scaling)), "Zmumu", "ch_masked")
 
-# writer.add_channel(h3_data_unrolled.axes, "ch_iso_poi")
-# writer.add_data(h3_data_unrolled, "ch_iso_poi")
-# writer.add_process(h3_unrolled, "Zmumu", "ch_iso_poi")
+writer.add_channel(h3_data_unrolled.axes, "ch_iso_poi")
+writer.add_data(h3_data_unrolled, "ch_iso_poi")
+writer.add_process(h3_unrolled, "Zmumu", "ch_iso_poi")
 
-# writer.add_channel(h2_data_unrolled.axes, "ch_dtdt_poi")
-# writer.add_data(h2_data_unrolled, "ch_dtdt_poi")
-# writer.add_process(h2_unrolled, "Zmumu", "ch_dtdt_poi")
+writer.add_channel(h2_data_unrolled.axes, "ch_dtdt_poi")
+writer.add_data(h2_data_unrolled, "ch_dtdt_poi")
+writer.add_process(h2_unrolled, "Zmumu", "ch_dtdt_poi")
 
-# writer.add_channel(h1_data_unrolled.axes, "ch_dtst_poi")
-# writer.add_data(h1_data_unrolled, "ch_dtst_poi")
-# writer.add_process(h1_unrolled, "Zmumu", "ch_dtst_poi")
+writer.add_channel(h1_data_unrolled.axes, "ch_dtst_poi")
+writer.add_data(h1_data_unrolled, "ch_dtst_poi")
+writer.add_process(h1_unrolled, "Zmumu", "ch_dtst_poi")
 
-# writer.add_channel(h0_data_unrolled.axes, "ch_stst_poi")
-# writer.add_data(h0_data_unrolled, "ch_stst_poi")
-# writer.add_process(h0_unrolled, "Zmumu", "ch_stst_poi")
+writer.add_channel(h0_data_unrolled.axes, "ch_stst_poi")
+writer.add_data(h0_data_unrolled, "ch_stst_poi")
+writer.add_process(h0_unrolled, "Zmumu", "ch_stst_poi")
 
 
 h3_data = h3_data[{"mll": 9}]

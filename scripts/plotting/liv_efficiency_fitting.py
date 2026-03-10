@@ -398,10 +398,12 @@ writer = tensorwriter.TensorWriter()
 # h2_unrolled = unrolledHist(h2)
 # h1_unrolled = unrolledHist(h1)
 # h0_unrolled = unrolledHist(h0)
-# n_masked = n_masked[{"mll": 9}]
-# pass_gen = pass_gen[{"mll": 9}]
-writer.add_channel(n_masked.axes, "ch_masked", masked=True)  ## is this still correct?
-writer.add_process((divideHists(n_masked, lumi_scaling)), "Zmumu", "ch_masked")
+n_masked = n_masked[{"mll": 9}]
+pass_gen = pass_gen[{"mll": 9}]
+
+
+# writer.add_channel(n_masked.axes, "ch_masked", masked=True)  ## is this still correct?
+# writer.add_process((divideHists(n_masked, lumi_scaling)), "Zmumu", "ch_masked")
 
 # writer.add_channel(h3_data_unrolled.axes, "ch_iso_poi")
 # writer.add_data(h3_data_unrolled, "ch_iso_poi")
@@ -477,7 +479,6 @@ id_var_h2 = remove_low_bins(id_var_nom)
 iso_var_nom_h2 = remove_low_bins(iso_var_nom)
 hlt_var_nom_h2 = remove_low_bins(hlt_var_nom)
 
-
 writer.add_channel(h3_data.axes, "ch_iso_eff")
 writer.add_data(h3_data, "ch_iso_eff")
 writer.add_process(h3, "Zmumu", "ch_iso_eff")
@@ -496,7 +497,6 @@ writer.add_process(h0, "Zmumu", "ch_stst_eff")
 
 
 pass_gen = expand_hist_by_duplicate_axis(pass_gen, "time", "gen_time")
-# pass_gen = expand_hist_by_duplicate_axis(pass_gen, "mll", "gen_mll")
 nbins_h2 = (nbins_pt - 1) + nbins_eta + nbins_time
 nbins_h1 = nbins_pt + nbins_eta + nbins_time
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
@@ -718,14 +718,14 @@ for i in range(0, 3):  # pt
             var_masked = addHists(v_masked * var_size, n_masked)
             cross_section_masked = divideHists(var_masked, lumi_scaling)
 
-            writer.add_systematic(
-                cross_section_masked,
-                f"n_pt{i}_eta{j}_time{k}",
-                "Zmumu",
-                "ch_masked",
-                constrained=False,
-                groups=["nz"],
-            )
+            # writer.add_systematic(
+            #     cross_section_masked,
+            #     f"n_pt{i}_eta{j}_time{k}",
+            #     "Zmumu",
+            #     "ch_masked",
+            #     constrained=False,
+            #     groups=["nz"],
+            # )
 
             ###### ID #####
             id_var_tag_h3 = create_variation(id_var_nom, iso_mc, i, j, k, nbins_h1)
@@ -901,5 +901,5 @@ luminometer_syst(
     "linearity",
 )
 """
-writer.write(outfolder="./", outfilename="liv_test")
+writer.write(outfolder="./", outfilename="liv")
 # writer.write(outfolder="./")

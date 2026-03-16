@@ -125,12 +125,21 @@ def mass_extraction(dataframe, name, root_dataype, filter_name):
 
 
 def luminometer_filter(df, lumi_name, filter_helper, helper):
-    df_filtered = df.Define(
-        f"in_{lumi_name}", filter_helper, ["run", "luminosityBlock"]
-    )
-    df_filtered = df_filtered.Filter(f"in_{lumi_name}")
+    ## in the specific luminometer, what are all the luminosity blocks
+    df = df.Define(f"in_{lumi_name}", filter_helper, ["run", "luminosityBlock"])
+    ### does this line do anything?
+    df_filtered = df.Filter(f"in_{lumi_name} and ")
+
     df_filtered = df_filtered.Define(
         f"lumival_{lumi_name}", helper, ["run", "luminosityBlock"]
+    )
+
+    df_filtered_hist = df_filtered.HistoBoost(
+        f"lumi_{lumi_name}", [axis_date], ["time", f"lumival_{lumi_name}"]
+    )
+
+    df_filtered_hist_nominal = df_filtered.HistoBoost(
+        f"lumi_in_{lumi_name}", [axis_date], ["time", "lumival"]
     )
 
     ###
@@ -145,14 +154,6 @@ def luminometer_filter(df, lumi_name, filter_helper, helper):
 
     ### histogram
     df_count_hist = df_filtered.HistoBoost(f"count_{lumi_name}", [axis_date], ["time"])
-
-    df_filtered_hist = df_filtered.HistoBoost(
-        f"lumi_{lumi_name}", [axis_date], ["time", f"lumival_{lumi_name}"]
-    )
-
-    df_filtered_hist_nominal = df_filtered.HistoBoost(
-        f"lumi_in_{lumi_name}", [axis_date], ["time", "lumival"]
-    )
 
     df_filtered_hist_sbil = df_filtered.HistoBoost(
         f"sbil_{lumi_name}", [axis_date], ["time", f"sbilval_{lumi_name}"]
@@ -364,27 +365,6 @@ axis_eta = hist.axis.Variable([-2.4, -1.4, -0.7, 0, 0.7, 1.4, 2.4], name="eta_pr
 axis_eta_copy = hist.axis.Variable([-2.4, -1.4, -0.7, 0, 0.7, 1.4, 2.4], name="eta_tag")
 
 
-# axis_pt_high = hist.axis.Variable(
-#     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 80],
-#     name="pt_tag",
-# )
-
-# axis_pt_high_copy = hist.axis.Variable(
-#     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 80],
-#     name="pt_tag",
-# )
-
-# axis_pt_low = hist.axis.Variable(
-#     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 80],
-#     name="pt_probe",
-# )
-
-# axis_pt_low_copy = hist.axis.Variable(
-#     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 80],
-#     name="pt_probe",
-# )
-
-
 axis_pt_high = hist.axis.Variable(
     [15, 25, 28, 30, 32, 34, 36, 38, 40, 42, 47, 55, 60, 65, 80],
     name="pt_tag",
@@ -412,12 +392,6 @@ axis_mll = hist.axis.Variable(
 axis_mll_copy = hist.axis.Variable(
     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="goodLoose_mll"
 )
-# axis_mll = hist.axis.Variable(
-#     [50, 91, 120], name="mll"
-# )
-# axis_mll_copy = hist.axis.Variable(
-#     [50, 91, 120], name="goodLoose_mll"
-# )
 
 
 axis_weight = hist.axis.Regular(50, 0.5, 1, name="weight")

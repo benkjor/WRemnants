@@ -7,8 +7,9 @@ from wums.boostHistHelpers import (
     divideHists,
     multiplyHists,
     scaleHist,
-    unrolledHist,
 )
+
+mass_bin = 9
 
 
 def mc_scaling(hist_in, hist_proj, lumi_scaling, weightsum, cross_sec):
@@ -139,41 +140,35 @@ def eta_phi_systematic(
         iso_stat, dtdt_stat, dtst_stat, stst_stat
     )
     writer.add_systematic(
-        unrolledHist(iso_stat.project("time", "mll", "pt_probe", "eta_probe")),  # ),
+        iso_stat[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu",
-        "ch_iso",
+        "ch_iso_eff",
         constrained=True,
         groups=["prefiring_stat"],
     )
     dtdt_stat = remove_low_bins(dtdt_stat)
     writer.add_systematic(
-        unrolledHist(
-            dtdt_stat.project("time", "mll", "pt_probe", "eta_probe")
-        ),  # , "mll"),
+        dtdt_stat[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu",
-        "ch_dtdt",
+        "ch_dtdt_eff",
         constrained=True,
         groups=["prefiring_stat"],
     )
     writer.add_systematic(
-        unrolledHist(
-            dtst_stat.project("time", "mll", "pt_probe", "eta_probe")
-        ),  # , "mll"),
+        dtst_stat.project("time", "pt_probe", "eta_probe"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu",
-        "ch_dtst",
+        "ch_dtst_eff",
         constrained=True,
         groups=["prefiring_stat"],
     )
     writer.add_systematic(
-        unrolledHist(
-            stst_stat.project("time", "mll", "pt_probe", "eta_probe")
-        ),  # , "mll"),
+        stst_stat[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu",
-        "ch_stst",
+        "ch_stst_eff",
         constrained=True,
         groups=["prefiring_stat"],
     )
@@ -205,35 +200,35 @@ def get_era_vals(mc, trigger_cut, era, type_gen="pass", iso=False):
 def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
     dtdt = remove_low_bins(dtdt)
     writer.add_systematic(
-        unrolledHist(iso.project("time", "mll", "pt_probe", "eta_probe")),
+        iso[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"{luminometer}_{syst}",
         "Zmumu",
-        "ch_iso",
+        "ch_iso_eff",
         constrained=True,
         groups=[f"{syst}"],
     )
 
     writer.add_systematic(
-        unrolledHist(dtdt.project("time", "mll", "pt_probe", "eta_probe")),
+        dtdt[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"{luminometer}_{syst}",
         "Zmumu",
-        "ch_dtdt",
+        "ch_dtdt_eff",
         constrained=True,
         groups=[f"{syst}"],
     )
     writer.add_systematic(
-        unrolledHist(dtst.project("time", "mll", "pt_probe", "eta_probe")),
+        dtst[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"{luminometer}_{syst}",
         "Zmumu",
-        "ch_dtst",
+        "ch_dtst_eff",
         constrained=True,
         groups=[f"{syst}"],
     )
     writer.add_systematic(
-        unrolledHist(stst.project("time", "mll", "pt_probe", "eta_probe")),
+        stst[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"{luminometer}_{syst}",
         "Zmumu",
-        "ch_stst",
+        "ch_stst_eff",
         constrained=True,
         groups=[f"{syst}"],
     )
@@ -249,7 +244,7 @@ def background_syst(
     proc_name,
     bkg_name,
     fail_gen=False,
-    mass_bin=-1,  # 9,
+    mass_bin=9,  # 9,
 ):
 
     MC = results[res_str]["output"]
@@ -281,15 +276,15 @@ def background_syst(
         dtst_prpg_H, _, _ = get_era_vals(MC, "dtst", "H")
         stst_prpg_H, _, _ = get_era_vals(MC, "stst", "H")
 
-    iso_H = iso_H
-    dtdt_prpg_H = dtdt_prpg_H
-    dtst_prpg_H = dtst_prpg_H
-    stst_prpg_H = stst_prpg_H
+    iso_H = iso_H[{"mll": mass_bin}]
+    dtdt_prpg_H = dtdt_prpg_H[{"mll": mass_bin}]
+    dtst_prpg_H = dtst_prpg_H[{"mll": mass_bin}]
+    stst_prpg_H = stst_prpg_H[{"mll": mass_bin}]
 
-    iso_BG = iso_BG
-    dtdt_prpg_BG = dtdt_prpg_BG
-    dtst_prpg_BG = dtst_prpg_BG
-    stst_prpg_BG = stst_prpg_BG
+    iso_BG = iso_BG[{"mll": mass_bin}]
+    dtdt_prpg_BG = dtdt_prpg_BG[{"mll": mass_bin}]
+    dtst_prpg_BG = dtst_prpg_BG[{"mll": mass_bin}]
+    stst_prpg_BG = stst_prpg_BG[{"mll": mass_bin}]
 
     prpg_all = [
         iso_H,
@@ -314,41 +309,37 @@ def background_syst(
     )
     iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
     dtdt = remove_low_bins(dtdt)
+    # pdb.set_trace()
+    iso_proc = iso.project("time", "pt_probe", "eta_probe")
+    dtdt_proc = dtdt.project("time", "pt_probe", "eta_probe")
+    dtst_proc = dtst.project("time", "pt_probe", "eta_probe")
+    stst_proc = stst.project("time", "pt_probe", "eta_probe")
 
-    iso_proc = unrolledHist(
-        iso.project("time", "mll", "pt_probe", "eta_probe")
-    )  # , "mll")
-    dtdt_proc = unrolledHist(
-        dtdt.project("time", "mll", "pt_probe", "eta_probe")
-    )  # , "mll")
-    dtst_proc = unrolledHist(
-        dtst.project("time", "mll", "pt_probe", "eta_probe")
-    )  # , "mll")
-    stst_proc = unrolledHist(
-        stst.project("time", "mll", "pt_probe", "eta_probe")
-    )  # , "mll")
+    if proc_name == "W":
+        dtdt_proc.variances()[...] = np.abs(dtdt_proc.variances())
+        dtdt_proc.values()[...] = np.abs(
+            dtdt_proc.variances()
+        )  ## there are no variances less than -0.01 so setting this as positive per kenneth's recommendation
 
-    # iso_proc = remove_low_bins(iso_proc)
-
-    writer.add_process(iso_proc, f"{proc_name}", "ch_iso", signal=False)
-    writer.add_process(dtdt_proc, f"{proc_name}", "ch_dtdt", signal=False)
-    writer.add_process(dtst_proc, f"{proc_name}", "ch_dtst", signal=False)
-    writer.add_process(stst_proc, f"{proc_name}", "ch_stst", signal=False)
+    writer.add_process(iso_proc, f"{proc_name}", "ch_iso_eff", signal=False)
+    writer.add_process(dtdt_proc, f"{proc_name}", "ch_dtdt_eff", signal=False)
+    writer.add_process(dtst_proc, f"{proc_name}", "ch_dtst_eff", signal=False)
+    writer.add_process(stst_proc, f"{proc_name}", "ch_stst_eff", signal=False)
 
     var = 1.01
-    if proc_name == "W":
+    if proc_name == "W" or "Diboson":
         var = 1.001
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_iso", var, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_iso_eff", var, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_dtdt", var, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_dtdt_eff", var, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_dtst", var, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_dtst_eff", var, groups=["bkg"]
     )
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_stst", var, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_stst_eff", var, groups=["bkg"]
     )
 
 
@@ -388,6 +379,7 @@ def make_mutually_exclusive(iso, dtdt, dtst, stst):
     dtdt_ex = addHists(dtdt, scaleHist(iso, -1))
     dtst_ex = addHists(dtst, scaleHist(dtdt, -1))
     stst_ex = addHists(stst, scaleHist(dtst, -1))
+
     return iso_ex, dtdt_ex, dtst_ex, stst_ex
 
 
@@ -416,3 +408,185 @@ def create_variation(
         var = multiplyHists(scaleHist(var, var_size / (nbins_total)), refererence_hist)
         var = var.project("time", "pt_probe", "eta_probe")
     return var
+
+
+def get_corrected_mc(
+    results,
+    process,
+    time_proj_low,
+    lumi_hists,
+    pcc_scaling,
+    hfoc_scaling,
+    ramses_scaling,
+    hfoc_sbil,
+    ramses_sbil,
+    lumi_scaling,
+    luminometers=False,
+):
+    print(process)
+    MC = results[process]["output"]
+
+    iso_BG, iso_BG_syst, iso_BG_stat = get_era_vals(MC, "pass_iso", "BG", iso=True)
+    dtdt_BG, dtdt_BG_syst, dtdt_BG_stat = get_era_vals(MC, "dtdt", "BG")
+    dtst_BG, dtst_BG_syst, dtst_BG_stat = get_era_vals(MC, "dtst", "BG")
+    stst_BG, stst_BG_syst, stst_BG_stat = get_era_vals(MC, "stst", "BG")
+
+    iso_H, iso_H_syst, iso_H_stat = get_era_vals(MC, "pass_iso", "H", iso=True)
+    dtdt_H, dtdt_H_syst, dtdt_H_stat = get_era_vals(MC, "dtdt", "H")
+    dtst_H, dtst_H_syst, dtst_H_stat = get_era_vals(MC, "dtst", "H")
+    stst_H, stst_H_syst, stst_H_stat = get_era_vals(MC, "stst", "H")
+    syst = [
+        iso_H_syst[{"downUpVar": 0}],
+        dtdt_H_syst[{"downUpVar": 0}],
+        dtst_H_syst[{"downUpVar": 0}],
+        stst_H_syst[{"downUpVar": 0}],
+        iso_BG_syst[{"downUpVar": 0}],
+        dtdt_BG_syst[{"downUpVar": 0}],
+        dtst_BG_syst[{"downUpVar": 0}],
+        stst_BG_syst[{"downUpVar": 0}],
+    ]
+    stat = [
+        iso_H_stat[{"downUpVar": 0}],
+        dtdt_H_stat[{"downUpVar": 0}],
+        dtst_H_stat[{"downUpVar": 0}],
+        stst_H_stat[{"downUpVar": 0}],
+        iso_BG_stat[{"downUpVar": 0}],
+        dtdt_BG_stat[{"downUpVar": 0}],
+        dtst_BG_stat[{"downUpVar": 0}],
+        stst_BG_stat[{"downUpVar": 0}],
+    ]
+
+    prpg_all = [
+        iso_H,
+        dtdt_H,
+        dtst_H,
+        stst_H,
+        iso_BG,
+        dtdt_BG,
+        dtst_BG,
+        stst_BG,
+    ]
+
+    weightsum = results[process]["weight_sum"]
+    xsec = results[process]["dataset"]["xsec"]
+
+    pass_gen = MC["pass_gen"].get()
+
+    iso, dtdt, dtst, stst = get_mc_lumis(
+        prpg_all,
+        time_proj_low,
+        lumi_scaling,
+        lumi_hists,
+        weightsum,
+        xsec,
+    )
+    print("through nominal corrections")
+    if luminometers:
+        ### i think the way these should work is i do it in a single mass bin then project it across all the rest?
+
+        hfoc_rescale = divideHists(hfoc_scaling, lumi_scaling)
+        iso_hfoc = multiplyHists(hfoc_rescale, iso)
+        dtdt_hfoc = multiplyHists(hfoc_rescale, dtdt)
+        dtst_hfoc = multiplyHists(hfoc_rescale, dtst)
+        stst_hfoc = multiplyHists(hfoc_rescale, stst)
+
+        print("hfoc stability")
+        pcc_rescale = divideHists(pcc_scaling, lumi_scaling)
+        iso_pcc = multiplyHists(pcc_rescale, iso)
+        dtdt_pcc = multiplyHists(pcc_rescale, dtdt)
+        dtst_pcc = multiplyHists(pcc_rescale, dtst)
+        stst_pcc = multiplyHists(pcc_rescale, stst)
+        print("pcc stability")
+
+        ramses_rescale = divideHists(ramses_scaling, lumi_scaling)
+        iso_ramses = multiplyHists(ramses_rescale, iso)
+        dtdt_ramses = multiplyHists(ramses_rescale, dtdt)
+        dtst_ramses = multiplyHists(ramses_rescale, dtst)
+        stst_ramses = multiplyHists(ramses_rescale, stst)
+        print("ramses stability")
+
+        hfoc_sbil_rescale = divideHists(hfoc_sbil, lumi_scaling)
+        iso_sbil_hfoc = multiplyHists(hfoc_sbil_rescale, iso)
+        dtdt_sbil_hfoc = multiplyHists(hfoc_sbil_rescale, dtdt)
+        dtst_sbil_hfoc = multiplyHists(hfoc_sbil_rescale, dtst)
+        stst_sbil_hfoc = multiplyHists(hfoc_sbil_rescale, stst)
+        print("hfoc linearity")
+
+        ramses_sbil_rescale = divideHists(ramses_sbil, lumi_scaling)
+        iso_sbil_ramses = multiplyHists(ramses_sbil_rescale, iso)
+        dtdt_sbil_ramses = multiplyHists(ramses_sbil_rescale, dtdt)
+        dtst_sbil_ramses = multiplyHists(ramses_sbil_rescale, dtst)
+        stst_sbil_ramses = multiplyHists(ramses_sbil_rescale, stst)
+        print("ramses linearity")
+
+        iso_pcc, dtdt_pcc, dtst_pcc, stst_pcc = make_mutually_exclusive(
+            iso_pcc, dtdt_pcc, dtst_pcc, stst_pcc
+        )
+        iso_hfoc, dtdt_hfoc, dtst_hfoc, stst_hfoc = make_mutually_exclusive(
+            iso_hfoc, dtdt_hfoc, dtst_hfoc, stst_hfoc
+        )
+        iso_sbil_hfoc, dtdt_sbil_hfoc, dtst_sbil_hfoc, stst_sbil_hfoc = (
+            make_mutually_exclusive(
+                iso_sbil_hfoc, dtdt_sbil_hfoc, dtst_sbil_hfoc, stst_sbil_hfoc
+            )
+        )
+        iso_sbil_ramses, dtdt_sbil_ramses, dtst_sbil_ramses, stst_sbil_ramses = (
+            make_mutually_exclusive(
+                iso_sbil_ramses, dtdt_sbil_ramses, dtst_sbil_ramses, stst_sbil_ramses
+            )
+        )
+
+    ### dtdt was negative from before this was all passed into a single function. need to investigate further
+    iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire = get_mc_lumis(
+        syst,
+        time_proj_low,
+        lumi_scaling,
+        lumi_hists,
+        weightsum,
+        xsec,
+    )
+    print("prefiring")
+
+    iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire = make_mutually_exclusive(
+        iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire
+    )
+
+    pass_gen = mc_scaling(
+        pass_gen,
+        time_proj_low,
+        lumi_scaling,
+        weightsum,
+        xsec,
+    )
+    iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
+    corrected_mc = [iso, dtdt, dtst, stst]
+    corrected_prefiring = [iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire]
+
+    if luminometers:
+        pcc_stability = [iso_pcc, dtdt_pcc, dtst_pcc, stst_pcc]
+        hfoc_stability = [iso_hfoc, dtdt_hfoc, dtst_hfoc, stst_hfoc]
+        ramses_stability = [iso_ramses, dtdt_ramses, dtst_ramses, stst_ramses]
+        hfoc_linearity = [iso_sbil_hfoc, dtdt_sbil_hfoc, dtst_sbil_hfoc, stst_sbil_hfoc]
+        ramses_linearity = [
+            iso_sbil_ramses,
+            dtdt_sbil_ramses,
+            dtst_sbil_ramses,
+            stst_sbil_ramses,
+        ]
+
+        return (
+            corrected_mc,
+            pass_gen,
+            corrected_prefiring,
+            stat,
+            weightsum,
+            xsec,
+            pcc_stability,
+            hfoc_stability,
+            ramses_stability,
+            hfoc_linearity,
+            ramses_linearity,
+        )
+
+    else:
+        return corrected_mc, pass_gen, corrected_prefiring, stat

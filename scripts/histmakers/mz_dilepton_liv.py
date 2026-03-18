@@ -8,6 +8,7 @@ import narf
 from narf.lumitools import (
     make_brilcalc_filter_helper,
     make_brilcalc_helper,
+    make_brilcalc_luminometer_helper,
     make_lumihelper,
 )
 from utilities import common, parsing
@@ -124,28 +125,58 @@ def mass_extraction(dataframe, name, root_dataype, filter_name):
     return new_df
 
 
-def luminometer_filter(df, lumi_name, filter_helper, helper):
+def luminometer_filter(
+    df,
+    lumi_name,
+    filter_helper,
+    helper,
+    physics_filter_helper,
+    luminometer_source_helper,
+    physics_luminometer_source_helper,
+):
     ## in the specific luminometer, what are all the luminosity blocks
-    df = df.Define(f"in_{lumi_name}", filter_helper, ["run", "luminosityBlock"])
-    ### does this line do anything?
-    df_filtered = df.Filter(f"in_{lumi_name} and ")
+    df = df.Define(f"blocks_in_{lumi_name}", filter_helper, ["run", "luminosityBlock"])
+
+    df = df.Define(
+        "blocks_in_physics", physics_filter_helper, ["run", "luminosityBlock"]
+    )
+
+    ### ideally all sources are "lumi_name"
+    df = df.Define(
+        f"source_in_{lumi_name}", luminometer_source_helper, ["run", "luminosityBlock"]
+    )
+
+    df = df.Define(
+        "source_in_physics",
+        physics_luminometer_source_helper,
+        ["run", "luminosityBlock"],
+    )
+
+    ### filters to only look at events that were recorded by that specific luminometer
+    ### yes it does because if i comment it out the code breaks. so the question is now what does it do.
+
+    # would it be that if it only wants ones from the
+    df_filtered = df.Filter(
+        f"(blocks_in_{lumi_name} && blocks_in_physics) && (blocks_in_{lumi_name} == blocks_in_physics)"
+    )
+
+    # df_filtered = df_filtered.Filter(f"source_in_physics == source_in_{lumi_name}")
 
     df_filtered = df_filtered.Define(
-        f"lumival_{lumi_name}", helper, ["run", "luminosityBlock"]
+        f"lumi_in_{lumi_name}", helper, ["run", "luminosityBlock"]
     )
 
     df_filtered_hist = df_filtered.HistoBoost(
-        f"lumi_{lumi_name}", [axis_date], ["time", f"lumival_{lumi_name}"]
+        f"lumi_{lumi_name}", [axis_date], ["time", f"lumi_in_{lumi_name}"]
     )
-
+    ### so the question now is why aren't these all 1?
     df_filtered_hist_nominal = df_filtered.HistoBoost(
-        f"lumi_in_{lumi_name}", [axis_date], ["time", "lumival"]
+        f"lumi_physics_{lumi_name}", [axis_date], ["time", "lumival"]
     )
-
     ###
     ### take the luminosity measured from this detector and divide it by the fill
     df_filtered = df_filtered.Define(
-        f"sbilval_{lumi_name}", f"lumival_{lumi_name}/fill_count*1/24"
+        f"sbilval_{lumi_name}", f"lumi_in_{lumi_name}/fill_count*1/24"
     )
     ## take the nominal value of the luminosity and divide it by fill
     df_filtered = df_filtered.Define(
@@ -417,13 +448,27 @@ hfoc_helper = make_lumihelper(hfoc_csv)
 pcc_helper = make_lumihelper(pcc_csv)
 ramses_helper = make_lumihelper(ramses_csv)
 
-hfoc_bunch_helper = make_brilcalc_helper(hfoc_csv, idx=9, action=float)
-pcc_bunch_helper = make_brilcalc_helper(pcc_csv, idx=9, action=float)
-ramses_bunch_helper = make_brilcalc_helper(ramses_csv, idx=9, action=float)
+# hfoc_bunch_helper = make_brilcalc_helper(hfoc_csv, idx = 9, action=float)
+# pcc_bunch_helper = make_brilcalc_helper(pcc_csv, idx = 9, action=float)
+# ramses_bunch_helper = make_brilcalc_helper(ramses_csv, idx = 9,action=float)
 
 hfoc_filter_helper = make_brilcalc_filter_helper(hfoc_csv)
 pcc_filter_helper = make_brilcalc_filter_helper(pcc_csv)
 ramses_filter_helper = make_brilcalc_filter_helper(ramses_csv)
+physics_filter_helper = make_brilcalc_filter_helper(lumicsv)
+
+physics_luminometer_source_helper = make_brilcalc_luminometer_helper(
+    lumicsv, idx=8, action=str
+)
+hfoc_luminometer_source_helper = make_brilcalc_luminometer_helper(
+    hfoc_csv, idx=8, action=str
+)
+ramses_luminometer_source_helper = make_brilcalc_luminometer_helper(
+    ramses_csv, idx=8, action=str
+)
+pcc_luminometer_source_helper = make_brilcalc_luminometer_helper(
+    pcc_csv, idx=8, action=str
+)
 
 
 ## make the two sets of prefiring helpers for each port of the data
@@ -470,13 +515,37 @@ def build_graph_lumi(df, dataset):
     hist_lumi_pre = df_B.HistoBoost("lumi_pre", [axis_date], ["time", "lumival"])
 
     hist_hfoc_filtered, hist_nominal_in_hfoc_filtered, hist_hfoc_count = (
-        luminometer_filter(df, "hfoc", hfoc_filter_helper, hfoc_helper)
+        luminometer_filter(
+            df,
+            "hfoc",
+            hfoc_filter_helper,
+            hfoc_helper,
+            physics_filter_helper,
+            hfoc_luminometer_source_helper,
+            physics_luminometer_source_helper,
+        )
     )
     hist_pcc_filtered, hist_nominal_in_pcc_filtered, hist_pcc_count, hist_pcc_sbil = (
-        luminometer_filter(df, "pcc", pcc_filter_helper, pcc_helper)
+        luminometer_filter(
+            df,
+            "pcc",
+            pcc_filter_helper,
+            pcc_helper,
+            physics_filter_helper,
+            pcc_luminometer_source_helper,
+            physics_luminometer_source_helper,
+        )
     )
     hist_ramses_filtered, hist_nominal_in_ramses_filtered, hist_ramses_count = (
-        luminometer_filter(df, "ramses", ramses_filter_helper, ramses_helper)
+        luminometer_filter(
+            df,
+            "ramses",
+            ramses_filter_helper,
+            ramses_helper,
+            physics_filter_helper,
+            ramses_luminometer_source_helper,
+            physics_luminometer_source_helper,
+        )
     )
 
     results = [

@@ -233,6 +233,15 @@ def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
         groups=[f"{syst}"],
     )
 
+    writer.add_systematic(
+        iso.project("time", "mll"),
+        f"{luminometer}_{syst}",
+        "Zmumu",
+        "ch_iso_poi",
+        constrained=True,
+        groups=[f"{syst}"],
+    )
+
 
 def background_syst(
     writer,
@@ -244,7 +253,7 @@ def background_syst(
     proc_name,
     bkg_name,
     fail_gen=False,
-    mass_bin=9,  # 9,
+    mass_bin=mass_bin,
 ):
 
     MC = results[res_str]["output"]
@@ -309,7 +318,18 @@ def background_syst(
     )
     iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
     dtdt = remove_low_bins(dtdt)
-    # pdb.set_trace()
+
+    iso_poi = iso.project("time", "mll")
+    writer.add_process(iso_poi, f"{proc_name}", "ch_iso_poi", signal=False)
+
+    var = 1.01
+    if proc_name == "W" or "Diboson":
+        var = 1.001
+    writer.add_norm_systematic(
+        f"{bkg_name}", f"{proc_name}", "ch_iso_poi", var, groups=["bkg"]
+    )
+
+    ##### in efficiency channels ####
     iso_proc = iso.project("time", "pt_probe", "eta_probe")
     dtdt_proc = dtdt.project("time", "pt_probe", "eta_probe")
     dtst_proc = dtst.project("time", "pt_probe", "eta_probe")
@@ -408,6 +428,57 @@ def create_variation(
         var = multiplyHists(scaleHist(var, var_size / (nbins_total)), refererence_hist)
         var = var.project("time", "pt_probe", "eta_probe")
     return var
+
+
+def prefiring_syst(writer, iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire):
+    writer.add_systematic(
+        iso_prefire[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
+        f"prefiring_syst",
+        "Zmumu",
+        "ch_iso_eff",
+        constrained=True,
+        groups=["prefiring_syst"],
+    )
+    dtdt_prefire = remove_low_bins(dtdt_prefire)
+    writer.add_systematic(
+        dtdt_prefire[{"mll": mass_bin}].project(
+            "time", "pt_probe", "eta_probe"
+        ),  # used to be mll as well
+        f"prefiring_syst",
+        "Zmumu",
+        "ch_dtdt_eff",
+        constrained=True,
+        groups=["prefiring_syst"],
+    )
+    writer.add_systematic(
+        dtst_prefire[{"mll": mass_bin}].project(
+            "time", "pt_probe", "eta_probe"
+        ),  # used to be tag pt and eta
+        f"prefiring_syst",
+        "Zmumu",
+        "ch_dtst_eff",
+        constrained=True,
+        groups=["prefiring_syst"],
+    )
+    writer.add_systematic(
+        stst_prefire[{"mll": mass_bin}].project(
+            "time", "pt_probe", "eta_probe"
+        ),  # used to be tag pt and eta
+        f"prefiring_syst",
+        "Zmumu",
+        "ch_stst_eff",
+        constrained=True,
+        groups=["prefiring_syst"],
+    )
+
+    writer.add_systematic(
+        iso_prefire.project("time", "mll"),
+        f"prefiring_syst",
+        "Zmumu",
+        "ch_iso_poi",
+        constrained=True,
+        groups=["prefiring_syst"],
+    )
 
 
 def get_corrected_mc(

@@ -8,7 +8,6 @@ import narf
 from narf.lumitools import (
     make_brilcalc_filter_helper,
     make_brilcalc_helper,
-    make_brilcalc_luminometer_helper,
     make_lumihelper,
 )
 from utilities import common, parsing
@@ -131,8 +130,6 @@ def luminometer_filter(
     filter_helper,
     helper,
     physics_filter_helper,
-    luminometer_source_helper,
-    physics_luminometer_source_helper,
 ):
     ## in the specific luminometer, what are all the luminosity blocks
     df = df.Define(f"blocks_in_{lumi_name}", filter_helper, ["run", "luminosityBlock"])
@@ -140,27 +137,10 @@ def luminometer_filter(
     df = df.Define(
         "blocks_in_physics", physics_filter_helper, ["run", "luminosityBlock"]
     )
-
-    ### ideally all sources are "lumi_name"
-    df = df.Define(
-        f"source_in_{lumi_name}", luminometer_source_helper, ["run", "luminosityBlock"]
-    )
-
-    df = df.Define(
-        "source_in_physics",
-        physics_luminometer_source_helper,
-        ["run", "luminosityBlock"],
-    )
-
-    ### filters to only look at events that were recorded by that specific luminometer
-    ### yes it does because if i comment it out the code breaks. so the question is now what does it do.
-
-    # would it be that if it only wants ones from the
+    ### filters to only look at events that were recorded by that specific luminometer. allows any luminometer to be be in that run:fill in PHYSICS
     df_filtered = df.Filter(
         f"(blocks_in_{lumi_name} && blocks_in_physics) && (blocks_in_{lumi_name} == blocks_in_physics)"
     )
-
-    # df_filtered = df_filtered.Filter(f"source_in_physics == source_in_{lumi_name}")
 
     df_filtered = df_filtered.Define(
         f"lumi_in_{lumi_name}", helper, ["run", "luminosityBlock"]
@@ -169,7 +149,7 @@ def luminometer_filter(
     df_filtered_hist = df_filtered.HistoBoost(
         f"lumi_{lumi_name}", [axis_date], ["time", f"lumi_in_{lumi_name}"]
     )
-    ### so the question now is why aren't these all 1?
+    ### so the question now is why aren't these all 1? does ramses regularly read a higher value?
     df_filtered_hist_nominal = df_filtered.HistoBoost(
         f"lumi_physics_{lumi_name}", [axis_date], ["time", "lumival"]
     )
@@ -448,27 +428,10 @@ hfoc_helper = make_lumihelper(hfoc_csv)
 pcc_helper = make_lumihelper(pcc_csv)
 ramses_helper = make_lumihelper(ramses_csv)
 
-# hfoc_bunch_helper = make_brilcalc_helper(hfoc_csv, idx = 9, action=float)
-# pcc_bunch_helper = make_brilcalc_helper(pcc_csv, idx = 9, action=float)
-# ramses_bunch_helper = make_brilcalc_helper(ramses_csv, idx = 9,action=float)
-
 hfoc_filter_helper = make_brilcalc_filter_helper(hfoc_csv)
 pcc_filter_helper = make_brilcalc_filter_helper(pcc_csv)
 ramses_filter_helper = make_brilcalc_filter_helper(ramses_csv)
 physics_filter_helper = make_brilcalc_filter_helper(lumicsv)
-
-physics_luminometer_source_helper = make_brilcalc_luminometer_helper(
-    lumicsv, idx=8, action=str
-)
-hfoc_luminometer_source_helper = make_brilcalc_luminometer_helper(
-    hfoc_csv, idx=8, action=str
-)
-ramses_luminometer_source_helper = make_brilcalc_luminometer_helper(
-    ramses_csv, idx=8, action=str
-)
-pcc_luminometer_source_helper = make_brilcalc_luminometer_helper(
-    pcc_csv, idx=8, action=str
-)
 
 
 ## make the two sets of prefiring helpers for each port of the data
@@ -521,8 +484,6 @@ def build_graph_lumi(df, dataset):
             hfoc_filter_helper,
             hfoc_helper,
             physics_filter_helper,
-            hfoc_luminometer_source_helper,
-            physics_luminometer_source_helper,
         )
     )
     hist_pcc_filtered, hist_nominal_in_pcc_filtered, hist_pcc_count, hist_pcc_sbil = (
@@ -532,8 +493,6 @@ def build_graph_lumi(df, dataset):
             pcc_filter_helper,
             pcc_helper,
             physics_filter_helper,
-            pcc_luminometer_source_helper,
-            physics_luminometer_source_helper,
         )
     )
     hist_ramses_filtered, hist_nominal_in_ramses_filtered, hist_ramses_count = (
@@ -543,8 +502,6 @@ def build_graph_lumi(df, dataset):
             ramses_filter_helper,
             ramses_helper,
             physics_filter_helper,
-            ramses_luminometer_source_helper,
-            physics_luminometer_source_helper,
         )
     )
 
@@ -616,7 +573,7 @@ def build_graph(df, dataset):
     df_positive = df.Filter(
         "Sum(Muon_isGoodGlobal) > 0 "
     )  ## just so i can count how many are in each
-    df_positive = df_positive.Define("Muon_isPositive", "Muon_charge == -1")
+    df_positive = df_positive.Define("Muon_isPositive", "Muon_charge == 1")
 
     df = df.Filter("Sum(Muon_isGoodGlobal) == 2")
     df = df.Filter(
@@ -672,6 +629,7 @@ def build_graph(df, dataset):
         )
 
         df_positive = theory_tools.define_postfsr_vars(df_positive)
+        ### positive stuff is just for comparison with mw efficincies
         df_positive = df_positive.Define(
             "reco_scalefactor_weight",
             muon_reco_efficiency_helper,

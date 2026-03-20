@@ -423,10 +423,10 @@ def create_variation(
     var = variation_hist[{"gen_time": k, f"pt_{not_muon}": i, f"eta_{not_muon}": j}]
 
     if muon == "tag":
-        var = var.project("time", f"pt_{muon}", f"eta_{muon}")
+        var = var.project("time", "mll", f"pt_{muon}", f"eta_{muon}")
         var = broadcastSystHist(var, refererence_hist)
         var = multiplyHists(scaleHist(var, var_size / (nbins_total)), refererence_hist)
-        var = var.project("time", "pt_probe", "eta_probe")
+        var = var.project("time", "mll", "pt_probe", "eta_probe")
     return var
 
 
@@ -441,9 +441,7 @@ def prefiring_syst(writer, iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire
     )
     dtdt_prefire = remove_low_bins(dtdt_prefire)
     writer.add_systematic(
-        dtdt_prefire[{"mll": mass_bin}].project(
-            "time", "pt_probe", "eta_probe"
-        ),  # used to be mll as well
+        dtdt_prefire[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"prefiring_syst",
         "Zmumu",
         "ch_dtdt_eff",
@@ -451,9 +449,7 @@ def prefiring_syst(writer, iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire
         groups=["prefiring_syst"],
     )
     writer.add_systematic(
-        dtst_prefire[{"mll": mass_bin}].project(
-            "time", "pt_probe", "eta_probe"
-        ),  # used to be tag pt and eta
+        dtst_prefire[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"prefiring_syst",
         "Zmumu",
         "ch_dtst_eff",

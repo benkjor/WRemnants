@@ -214,8 +214,8 @@ stst_mc = addHists(Zmumu_stst_mc, DYJets_stst_mc)
 n_masked = pass_gen.project("time", "mll", "pt_probe", "eta_probe")
 
 iso_eff_var = divideHists(
-    iso_mc.project("time", "pt_probe", "eta_probe"),
-    iso_mc.project("time", "pt_probe", "eta_probe"),
+    iso_mc.project("time", "mll", "pt_probe", "eta_probe"),
+    iso_mc.project("time", "mll", "pt_probe", "eta_probe"),
 )  ## just want this to be one
 
 dtdt_all = addHists(iso_mc, dtdt_mc)
@@ -223,13 +223,13 @@ dtst_all = addHists(dtdt_all, dtst_mc)
 stst_all = addHists(dtst_all, stst_mc)
 
 hlt_eff_var = divideHists(
-    dtdt_all.project("time", "pt_probe", "eta_probe"),
-    dtst_all.project("time", "pt_probe", "eta_probe"),
+    dtdt_all.project("time", "mll", "pt_probe", "eta_probe"),
+    dtst_all.project("time", "mll", "pt_probe", "eta_probe"),
 )
 
 id_eff_var = divideHists(
-    dtst_all.project("time", "pt_probe", "eta_probe"),
-    stst_all.project("time", "pt_probe", "eta_probe"),
+    dtst_all.project("time", "mll", "pt_probe", "eta_probe"),
+    stst_all.project("time", "mll", "pt_probe", "eta_probe"),
 )
 dtdt_mc = remove_low_bins(dtdt_mc)
 
@@ -281,14 +281,25 @@ writer.add_data(h0_data_unrolled, "ch_stst_poi")
 writer.add_process(h0_unrolled, "Zmumu", "ch_stst_poi", signal=True)
 
 
-h3_data_eff = h3_data[{"mll": mass_bin}]
-h3_mc_eff = h3[{"mll": mass_bin}]
-h2_data_eff = h2_data[{"mll": mass_bin}]
-h2_mc_eff = h2[{"mll": mass_bin}]
-h1_data_eff = h1_data[{"mll": mass_bin}]
-h1_mc_eff = h1[{"mll": mass_bin}]
-h0_data_eff = h0_data[{"mll": mass_bin}]
-h0_mc_eff = h0[{"mll": mass_bin}]
+h3_data_central = h3_data[{"mll": mass_bin}]
+h3_mc_central = h3[{"mll": mass_bin}]
+h2_data_central = h2_data[{"mll": mass_bin}]
+h2_mc_central = h2[{"mll": mass_bin}]
+h1_data_central = h1_data[{"mll": mass_bin}]
+h1_mc_central = h1[{"mll": mass_bin}]
+h0_data_central = h0_data[{"mll": mass_bin}]
+h0_mc_central = h0[{"mll": mass_bin}]
+
+
+h3_data_eff = h3_data
+h3_mc_eff = h3
+h2_data_eff = h2_data
+h2_mc_eff = h2
+h1_data_eff = h1_data
+h1_mc_eff = h1
+h0_data_eff = h0_data
+h0_mc_eff = h0
+
 
 print("begin expanding")
 
@@ -336,28 +347,27 @@ id_eff_var_dtdt = remove_low_bins(id_eff_var)
 iso_eff_var_dtdt = remove_low_bins(iso_eff_var)
 hlt_eff_var_dtdt = remove_low_bins(hlt_eff_var)
 
-writer.add_channel(h3_data_eff.axes, "ch_iso_eff")
-writer.add_data(h3_data_eff, "ch_iso_eff")
-writer.add_process(h3_mc_eff, "Zmumu", "ch_iso_eff", signal=True)
+writer.add_channel(h3_data_central.axes, "ch_iso_eff")
+writer.add_data(h3_data_central, "ch_iso_eff")
+writer.add_process(h3_mc_central, "Zmumu", "ch_iso_eff", signal=True)
 
-writer.add_channel(h2_data_eff.axes, "ch_dtdt_eff")
-writer.add_data(h2_data_eff, "ch_dtdt_eff")
-writer.add_process(h2_mc_eff, "Zmumu", "ch_dtdt_eff", signal=True)
+writer.add_channel(h2_data_central.axes, "ch_dtdt_eff")
+writer.add_data(h2_data_central, "ch_dtdt_eff")
+writer.add_process(h2_mc_central, "Zmumu", "ch_dtdt_eff", signal=True)
 
-writer.add_channel(h1_data_eff.axes, "ch_dtst_eff")
-writer.add_data(h1_data_eff, "ch_dtst_eff")
-writer.add_process(h1_mc_eff, "Zmumu", "ch_dtst_eff", signal=True)
+writer.add_channel(h1_data_central.axes, "ch_dtst_eff")
+writer.add_data(h1_data_central, "ch_dtst_eff")
+writer.add_process(h1_mc_central, "Zmumu", "ch_dtst_eff", signal=True)
 
-writer.add_channel(h0_data_eff.axes, "ch_stst_eff")
-writer.add_data(h0_data_eff, "ch_stst_eff")
-writer.add_process(h0_mc_eff, "Zmumu", "ch_stst_eff", signal=True)
+writer.add_channel(h0_data_central.axes, "ch_stst_eff")
+writer.add_data(h0_data_central, "ch_stst_eff")
+writer.add_process(h0_mc_central, "Zmumu", "ch_stst_eff", signal=True)
 
 
 pass_gen = expand_hist_by_duplicate_axis(pass_gen, "time", "gen_time")
 nbins_dtdt = (nbins_pt - 1) + nbins_eta + nbins_time
 nbins_h1 = nbins_pt + nbins_eta + nbins_time
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
-
 
 ############### EFFICIENCY LOOP ##################
 # for i in range(nbins_pt):  # pt
@@ -372,12 +382,13 @@ for i in range(0, 2):  # pt
 
             if i > 0:  ## we only have 1 bin beneath 25 GeV
                 #### NORMALIZATION #####
+                # for l in range(nbins_mll):
                 v2 = dtdt_eff_proj[{"gen_time": k, "pt_tag": i - 1, "eta_tag": j}]
                 var2 = addHists(v2 * var_size, h2_mc_eff)
 
                 writer.add_systematic(
-                    var2,
-                    f"n_pt{i}_eta{j}_time{k}",
+                    var2[{"mll": mass_bin}],
+                    f"n_pt{i}_eta{j}_time{k}_mll{mass_bin}",
                     "Zmumu",
                     "ch_dtdt_eff",
                     constrained=False,
@@ -397,7 +408,10 @@ for i in range(0, 2):  # pt
                 hlt_var_total_h3 = addHists(hlt_var_tag_h3, hlt_probe_h3)
 
                 writer.add_systematic(
-                    addHists(hlt_var_total_h3, h3_mc_eff),
+                    addHists(
+                        hlt_var_total_h3[{"mll": mass_bin}],
+                        h3_mc_eff[{"mll": mass_bin}],
+                    ),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_iso_eff",
@@ -417,7 +431,10 @@ for i in range(0, 2):  # pt
                 hlt_var_total_h2 = scaleHist(addHists(hlt_var_tag_h2, hlt_probe_h2), 2)
 
                 writer.add_systematic(
-                    addHists(hlt_var_total_h2, h2_mc_eff),
+                    addHists(
+                        hlt_var_total_h2[{"mll": mass_bin}],
+                        h2_mc_eff[{"mll": mass_bin}],
+                    ),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_dtdt_eff",
@@ -439,7 +456,10 @@ for i in range(0, 2):  # pt
                 )
 
                 writer.add_systematic(
-                    addHists(hlt_var_total_h1, h1_mc_eff),
+                    addHists(
+                        hlt_var_total_h1[{"mll": mass_bin}],
+                        h1_mc_eff[{"mll": mass_bin}],
+                    ),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_dtst_eff",
@@ -453,7 +473,10 @@ for i in range(0, 2):  # pt
                 hlt_var_total_h0 = 2 * hlt_var_tag_h0
 
                 writer.add_systematic(
-                    addHists(hlt_var_total_h0, h0_mc_eff),
+                    addHists(
+                        hlt_var_total_h0[{"mll": mass_bin}],
+                        h0_mc_eff[{"mll": mass_bin}],
+                    ),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_stst_eff",
@@ -473,7 +496,9 @@ for i in range(0, 2):  # pt
                 id_var_total_h2 = addHists(id_var_tag_h2, id_probe_h2)
 
                 writer.add_systematic(
-                    addHists(id_var_total_h2, h2_mc_eff),
+                    addHists(
+                        id_var_total_h2[{"mll": mass_bin}], h2_mc_eff[{"mll": mass_bin}]
+                    ),
                     f"id_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_dtdt_eff",
@@ -497,7 +522,10 @@ for i in range(0, 2):  # pt
                 )
 
                 writer.add_systematic(
-                    addHists(iso_var_total_h2, h2_mc_eff),
+                    addHists(
+                        iso_var_total_h2[{"mll": mass_bin}],
+                        h2_mc_eff[{"mll": mass_bin}],
+                    ),
                     f"iso_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_dtdt_eff",
@@ -509,8 +537,11 @@ for i in range(0, 2):  # pt
             iso_probe_h3 = create_variation(iso_eff_var, iso_mc, i, j, k, 0, "probe")
             iso_probe_h3 = multiplyHists(scaleHist(iso_probe_h3, var_size), h3_mc_eff)
             iso_var_total_h3 = addHists(iso_var_tag_h3, iso_probe_h3)
+
             writer.add_systematic(
-                addHists(iso_var_total_h3, h3_mc_eff),
+                addHists(
+                    iso_var_total_h3[{"mll": mass_bin}], h3_mc_eff[{"mll": mass_bin}]
+                ),
                 f"iso_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_iso_eff",
@@ -524,7 +555,9 @@ for i in range(0, 2):  # pt
             iso_var_total_h1 = scaleHist(addHists(iso_var_tag_h1, -1 * iso_probe_h1), 2)
 
             writer.add_systematic(
-                addHists(iso_var_total_h1, h1_mc_eff),
+                addHists(
+                    iso_var_total_h1[{"mll": mass_bin}], h1_mc_eff[{"mll": mass_bin}]
+                ),
                 f"iso_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_dtst_eff",
@@ -534,9 +567,10 @@ for i in range(0, 2):  # pt
 
             iso_var_tag_h0 = create_variation(iso_eff_var, stst_mc, i, j, k, nbins_h1)
             iso_var_total_h0 = 2 * iso_var_tag_h0
-
             writer.add_systematic(
-                addHists(iso_var_total_h0, h0_mc_eff),
+                addHists(
+                    iso_var_total_h0[{"mll": mass_bin}], h0_mc_eff[{"mll": mass_bin}]
+                ),
                 f"iso_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_stst_eff",
@@ -551,8 +585,8 @@ for i in range(0, 2):  # pt
             var3 = addHists(v3 * var_size, h3_mc_eff)
 
             writer.add_systematic(
-                var3,
-                f"n_pt{i}_eta{j}_time{k}",
+                var3[{"mll": mass_bin}],
+                f"n_pt{i}_eta{j}_time{k}_mll{mass_bin}",
                 "Zmumu",
                 "ch_iso_eff",
                 constrained=False,
@@ -562,8 +596,8 @@ for i in range(0, 2):  # pt
             v1 = dtst_eff_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
             var1 = addHists(v1 * var_size, h1_mc_eff)
             writer.add_systematic(
-                var1,
-                f"n_pt{i}_eta{j}_time{k}",
+                var1[{"mll": mass_bin}],
+                f"n_pt{i}_eta{j}_time{k}_mll{mass_bin}",
                 "Zmumu",
                 "ch_dtst_eff",
                 constrained=False,
@@ -573,8 +607,8 @@ for i in range(0, 2):  # pt
             v0 = stst_eff_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
             var0 = addHists(v0 * var_size, h0_mc_eff)
             writer.add_systematic(
-                var0,
-                f"n_pt{i}_eta{j}_time{k}",
+                var0[{"mll": mass_bin}],
+                f"n_pt{i}_eta{j}_time{k}_mll{mass_bin}",
                 "Zmumu",
                 "ch_stst_eff",
                 constrained=False,
@@ -601,7 +635,9 @@ for i in range(0, 2):  # pt
             id_var_total_h3 = scaleHist(addHists(id_var_tag_h3, id_probe_h3), 1 / 2)
 
             writer.add_systematic(
-                addHists(id_var_total_h3, h3_mc_eff),
+                addHists(
+                    id_var_total_h3[{"mll": mass_bin}], h3_mc_eff[{"mll": mass_bin}]
+                ),
                 f"id_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_iso_eff",
@@ -615,7 +651,9 @@ for i in range(0, 2):  # pt
             id_var_total_h1 = addHists(id_var_tag_h1, id_probe_h1)
 
             writer.add_systematic(
-                addHists(id_var_total_h1, h1_mc_eff),
+                addHists(
+                    id_var_total_h1[{"mll": mass_bin}], h1_mc_eff[{"mll": mass_bin}]
+                ),
                 f"id_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_dtst_eff",
@@ -629,27 +667,15 @@ for i in range(0, 2):  # pt
             id_var_total_h0 = addHists(id_var_tag_h0, -1 * id_probe_h0)
 
             writer.add_systematic(
-                addHists(id_var_total_h0, h0_mc_eff),
+                addHists(
+                    id_var_total_h0[{"mll": mass_bin}], h0_mc_eff[{"mll": mass_bin}]
+                ),
                 f"id_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_stst_eff",
                 constrained=False,
                 groups=["eff_id"],
             )
-
-
-for i in range(nbins_mll):
-    v2 = dtdt_eff_proj[{"gen_time": k, "pt_tag": i - 1, "eta_tag": j}]
-    var2 = addHists(v2 * var_size, h2_mc_eff)
-
-    writer.add_systematic(
-        var2,
-        f"n_pt{i}_eta{j}_time{k}",
-        "Zmumu",
-        "ch_dtdt_eff",
-        constrained=False,
-        groups=["nz"],
-    )
 
 
 for i in range(len(background_syst_names)):

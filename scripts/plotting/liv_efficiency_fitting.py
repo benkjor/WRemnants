@@ -263,23 +263,9 @@ pass_gen = pass_gen[{"mll": mass_bin}]
 ### so I think these go in first
 # writer.add_channel(n_masked.axes, "ch_masked", masked=True)  ## is this still correct?
 # writer.add_process((divideHists(n_masked, lumi_scaling)), "Zmumu", "ch_masked")
-
 writer.add_channel(h3_data_unrolled.axes, "ch_iso_poi")
 writer.add_data(h3_data_unrolled, "ch_iso_poi")
 writer.add_process(h3_unrolled, "Zmumu", "ch_iso_poi", signal=True)
-
-writer.add_channel(h2_data_unrolled.axes, "ch_dtdt_poi")
-writer.add_data(h2_data_unrolled, "ch_dtdt_poi")
-writer.add_process(h2_unrolled, "Zmumu", "ch_dtdt_poi", signal=True)
-
-writer.add_channel(h1_data_unrolled.axes, "ch_dtst_poi")
-writer.add_data(h1_data_unrolled, "ch_dtst_poi")
-writer.add_process(h1_unrolled, "Zmumu", "ch_dtst_poi", signal=True)
-
-writer.add_channel(h0_data_unrolled.axes, "ch_stst_poi")
-writer.add_data(h0_data_unrolled, "ch_stst_poi")
-writer.add_process(h0_unrolled, "Zmumu", "ch_stst_poi", signal=True)
-
 
 h3_data_central = h3_data[{"mll": mass_bin}]
 h3_mc_central = h3[{"mll": mass_bin}]
@@ -370,25 +356,25 @@ nbins_h1 = nbins_pt + nbins_eta + nbins_time
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
 
 ############### EFFICIENCY LOOP ##################
-# for i in range(nbins_pt):  # pt
-for i in range(0, 2):  # pt
+for i in range(nbins_pt):  # pt
+    # for i in range(0, 2):  # pt
     print(f"pt bin: {i}")
-    for j in range(4, 5):  # eta
-        # for j in range(nbins_eta):  # eta
+    # for j in range(4, 5):  # eta
+    for j in range(nbins_eta):  # eta
 
         print(f"eta_bin: {j}")
-        # for k in range(nbins_time):  #  time
-        for k in range(22, 23):  #  time
+        for k in range(nbins_time):  #  time
+            # for k in range(22, 23):  #  time
 
             if i > 0:  ## we only have 1 bin beneath 25 GeV
                 #### NORMALIZATION #####
-                # for l in range(nbins_mll):
+
                 v2 = dtdt_eff_proj[{"gen_time": k, "pt_tag": i - 1, "eta_tag": j}]
                 var2 = addHists(v2 * var_size, h2_mc_eff)
 
                 writer.add_systematic(
                     var2[{"mll": mass_bin}],
-                    f"n_pt{i}_eta{j}_time{k}_mll{mass_bin}",
+                    f"n_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_dtdt_eff",
                     constrained=False,
@@ -415,6 +401,18 @@ for i in range(0, 2):  # pt
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_iso_eff",
+                    constrained=False,
+                    groups=["eff_trig"],
+                )
+                ### may need to broadcast to mll instead. tbd.
+                writer.add_systematic(
+                    addHists(
+                        hlt_var_total_h3.project("time", "mll"),
+                        h3_mc_eff.project("time", "mll"),
+                    ),
+                    f"hlt_pt{i}_eta{j}_time{k}",
+                    "Zmumu",
+                    "ch_iso_poi",
                     constrained=False,
                     groups=["eff_trig"],
                 )
@@ -549,6 +547,18 @@ for i in range(0, 2):  # pt
                 groups=["eff_trig"],
             )
 
+            writer.add_systematic(
+                addHists(
+                    iso_var_total_h3.project("time", "mll"),
+                    h3_mc_eff.project("time", "mll"),
+                ),
+                f"iso_pt{i}_eta{j}_time{k}",
+                "Zmumu",
+                "ch_iso_poi",
+                constrained=False,
+                groups=["eff_trig"],
+            )
+
             iso_var_tag_h1 = create_variation(iso_eff_var, dtst_mc, i, j, k, nbins_h1)
             iso_probe_h1 = create_variation(iso_eff_var, dtst_mc, i, j, k, 0, "probe")
             iso_probe_h1 = multiplyHists(scaleHist(iso_probe_h1, var_size), h1_mc_eff)
@@ -581,39 +591,44 @@ for i in range(0, 2):  # pt
             #### FOR THE LOWEST PT BIN ####
 
             ##### NORMALIZATION #####
+            ### need to add an extra mass axis to this
+
             v3 = iso_eff_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
             var3 = addHists(v3 * var_size, h3_mc_eff)
 
+            v1 = dtst_eff_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
+            var1 = addHists(v1 * var_size, h1_mc_eff)
+
+            v0 = stst_eff_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
+            var0 = addHists(v0 * var_size, h0_mc_eff)
+
             writer.add_systematic(
                 var3[{"mll": mass_bin}],
-                f"n_pt{i}_eta{j}_time{k}_mll{mass_bin}",
+                f"n_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_iso_eff",
                 constrained=False,
                 groups=["nz"],
             )
 
-            v1 = dtst_eff_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
-            var1 = addHists(v1 * var_size, h1_mc_eff)
             writer.add_systematic(
                 var1[{"mll": mass_bin}],
-                f"n_pt{i}_eta{j}_time{k}_mll{mass_bin}",
+                f"n_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_dtst_eff",
                 constrained=False,
                 groups=["nz"],
             )
 
-            v0 = stst_eff_proj[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
-            var0 = addHists(v0 * var_size, h0_mc_eff)
             writer.add_systematic(
                 var0[{"mll": mass_bin}],
-                f"n_pt{i}_eta{j}_time{k}_mll{mass_bin}",
+                f"n_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_stst_eff",
                 constrained=False,
                 groups=["nz"],
             )
+
             # for masked channel --> IS NOT MUTUALLY EXCLUSIVE
             v_masked = pass_gen[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
             var_masked = addHists(v_masked * var_size, n_masked)
@@ -641,6 +656,18 @@ for i in range(0, 2):  # pt
                 f"id_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_iso_eff",
+                constrained=False,
+                groups=["eff_id"],
+            )
+
+            writer.add_systematic(
+                addHists(
+                    id_var_total_h3.project("time", "mll"),
+                    h3_mc_eff.project("time", "mll"),
+                ),
+                f"id_pt{i}_eta{j}_time{k}",
+                "Zmumu",
+                "ch_iso_poi",
                 constrained=False,
                 groups=["eff_id"],
             )

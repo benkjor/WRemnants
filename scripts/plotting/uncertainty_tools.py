@@ -139,6 +139,16 @@ def eta_phi_systematic(
     iso_stat, dtdt_stat, dtst_stat, stst_stat = make_mutually_exclusive(
         iso_stat, dtdt_stat, dtst_stat, stst_stat
     )
+
+    writer.add_systematic(
+        iso_stat.project("time", "mll"),
+        f"prefiring_stat_etaphi_{etaphi_num}",
+        "Zmumu",
+        "ch_iso_poi",
+        constrained=True,
+        groups=["prefiring_stat"],
+    )
+
     writer.add_systematic(
         iso_stat[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"prefiring_stat_etaphi_{etaphi_num}",

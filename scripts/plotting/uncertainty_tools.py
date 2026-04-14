@@ -140,11 +140,20 @@ def eta_phi_systematic(
         iso_stat, dtdt_stat, dtst_stat, stst_stat
     )
 
+    poi_prefire_stat_proj = iso_stat.project("time", "mll")
     writer.add_systematic(
-        iso_stat.project("time", "mll"),
+        remove_bins(poi_prefire_stat_proj, "mll", mass_bin + 1),
         f"prefiring_stat_etaphi_{etaphi_num}",
         "Zmumu",
-        "ch_iso_poi",
+        "ch_iso_poi_high",
+        constrained=True,
+        groups=["prefiring_stat"],
+    )
+    writer.add_systematic(
+        remove_bins(poi_prefire_stat_proj, "mll", mass_bin + 1, False),
+        f"prefiring_stat_etaphi_{etaphi_num}",
+        "Zmumu",
+        "ch_iso_poi_low",
         constrained=True,
         groups=["prefiring_stat"],
     )
@@ -157,7 +166,7 @@ def eta_phi_systematic(
         constrained=True,
         groups=["prefiring_stat"],
     )
-    dtdt_stat = remove_low_bins(dtdt_stat)
+    dtdt_stat = remove_bins(dtdt_stat)
     writer.add_systematic(
         dtdt_stat[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"prefiring_stat_etaphi_{etaphi_num}",
@@ -208,7 +217,7 @@ def get_era_vals(mc, trigger_cut, era, type_gen="pass", iso=False):
 
 
 def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
-    dtdt = remove_low_bins(dtdt)
+    dtdt = remove_bins(dtdt)
     writer.add_systematic(
         iso[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"{luminometer}_{syst}",
@@ -243,11 +252,20 @@ def luminometer_syst(writer, luminometer, iso, dtdt, dtst, stst, syst):
         groups=[f"{syst}"],
     )
 
+    poi_iso_lumi_proj = iso.project("time", "mll")
     writer.add_systematic(
-        iso.project("time", "mll"),
+        remove_bins(poi_iso_lumi_proj, "mll", mass_bin + 1),
         f"{luminometer}_{syst}",
         "Zmumu",
-        "ch_iso_poi",
+        "ch_iso_poi_high",
+        constrained=True,
+        groups=[f"{syst}"],
+    )
+    writer.add_systematic(
+        remove_bins(poi_iso_lumi_proj, "mll", mass_bin + 1, False),
+        f"{luminometer}_{syst}",
+        "Zmumu",
+        "ch_iso_poi_low",
         constrained=True,
         groups=[f"{syst}"],
     )
@@ -327,16 +345,33 @@ def background_syst(
         cross_sec,
     )
     iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
-    dtdt = remove_low_bins(dtdt)
+    dtdt = remove_bins(dtdt)
 
     iso_poi = iso.project("time", "mll")
-    writer.add_process(iso_poi, f"{proc_name}", "ch_iso_poi", signal=False)
+
+    writer.add_process(
+        remove_bins(iso_poi, "mll", mass_bin + 1),
+        f"{proc_name}",
+        "ch_iso_poi_high",
+        signal=False,
+    )
+
+    writer.add_process(
+        remove_bins(iso_poi, "mll", mass_bin + 1, False),
+        f"{proc_name}",
+        "ch_iso_poi_low",
+        signal=False,
+    )
 
     var = 1.01
     if proc_name == "W" or "Diboson":
         var = 1.001
     writer.add_norm_systematic(
-        f"{bkg_name}", f"{proc_name}", "ch_iso_poi", var, groups=["bkg"]
+        f"{bkg_name}", f"{proc_name}", "ch_iso_poi_high", var, groups=["bkg"]
+    )
+
+    writer.add_norm_systematic(
+        f"{bkg_name}", f"{proc_name}", "ch_iso_poi_low", var, groups=["bkg"]
     )
 
     ##### in efficiency channels ####
@@ -373,13 +408,14 @@ def background_syst(
     )
 
 
-def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
-
+def remove_bins(old_hist, ax_name="pt_probe", nbins=1, low=True):
     if ax_name == "pt_probe":
         nbins = old_hist.axes[ax_name].index(25)
 
-    new_edges = old_hist.axes[ax_name].edges[nbins:]
-
+    if low:
+        new_edges = old_hist.axes[ax_name].edges[nbins:]
+    elif not low:
+        new_edges = old_hist.axes[ax_name].edges[:nbins]
     new_axis = hist.axis.Variable(new_edges, name=ax_name)
     ax_name_ind = old_hist.axes.name.index(ax_name)
 
@@ -387,7 +423,10 @@ def remove_low_bins(old_hist, ax_name="pt_probe", nbins=1):
     axes[ax_name_ind] = new_axis
 
     slices = [slice(None)] * old_hist.ndim
-    slices[ax_name_ind] = slice(nbins, None)
+    if low:
+        slices[ax_name_ind] = slice(nbins, None)
+    elif not low:
+        slices[ax_name_ind] = slice(None, nbins - 1)
 
     if "probe" in ax_name:
         try:
@@ -449,7 +488,7 @@ def prefiring_syst(writer, iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire
         constrained=True,
         groups=["prefiring_syst"],
     )
-    dtdt_prefire = remove_low_bins(dtdt_prefire)
+    dtdt_prefire = remove_bins(dtdt_prefire)
     writer.add_systematic(
         dtdt_prefire[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe"),
         f"prefiring_syst",
@@ -477,11 +516,21 @@ def prefiring_syst(writer, iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire
         groups=["prefiring_syst"],
     )
 
+    poi_prefire_proj = iso_prefire.project("time", "mll")
     writer.add_systematic(
-        iso_prefire.project("time", "mll"),
+        remove_bins(poi_prefire_proj, "mll", mass_bin + 1),
         f"prefiring_syst",
         "Zmumu",
-        "ch_iso_poi",
+        "ch_iso_poi_high",
+        constrained=True,
+        groups=["prefiring_syst"],
+    )
+
+    writer.add_systematic(
+        remove_bins(poi_prefire_proj, "mll", mass_bin + 1, False),
+        f"prefiring_syst",
+        "Zmumu",
+        "ch_iso_poi_low",
         constrained=True,
         groups=["prefiring_syst"],
     )

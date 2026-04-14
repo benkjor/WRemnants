@@ -788,8 +788,6 @@ def build_graph(df, dataset):
             "Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1"
         )
 
-        # df_iso = df_trig.Filter("Muon_passIsoTrig[Muon_isGoodGlobal][mu_probe] == 1")
-
         ## either the probe muon passes the trigger or it is going to pass iso. or is okay because trigger is above 25 and this is mutually exclusive
         df_iso = df_tight.Filter(
             f"Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1 || (Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1 && Muon_pt[Muon_isGoodGlobal][mu_probe] < {trigger_pt_cutoff})"

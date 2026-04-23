@@ -313,16 +313,6 @@ def background_syst(
         dtst_prpg_H, _, _ = get_era_vals(MC, "dtst", "H")
         stst_prpg_H, _, _ = get_era_vals(MC, "stst", "H")
 
-    iso_H = iso_H[{"mll": mass_bin}]
-    dtdt_prpg_H = dtdt_prpg_H[{"mll": mass_bin}]
-    dtst_prpg_H = dtst_prpg_H[{"mll": mass_bin}]
-    stst_prpg_H = stst_prpg_H[{"mll": mass_bin}]
-
-    iso_BG = iso_BG[{"mll": mass_bin}]
-    dtdt_prpg_BG = dtdt_prpg_BG[{"mll": mass_bin}]
-    dtst_prpg_BG = dtst_prpg_BG[{"mll": mass_bin}]
-    stst_prpg_BG = stst_prpg_BG[{"mll": mass_bin}]
-
     prpg_all = [
         iso_H,
         dtdt_prpg_H,
@@ -334,11 +324,9 @@ def background_syst(
         stst_prpg_BG,
     ]
 
-    time_hists = time_proj_low
-
     iso, dtdt, dtst, stst = get_mc_lumis(
         prpg_all,
-        time_hists,
+        time_proj_low,
         lumi_scaling,
         lumi_hists,
         weightsum,
@@ -375,10 +363,10 @@ def background_syst(
     )
 
     ##### in efficiency channels ####
-    iso_proc = iso.project("time", "pt_probe", "eta_probe")
-    dtdt_proc = dtdt.project("time", "pt_probe", "eta_probe")
-    dtst_proc = dtst.project("time", "pt_probe", "eta_probe")
-    stst_proc = stst.project("time", "pt_probe", "eta_probe")
+    iso_proc = iso[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe")
+    dtdt_proc = dtdt[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe")
+    dtst_proc = dtst[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe")
+    stst_proc = stst[{"mll": mass_bin}].project("time", "pt_probe", "eta_probe")
 
     if proc_name == "W":
         dtdt_proc.variances()[...] = np.abs(dtdt_proc.variances())

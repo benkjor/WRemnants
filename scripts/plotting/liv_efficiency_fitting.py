@@ -385,13 +385,18 @@ nbins_h1 = nbins_pt + nbins_eta + nbins_time
 ### so at this point i have already selected the mass bin, need to iterate over pt, eta, time
 
 ############### EFFICIENCY LOOP ##################
+# Pre-compute expensive projections and slicing outside loop
+h3_mc_eff_mll = h3_mc_eff[{"mll": mass_bin}]
+h2_mc_eff_mll = h2_mc_eff[{"mll": mass_bin}]
+h1_mc_eff_mll = h1_mc_eff[{"mll": mass_bin}]
+h0_mc_eff_mll = h0_mc_eff[{"mll": mass_bin}]
+h3_mc_eff_time_mll = h3_mc_eff.project("time", "mll")
+h1_mc_eff_time_mll = h1_mc_eff.project("time", "mll")
+
 for i in range(nbins_pt):  # pt
     # for i in range(0, 2):  # pt
-    print(f"pt bin: {i}")
     # for j in range(4, 5):  # eta
     for j in range(nbins_eta):  # eta
-
-        print(f"eta_bin: {j}")
 
         if i > 0:
             v2 = dtdt_eff_proj_pt_eta[{"pt_tag": i - 1, "eta_tag": j}]
@@ -466,16 +471,14 @@ for i in range(nbins_pt):  # pt
                 hlt_probe_h3 = create_variation(
                     hlt_eff_var, iso_mc, i, j, k, 0, "probe"
                 )
-                hlt_probe_h3 = multiplyHists(
+                hlt_probe_h3_scaled = multiplyHists(
                     scaleHist(hlt_probe_h3, var_size), h3_mc_eff
                 )
-                hlt_var_total_h3 = addHists(hlt_var_tag_h3, hlt_probe_h3)
+                hlt_var_total_h3 = addHists(hlt_var_tag_h3, hlt_probe_h3_scaled)
+                hlt_var_total_h3_mll = hlt_var_total_h3[{"mll": mass_bin}]
 
                 writer.add_systematic(
-                    addHists(
-                        hlt_var_total_h3[{"mll": mass_bin}],
-                        h3_mc_eff[{"mll": mass_bin}],
-                    ),
+                    addHists(hlt_var_total_h3_mll, h3_mc_eff_mll),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_iso_eff",
@@ -486,7 +489,7 @@ for i in range(nbins_pt):  # pt
 
                 poi_hlt_proj = addHists(
                     hlt_var_total_h3.project("time", "mll"),
-                    h3_mc_eff.project("time", "mll"),
+                    h3_mc_eff_time_mll,
                 )
                 writer.add_systematic(
                     remove_bins(poi_hlt_proj, "mll", mass_bin + 1),
@@ -512,16 +515,16 @@ for i in range(nbins_pt):  # pt
                 hlt_probe_h2 = create_variation(
                     hlt_eff_var_dtdt, dtdt_mc, i, j, k, 0, "probe", h2=True
                 )
-                hlt_probe_h2 = multiplyHists(
+                hlt_probe_h2_scaled = multiplyHists(
                     scaleHist(hlt_probe_h2, var_size), h2_mc_eff
                 )
-                hlt_var_total_h2 = scaleHist(addHists(hlt_var_tag_h2, hlt_probe_h2), 2)
+                hlt_var_total_h2 = scaleHist(
+                    addHists(hlt_var_tag_h2, hlt_probe_h2_scaled), 2
+                )
+                hlt_var_total_h2_mll = hlt_var_total_h2[{"mll": mass_bin}]
 
                 writer.add_systematic(
-                    addHists(
-                        hlt_var_total_h2[{"mll": mass_bin}],
-                        h2_mc_eff[{"mll": mass_bin}],
-                    ),
+                    addHists(hlt_var_total_h2_mll, h2_mc_eff_mll),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_dtdt_eff",
@@ -535,18 +538,16 @@ for i in range(nbins_pt):  # pt
                 hlt_probe_h1 = create_variation(
                     hlt_eff_var, dtst_mc, i, j, k, 0, "probe"
                 )
-                hlt_probe_h1 = multiplyHists(
+                hlt_probe_h1_scaled = multiplyHists(
                     scaleHist(hlt_probe_h1, var_size), h1_mc_eff
                 )
                 hlt_var_total_h1 = scaleHist(
-                    addHists(hlt_var_tag_h1, -1 * hlt_probe_h1), 2
+                    addHists(hlt_var_tag_h1, -1 * hlt_probe_h1_scaled), 2
                 )
+                hlt_var_total_h1_mll = hlt_var_total_h1[{"mll": mass_bin}]
 
                 writer.add_systematic(
-                    addHists(
-                        hlt_var_total_h1[{"mll": mass_bin}],
-                        h1_mc_eff[{"mll": mass_bin}],
-                    ),
+                    addHists(hlt_var_total_h1_mll, h1_mc_eff_mll),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_dtst_eff",
@@ -558,12 +559,10 @@ for i in range(nbins_pt):  # pt
                     hlt_eff_var, stst_mc, i, j, k, nbins_h1
                 )
                 hlt_var_total_h0 = 2 * hlt_var_tag_h0
+                hlt_var_total_h0_mll = hlt_var_total_h0[{"mll": mass_bin}]
 
                 writer.add_systematic(
-                    addHists(
-                        hlt_var_total_h0[{"mll": mass_bin}],
-                        h0_mc_eff[{"mll": mass_bin}],
-                    ),
+                    addHists(hlt_var_total_h0_mll, h0_mc_eff_mll),
                     f"hlt_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_stst_eff",
@@ -579,13 +578,14 @@ for i in range(nbins_pt):  # pt
                 id_probe_h2 = create_variation(
                     id_eff_var_dtdt, dtdt_mc, i, j, k, 0, "probe", h2=True
                 )
-                id_probe_h2 = multiplyHists(scaleHist(id_probe_h2, var_size), h2_mc_eff)
-                id_var_total_h2 = addHists(id_var_tag_h2, id_probe_h2)
+                id_probe_h2_scaled = multiplyHists(
+                    scaleHist(id_probe_h2, var_size), h2_mc_eff
+                )
+                id_var_total_h2 = addHists(id_var_tag_h2, id_probe_h2_scaled)
+                id_var_total_h2_mll = id_var_total_h2[{"mll": mass_bin}]
 
                 writer.add_systematic(
-                    addHists(
-                        id_var_total_h2[{"mll": mass_bin}], h2_mc_eff[{"mll": mass_bin}]
-                    ),
+                    addHists(id_var_total_h2_mll, h2_mc_eff_mll),
                     f"id_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_dtdt_eff",
@@ -601,18 +601,16 @@ for i in range(nbins_pt):  # pt
                 iso_probe_h2 = create_variation(
                     iso_eff_var_dtdt, dtdt_mc, i, j, k, 0, "probe", h2=True
                 )
-                iso_probe_h2 = multiplyHists(
+                iso_probe_h2_scaled = multiplyHists(
                     scaleHist(iso_probe_h2, var_size), h2_mc_eff
                 )
                 iso_var_total_h2 = scaleHist(
-                    addHists(iso_var_tag_h2, -1 * hlt_probe_h2), 2
+                    addHists(iso_var_tag_h2, -1 * hlt_probe_h2_scaled), 2
                 )
+                iso_var_total_h2_mll = iso_var_total_h2[{"mll": mass_bin}]
 
                 writer.add_systematic(
-                    addHists(
-                        iso_var_total_h2[{"mll": mass_bin}],
-                        h2_mc_eff[{"mll": mass_bin}],
-                    ),
+                    addHists(iso_var_total_h2_mll, h2_mc_eff_mll),
                     f"iso_pt{i}_eta{j}_time{k}",
                     "Zmumu",
                     "ch_dtdt_eff",
@@ -622,13 +620,14 @@ for i in range(nbins_pt):  # pt
 
             iso_var_tag_h3 = create_variation(iso_eff_var, iso_mc, i, j, k, nbins_h1)
             iso_probe_h3 = create_variation(iso_eff_var, iso_mc, i, j, k, 0, "probe")
-            iso_probe_h3 = multiplyHists(scaleHist(iso_probe_h3, var_size), h3_mc_eff)
-            iso_var_total_h3 = addHists(iso_var_tag_h3, iso_probe_h3)
+            iso_probe_h3_scaled = multiplyHists(
+                scaleHist(iso_probe_h3, var_size), h3_mc_eff
+            )
+            iso_var_total_h3 = addHists(iso_var_tag_h3, iso_probe_h3_scaled)
+            iso_var_total_h3_mll = iso_var_total_h3[{"mll": mass_bin}]
 
             writer.add_systematic(
-                addHists(
-                    iso_var_total_h3[{"mll": mass_bin}], h3_mc_eff[{"mll": mass_bin}]
-                ),
+                addHists(iso_var_total_h3_mll, h3_mc_eff_mll),
                 f"iso_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_iso_eff",
@@ -637,7 +636,7 @@ for i in range(nbins_pt):  # pt
             )
             poi_iso_proj = addHists(
                 iso_var_total_h3.project("time", "mll"),
-                h3_mc_eff.project("time", "mll"),
+                h3_mc_eff_time_mll,
             )
 
             writer.add_systematic(
@@ -660,13 +659,16 @@ for i in range(nbins_pt):  # pt
 
             iso_var_tag_h1 = create_variation(iso_eff_var, dtst_mc, i, j, k, nbins_h1)
             iso_probe_h1 = create_variation(iso_eff_var, dtst_mc, i, j, k, 0, "probe")
-            iso_probe_h1 = multiplyHists(scaleHist(iso_probe_h1, var_size), h1_mc_eff)
-            iso_var_total_h1 = scaleHist(addHists(iso_var_tag_h1, -1 * iso_probe_h1), 2)
+            iso_probe_h1_scaled = multiplyHists(
+                scaleHist(iso_probe_h1, var_size), h1_mc_eff
+            )
+            iso_var_total_h1 = scaleHist(
+                addHists(iso_var_tag_h1, -1 * iso_probe_h1_scaled), 2
+            )
+            iso_var_total_h1_mll = iso_var_total_h1[{"mll": mass_bin}]
 
             writer.add_systematic(
-                addHists(
-                    iso_var_total_h1[{"mll": mass_bin}], h1_mc_eff[{"mll": mass_bin}]
-                ),
+                addHists(iso_var_total_h1_mll, h1_mc_eff_mll),
                 f"iso_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_dtst_eff",
@@ -676,10 +678,9 @@ for i in range(nbins_pt):  # pt
 
             iso_var_tag_h0 = create_variation(iso_eff_var, stst_mc, i, j, k, nbins_h1)
             iso_var_total_h0 = 2 * iso_var_tag_h0
+            iso_var_total_h0_mll = iso_var_total_h0[{"mll": mass_bin}]
             writer.add_systematic(
-                addHists(
-                    iso_var_total_h0[{"mll": mass_bin}], h0_mc_eff[{"mll": mass_bin}]
-                ),
+                addHists(iso_var_total_h0_mll, h0_mc_eff_mll),
                 f"iso_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_stst_eff",
@@ -709,13 +710,16 @@ for i in range(nbins_pt):  # pt
             ###### ID #####
             id_var_tag_h3 = create_variation(id_eff_var, iso_mc, i, j, k, nbins_h1)
             id_probe_h3 = create_variation(id_eff_var, iso_mc, i, j, k, 0, "probe")
-            id_probe_h3 = multiplyHists(scaleHist(id_probe_h3, var_size), h3_mc_eff)
-            id_var_total_h3 = scaleHist(addHists(id_var_tag_h3, id_probe_h3), 1 / 2)
+            id_probe_h3_scaled = multiplyHists(
+                scaleHist(id_probe_h3, var_size), h3_mc_eff
+            )
+            id_var_total_h3 = scaleHist(
+                addHists(id_var_tag_h3, id_probe_h3_scaled), 1 / 2
+            )
+            id_var_total_h3_mll = id_var_total_h3[{"mll": mass_bin}]
 
             writer.add_systematic(
-                addHists(
-                    id_var_total_h3[{"mll": mass_bin}], h3_mc_eff[{"mll": mass_bin}]
-                ),
+                addHists(id_var_total_h3_mll, h3_mc_eff_mll),
                 f"id_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_iso_eff",
@@ -725,7 +729,7 @@ for i in range(nbins_pt):  # pt
 
             poi_id_proj = addHists(
                 id_var_total_h3.project("time", "mll"),
-                h3_mc_eff.project("time", "mll"),
+                h3_mc_eff_time_mll,
             )
             writer.add_systematic(
                 remove_bins(poi_id_proj, "mll", mass_bin + 1),
@@ -747,13 +751,14 @@ for i in range(nbins_pt):  # pt
 
             id_var_tag_h1 = create_variation(id_eff_var, dtst_mc, i, j, k, nbins_h1)
             id_probe_h1 = create_variation(id_eff_var, dtst_mc, i, j, k, 0, "probe")
-            id_probe_h1 = multiplyHists(scaleHist(id_probe_h1, var_size), h1_mc_eff)
-            id_var_total_h1 = addHists(id_var_tag_h1, id_probe_h1)
+            id_probe_h1_scaled = multiplyHists(
+                scaleHist(id_probe_h1, var_size), h1_mc_eff
+            )
+            id_var_total_h1 = addHists(id_var_tag_h1, id_probe_h1_scaled)
+            id_var_total_h1_mll = id_var_total_h1[{"mll": mass_bin}]
 
             writer.add_systematic(
-                addHists(
-                    id_var_total_h1[{"mll": mass_bin}], h1_mc_eff[{"mll": mass_bin}]
-                ),
+                addHists(id_var_total_h1_mll, h1_mc_eff_mll),
                 f"id_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_dtst_eff",
@@ -763,13 +768,14 @@ for i in range(nbins_pt):  # pt
 
             id_var_tag_h0 = create_variation(id_eff_var, stst_mc, i, j, k, nbins_h1)
             id_probe_h0 = create_variation(id_eff_var, stst_mc, i, j, k, 0, "probe")
-            id_probe_h0 = multiplyHists(scaleHist(id_probe_h0, var_size), h0_mc_eff)
-            id_var_total_h0 = addHists(id_var_tag_h0, -1 * id_probe_h0)
+            id_probe_h0_scaled = multiplyHists(
+                scaleHist(id_probe_h0, var_size), h0_mc_eff
+            )
+            id_var_total_h0 = addHists(id_var_tag_h0, -1 * id_probe_h0_scaled)
+            id_var_total_h0_mll = id_var_total_h0[{"mll": mass_bin}]
 
             writer.add_systematic(
-                addHists(
-                    id_var_total_h0[{"mll": mass_bin}], h0_mc_eff[{"mll": mass_bin}]
-                ),
+                addHists(id_var_total_h0_mll, h0_mc_eff_mll),
                 f"id_pt{i}_eta{j}_time{k}",
                 "Zmumu",
                 "ch_stst_eff",

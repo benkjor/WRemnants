@@ -609,13 +609,15 @@ def build_graph(df, dataset):
     ### same as mW, allow for lower pt
     df = df.Define(
         "Muon_isGoodGlobal",
-        f" Muon_isGlobal && Muon_highPurity && Muon_standaloneNumberOfValidHits > 0 && Muon_standalonePt > {low_pt_cutoff} &&  wrem::vectDeltaR2(Muon_standaloneEta, Muon_standalonePhi, Muon_eta, Muon_phi) < 0.09 && Muon_pt >= {low_pt_cutoff} && abs(Muon_eta) <= 2.4 && Muon_charge != -99",
+        f" Muon_isGlobal && Muon_highPurity && Muon_standaloneNumberOfValidHits > 0 && Muon_standalonePt > {low_pt_cutoff} &&  wrem::vectDeltaR2(Muon_standaloneEta, Muon_standalonePhi, Muon_eta, Muon_phi) < 0.09 && Muon_pt >= {low_pt_cutoff} && abs(Muon_eta) <= 2.4 && Muon_charge != -99 && abs(Muon_dxybs) < 0.05 && Muon_looseId",
     )
-    #
+
+    #         f" Muon_isGlobal && Muon_highPurity && Muon_standaloneNumberOfValidHits > 0 && Muon_standalonePt > {low_pt_cutoff} &&  wrem::vectDeltaR2(Muon_standaloneEta, Muon_standalonePhi, Muon_eta, Muon_phi) < 0.09 && Muon_pt >= {low_pt_cutoff} && abs(Muon_eta) <= 2.4 && Muon_charge != -99",
+    # #
 
     df = df.Define(
         "Muon_isGoodMedium",
-        f"Muon_isGoodGlobal && Muon_mediumId && abs(Muon_dxybs) < 0.05",
+        f"Muon_isGoodGlobal && Muon_mediumId ",
     )
 
     df = df.Define(

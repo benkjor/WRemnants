@@ -1,4 +1,5 @@
 import argparse
+import time
 
 import h5py
 from uncertainty_tools import (
@@ -22,10 +23,22 @@ from wums.boostHistHelpers import (
     expand_hist_by_duplicate_axis,
     multiplyHists,
     scaleHist,
+    unrolledHist,
 )
 
 parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--randTime", type=bool, default=False, help="use assign times by event number"
+)
+
+parser.add_argument(
+    "--sameSignMuon",
+    type=bool,
+    default=False,
+    help="whether to select muons with the same sign in events",
+)
 args = parser.parse_args()
+
 
 slope_ramses = 0.0006
 slope_hfoc = 0.0007
@@ -38,9 +51,11 @@ background_syst_names = [
     "Diboson",
     "GGToLL_2016PostVFP",
     "QCDmuEnrichPt15_2016PostVFP",
-    "Wplusmunu_2016PostVFP",
+    # "Wplusmunu_2016PostVFP",
+    "Wminusmunu_2016PostVFP",
     "QGToDYQTo2L_2016PostVFP",
     "QGToWQToLNu_2016PostVFP",
+    "Ztautau_2016PostVFP",
 ]
 background_proc = [
     # "Zmumu fail gen",
@@ -48,16 +63,23 @@ background_proc = [
     "Diboson",
     "GG",
     "QCD",
-    "W",
+    # "W_plus",
+    "W_minus",
     "QG_2L",
     "QG_Lnu",
+    "Ztautau",
 ]
 
 ######################################################################
 # DATA IMPORTS #
 
 file_in = "/work/submit/jbenke/WRemnants/scripts/histmakers/"
+# if not args.randTime and not args.sameSignMuon:
 file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturbo_CT18Z_N3p0LL_N2LO_Corr.hdf5"
+# if args.randTime:
+#     file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturbo_CT18Z_N3p0LL_N2LO_Corr_randTime.hdf5"
+# if args.sameSignMuon:
+#     file_in_name = file_in + "mz_dilepton_liv_scetlib_dyturbo_CT18Z_N3p0LL_N2LO_Corr_sameSignMuons.hdf5"
 h5file = h5py.File(file_in_name, "r")
 results = input_tools.load_results_h5py(h5file)
 data_output = results["SingleMuon_2016PostVFP"]["output"]
@@ -78,6 +100,7 @@ iso_data, dtdt_data, dtst_data, stst_data = make_mutually_exclusive(
 )
 
 
+start = time.time()
 dtdt_data = remove_bins(dtdt_data)
 
 h3_data = iso_data.project("time", "mll", "pt_probe", "eta_probe")
@@ -238,7 +261,6 @@ h2 = dtdt_mc.project("time", "mll", "pt_probe", "eta_probe")
 h1 = dtst_mc.project("time", "mll", "pt_probe", "eta_probe")
 h0 = stst_mc.project("time", "mll", "pt_probe", "eta_probe")
 
-
 ###################################################################
 ## create the tensor
 writer = tensorwriter.TensorWriter()
@@ -270,10 +292,12 @@ h3_poi_low = remove_bins(h3_poi, "mll", mass_bin + 1, False)
 writer.add_channel(h3_data_poi_low.axes, "ch_iso_poi_low")
 writer.add_data(h3_data_poi_low, "ch_iso_poi_low")
 writer.add_process(h3_poi_low, "Zmumu", "ch_iso_poi_low", signal=True)
+nbins_total = len(unrolledHist(h3_poi_low).values())
 
 writer.add_channel(h3_data_poi_high.axes, "ch_iso_poi_high")
 writer.add_data(h3_data_poi_high, "ch_iso_poi_high")
 writer.add_process(h3_poi_high, "Zmumu", "ch_iso_poi_high", signal=True)
+nbins_total += len(unrolledHist(h3_poi_high).values())
 
 
 h3_data_central = h3_data[{"mll": mass_bin}]
@@ -284,7 +308,6 @@ h1_data_central = h1_data[{"mll": mass_bin}]
 h1_mc_central = h1[{"mll": mass_bin}]
 h0_data_central = h0_data[{"mll": mass_bin}]
 h0_mc_central = h0[{"mll": mass_bin}]
-
 
 h3_data_eff = h3_data
 h3_mc_eff = h3
@@ -365,20 +388,24 @@ hlt_eff_var_dtdt = remove_bins(hlt_eff_var)
 writer.add_channel(h3_data_central.axes, "ch_iso_eff")
 writer.add_data(h3_data_central, "ch_iso_eff")
 writer.add_process(h3_mc_central, "Zmumu", "ch_iso_eff", signal=True)
+nbins_total += len(unrolledHist(h3_mc_central).values())
 
 writer.add_channel(h2_data_central.axes, "ch_dtdt_eff")
 writer.add_data(h2_data_central, "ch_dtdt_eff")
 writer.add_process(h2_mc_central, "Zmumu", "ch_dtdt_eff", signal=True)
+nbins_total += len(unrolledHist(h2_mc_central).values())
 
 writer.add_channel(h1_data_central.axes, "ch_dtst_eff")
 writer.add_data(h1_data_central, "ch_dtst_eff")
 writer.add_process(h1_mc_central, "Zmumu", "ch_dtst_eff", signal=True)
+nbins_total += len(unrolledHist(h1_mc_central).values())
 
 writer.add_channel(h0_data_central.axes, "ch_stst_eff")
 writer.add_data(h0_data_central, "ch_stst_eff")
 writer.add_process(h0_mc_central, "Zmumu", "ch_stst_eff", signal=True)
+nbins_total += len(unrolledHist(h0_mc_central).values())
 
-
+print(f"total bins: {nbins_total}")
 pass_gen = expand_hist_by_duplicate_axis(pass_gen, "time", "gen_time")
 nbins_dtdt = (nbins_pt - 1) + nbins_eta + nbins_time
 nbins_h1 = nbins_pt + nbins_eta + nbins_time
@@ -451,18 +478,6 @@ for i in range(nbins_pt):  # pt
             # for k in range(22, 23):  #  time
             if i > 0:  ## we only have 1 bin beneath 25 GeV
                 #### NORMALIZATION #####
-
-                # v2 = dtdt_eff_proj[{"gen_time": k, "pt_tag": i - 1, "eta_tag": j}]
-                # var2 = addHists(v2 * var_size, h2_mc_eff)
-
-                # writer.add_systematic(
-                #     var2[{"mll": mass_bin}],
-                #     f"n_pt{i}_eta{j}_time{k}",
-                #     "Zmumu",
-                #     "ch_dtdt_eff",
-                #     constrained=False,
-                #     groups=["nz"],
-                # )
 
                 ##### HLT #####
                 hlt_var_tag_h3 = create_variation(
@@ -783,26 +798,15 @@ for i in range(nbins_pt):  # pt
                 groups=["eff_id"],
             )
 
-
 iso_eff_mll = expand_hist_by_duplicate_axis(h3_mc_eff, "mll", "gen_mll")
-
 dtdt_eff_mll = expand_hist_by_duplicate_axis(h2_mc_eff, "mll", "gen_mll")
-
-
 dtst_eff_mll = expand_hist_by_duplicate_axis(h1_mc_eff, "mll", "gen_mll")
-
 stst_eff_mll = expand_hist_by_duplicate_axis(h0_mc_eff, "mll", "gen_mll")
-
 poi_mll_high = expand_hist_by_duplicate_axis(h3_poi_high, "mll", "gen_mll")
-
 poi_mll_low = expand_hist_by_duplicate_axis(h3_poi_low, "mll", "gen_mll")
 
 for i in range(nbins_mll):
-    v2 = dtdt_eff_proj[{"gen_time": k, "pt_tag": i - 1, "eta_tag": j}]
-    var2 = addHists(v2 * var_size, h2_mc_eff)
     if i != mass_bin:
-        print(i)
-
         if i < mass_bin:
             writer.add_systematic(
                 addHists(poi_mll_low[{"gen_mll": i}] * var_size, h3_poi_low),
@@ -916,4 +920,7 @@ luminometer_syst(
     "linearity",
 )
 
-writer.write(outfolder="./", outfilename="liv_test")
+end = time.time()
+print(f"Total runtime of the program is {end - start} seconds")
+
+writer.write(outfolder="./", outfilename="liv")

@@ -33,6 +33,24 @@ trigger_pt_cutoff = 25
 analysis_label = Datagroups.analysisLabel(os.path.basename(__file__))
 parser, initargs = parsing.common_parser(analysis_label)
 
+parser.add_argument(
+    "--randTime", type=bool, default=False, help="use assign times by event number"
+)
+parser.add_argument(
+    "--sameSignMuon",
+    type=bool,
+    default=False,
+    help="whether to select muons with the same sign in events",
+)
+
+
+def make_random_timehelper(filename):
+    def to_time(x):
+        faketime = int(x[-3:-1]) % 24
+        return faketime
+
+    return make_brilcalc_helper(filename, idx=5, action=to_time)
+
 
 def make_timehelper(filename):
     def to_time(x):
@@ -349,7 +367,7 @@ def true_efficiencies(df):
 
     df = df.Define(
         "PosMuon_iso",
-        f"(PosMuon_trig && (Muon_passIso == 1) && Muon_pt >= {trigger_pt_cutoff}) || ((Muon_passIso == 1) && Muon_pt < {trigger_pt_cutoff} && PosMuon_ID)",
+        f"Muon_passIso == 1 && ((PosMuon_trig && Muon_pt >= {trigger_pt_cutoff}) || (Muon_pt < {trigger_pt_cutoff} && PosMuon_ID))",
     )
 
     df = df.Define("Global_pt", "Muon_pt[PosMuon_Global]")
@@ -487,6 +505,8 @@ brilcalc_helper = make_timehelper(lumicsv)
 lumi_no_time = make_lumihelper(lumicsv)  # post_vfp
 lumi_bunch_helper = make_brilcalc_helper(lumicsv, idx=9, action=float)
 
+randomTime_helper = make_random_timehelper(lumicsv)
+
 ### lumihelpers return the instantaneous luminosity for a given run:fill
 hfoc_helper = make_lumihelper(hfoc_csv)
 pcc_helper = make_lumihelper(pcc_csv)
@@ -534,7 +554,10 @@ datasets = getDatasets(
 ########################################################
 def build_graph_lumi(df, dataset):
     ## get the physics values
-    df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
+    if not args.randTime:
+        df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
+    else:
+        df = df.Define("time", randomTime_helper, ["run", "luminosityBlock"])
     hist_lumi_nom = df.HistoBoost("lumi_nom", [axis_date], ["time", "lumival"])
     df = df.Define("fill_count", lumi_bunch_helper, ["run", "luminosityBlock"])
 
@@ -596,7 +619,11 @@ def build_graph(df, dataset):
 
     if dataset.is_data:
         df = df.DefinePerSample("weight", "1.0")
-        df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
+        if not args.randTime:
+            df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
+        else:
+            df = df.Define("time", randomTime_helper, ["run", "luminosityBlock"])
+
         hist_time = df.HistoBoost("time", [axis_date], ["time"])
     else:
         ### oh do I need this?
@@ -611,9 +638,6 @@ def build_graph(df, dataset):
         "Muon_isGoodGlobal",
         f" Muon_isGlobal && Muon_highPurity && Muon_standaloneNumberOfValidHits > 0 && Muon_standalonePt > {low_pt_cutoff} &&  wrem::vectDeltaR2(Muon_standaloneEta, Muon_standalonePhi, Muon_eta, Muon_phi) < 0.09 && Muon_pt >= {low_pt_cutoff} && abs(Muon_eta) <= 2.4 && Muon_charge != -99 && abs(Muon_dxybs) < 0.05 && Muon_looseId",
     )
-
-    #         f" Muon_isGlobal && Muon_highPurity && Muon_standaloneNumberOfValidHits > 0 && Muon_standalonePt > {low_pt_cutoff} &&  wrem::vectDeltaR2(Muon_standaloneEta, Muon_standalonePhi, Muon_eta, Muon_phi) < 0.09 && Muon_pt >= {low_pt_cutoff} && abs(Muon_eta) <= 2.4 && Muon_charge != -99",
-    # #
 
     df = df.Define(
         "Muon_isGoodMedium",
@@ -640,14 +664,22 @@ def build_graph(df, dataset):
 
     ### I have this set aside for the true efficiency comparison
     df_positive = df.Filter("Sum(Muon_isGoodGlobal) > 0 ")
-    df_positive = df_positive.Define("Muon_isPositive", "Muon_charge == 1")
+    df_positive = df_positive.Define(
+        "Muon_isPositive", "Muon_charge == 1 || Muon_charge == -1 "
+    )
 
     #### always want events with only two muons
     df = df.Filter("Sum(Muon_isGoodGlobal) == 2")
+
     ### require that they are opposite charges
-    df = df.Filter(
-        "Muon_charge[Muon_isGoodGlobal][0] != Muon_charge[Muon_isGoodGlobal][1]"
-    )
+    if not args.sameSignMuon:
+        df = df.Filter(
+            "Muon_charge[Muon_isGoodGlobal][0] != Muon_charge[Muon_isGoodGlobal][1]"
+        )
+    else:
+        df = df.Filter(
+            "Muon_charge[Muon_isGoodGlobal][0] == Muon_charge[Muon_isGoodGlobal][1]"
+        )
     #### filter to ensure that at least one muon passes isolation
     df = df.Filter(
         "(Muon_passIsoTrig[Muon_isGoodGlobal][0] == 1) || (Muon_passIsoTrig[Muon_isGoodGlobal][1] == 1)"
@@ -681,8 +713,18 @@ def build_graph(df, dataset):
         "eta_tag", "mu_probe == 0 ? goodMed_smu_mom4.eta() :goodMed_mu_mom4.eta()"
     )
 
+    # df = muon_calibration.define_genFiltered_recoMuonSel(
+    #         df, reco_sel, require_prompt
+    #     )
+    # reco_sel_GF = muon_calibration.getColName_genFiltered_recoMuonSel(
+    #         reco_sel, require_prompt
+    #     )
+    # df = muon_calibration.define_matched_gen_muons_kinematics(df, reco_sel_GF)
+    # df = muon_calibration.calculate_matched_gen_muon_kinematics(df, reco_sel_GF)
+    # df = muon_calibration.define_matched_reco_muon_kinematics(df, reco_sel_GF)
+
     if not dataset.is_data:
-        df = theory_tools.define_postfsr_vars(df)
+        df_positive = true_efficiencies(df_positive)
         df = df.Define(
             "reco_scalefactor_weight",
             muon_reco_efficiency_helper,
@@ -693,14 +735,14 @@ def build_graph(df, dataset):
             muon_tracking_efficiency_helper,
             ["Muon_standaloneEta", "Muon_standalonePt"],
         )
+
         ### need to correct for these
         df = df.Redefine(
-            "weight", "weight * reco_scalefactor_weight* tracking_scalefactor_weight"
+            "weight", "weight * reco_scalefactor_weight * tracking_scalefactor_weight"
         )
-
+        df = theory_tools.define_postfsr_vars(df)
         df_positive = theory_tools.define_postfsr_vars(df_positive)
         ### positive stuff is just for comparison with mw efficincies
-        df_positive = true_efficiencies(df_positive)
 
         pos_global = df_positive.HistoBoost(
             "pos_global",
@@ -792,9 +834,8 @@ def build_graph(df, dataset):
 
         ## either the probe muon passes the trigger or it is going to pass iso. or is okay because trigger is above 25 and this is mutually exclusive
         df_iso = df_tight.Filter(
-            f"Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1 || (Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1 && Muon_pt[Muon_isGoodGlobal][mu_probe] < {trigger_pt_cutoff})"
+            f"Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1 && ((Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1 && Muon_pt[Muon_isGoodGlobal][mu_probe] > {trigger_pt_cutoff}) || Muon_pt[Muon_isGoodGlobal][mu_probe] < {trigger_pt_cutoff})"
         )
-        df_iso = df_iso.Filter("Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1")
 
         # ### fail generator
         df_loose_fg = df.Filter("!gen_pass")
@@ -825,9 +866,8 @@ def build_graph(df, dataset):
         dtdt = dtst.Filter("Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1")
 
         iso = dtst.Filter(
-            f"Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1 || (Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1 && Muon_pt[Muon_isGoodGlobal][mu_probe] < {trigger_pt_cutoff})"
+            f"Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1 && ((Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1 && Muon_pt[Muon_isGoodGlobal][mu_probe] > {trigger_pt_cutoff}) || Muon_pt[Muon_isGoodGlobal][mu_probe] < {trigger_pt_cutoff})"
         )
-        iso = iso.Filter("Muon_passIso[Muon_isGoodGlobal][mu_probe] == 1")
 
         hist_time_proj = df.HistoBoost(
             "time_proj",

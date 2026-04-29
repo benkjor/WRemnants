@@ -3,13 +3,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from utilities.io_tools import input_tools
-from wums.boostHistHelpers import (
-    divideHists,
-)
+from wums.boostHistHelpers import addHists, divideHists, scaleHist
 
 mass_bin = 9
 var_size = 0.01
-
 
 matplotlib.rcParams.update({"font.size": 12})
 
@@ -31,6 +28,7 @@ def make_plot(
     colors=[],
     linestyles=[],
     file_out_modifier="",
+    postfix="",
 ):
     plt.clf()
     plt.tight_layout()
@@ -54,7 +52,7 @@ def make_plot(
     plt.xlabel("Sidereal Time [hr]", fontsize=16)
     # plt.title(plotname)
     plt.legend(legend_all)
-    plt.savefig(file_out + file_out_modifier + plotname + ".png")
+    plt.savefig(file_out + file_out_modifier + plotname + postfix + ".png")
 
 
 h5file = h5py.File(file_in_name, "r")
@@ -67,6 +65,13 @@ MC_Zmumu = results["Zmumu_2016PostVFP"]["output"]
 
 pass_gen = MC_Zmumu["pass_gen"].get()
 
+postfit = {
+    "hfoc_linearity": 0.97018,
+    "hfoc_stability": 0.97015,
+    "pcc_stability": 0.97018,
+    "ramses_linearity": 0.97018,
+    "ramses_stability": 0.13871,
+}
 
 ### STABILITY
 lumi_hfoc = lumi_output["lumi_hfoc"].get()
@@ -74,7 +79,6 @@ lumi_pcc = lumi_output["lumi_pcc"].get()
 lumi_ramses = lumi_output["lumi_ramses"].get()
 
 ## LINEARITY
-#### not sure what this is yet
 lumi_physics_and_hfoc = lumi_output["lumi_physics_hfoc"].get()
 lumi_physics_and_pcc = lumi_output["lumi_physics_pcc"].get()
 lumi_physics_and_ramses = lumi_output["lumi_physics_ramses"].get()
@@ -86,44 +90,80 @@ lumi_scaling_bg = lumi_output["lumi_post"].get()
 
 
 hfoc_scaling = divideHists(lumi_hfoc, lumi_physics_and_hfoc)  ## this is the stability
-# scale by this becuase we assume this includes all physics events and we don't discriminate for events that were just detected by one in the histograms
-
 ### im confused how these aren't the same thing
 pcc_scaling = divideHists(lumi_pcc, lumi_physics_and_pcc)
 # pcc_scaling = multiplyHists(pcc_scaling, lumi_scaling)
 
 ramses_scaling = divideHists(lumi_ramses, lumi_physics_and_ramses)
 print(ramses_scaling)
-# ramses_scaling = multiplyHists(ramses_scaling, lumi_scaling)
-
-### percent of events detected by each
-
-# hfoc_scaling = divideHists(lumi_physics_and_hfoc, lumi_scaling)
-# pcc_scaling = divideHists(lumi_physics_and_pcc, lumi_scaling)
-# ramses_scaling = divideHists(lumi_physics_and_ramses, lumi_scaling)
 
 
-# ones_hist = divideHists(hfoc_scaling, hfoc_scaling)
-# hfoc_fitted = addHists(
-#     scaleHist(addHists(hfoc_scaling, scaleHist(ones_hist, -1)), hfoc_stability),
-#     ones_hist,
-# )
-# ramses_fitted = addHists(
-#     scaleHist(addHists(ramses_scaling, scaleHist(ones_hist, -1)), ramses_stability),
-#     ones_hist,
-# )
-# hfoc_fitted = divideHists(scaleHist(hfoc_scaling, hfoc_stability), pcc_scaling)
-# ramses_fitted = divideHists(scaleHist(ramses_scaling, ramses_stability), pcc_scaling)
+ones = divideHists(hfoc_scaling, hfoc_scaling)
+hfoc_postfit = addHists(
+    addHists(hfoc_scaling, -1 * ones) * postfit["hfoc_stability"], ones
+)
+ramses_postfit = addHists(
+    addHists(ramses_scaling, -1 * ones) * postfit["ramses_stability"], ones
+)
+##############
 make_plot(
-    [pcc_scaling, hfoc_scaling, ramses_scaling],
-    "lumi_ratios fitted",
+    [pcc_scaling, hfoc_postfit, ramses_postfit],
+    "lumi_ratios_stability",
     ["PCC", "HFOC", "RAMSES"],
     [0.997, 1.003],
     False,
     "ratio lumis (all events)",
     colors=["blue", "green", "red"],
-    file_out_modifier="liv_uncert/lumi/2026-03-18/",
+    file_out_modifier="liv_uncert/lumi/2026-04-29/",
+    postfix="_postfit",
 )
+
+slope_ramses = 0.0006
+slope_hfoc = 0.0007
+sbil_pcc = lumi_output["sbil_pcc"].get()
+count_pcc = lumi_output["count_pcc"].get()
+
+avg_sbil_pcc = scaleHist(divideHists(sbil_pcc, count_pcc), 1e9)
+
+sbil_hfoc_fit = scaleHist(avg_sbil_pcc, slope_hfoc)
+sbil_ramses_fit = scaleHist(avg_sbil_pcc, slope_ramses)
+
+pcc_linearity = 0 * avg_sbil_pcc
+
+make_plot(
+    [pcc_linearity, sbil_hfoc_fit, sbil_ramses_fit],
+    "lumi_ratios_linearity",
+    ["PCC", "HFOC", "RAMSES"],
+    [-0.005, 0.005],
+    False,
+    "ratio lumis (all events)",
+    colors=["blue", "green", "red"],
+    file_out_modifier="liv_uncert/lumi/2026-04-29/",
+    postfix="_prefit",
+)
+
+
+make_plot(
+    [
+        pcc_linearity,
+        sbil_hfoc_fit * postfit["hfoc_linearity"],
+        sbil_ramses_fit * postfit["ramses_linearity"],
+    ],
+    "lumi_ratios_linearity",
+    ["PCC", "HFOC", "RAMSES"],
+    [-0.005, 0.005],
+    False,
+    "ratio lumis (all events)",
+    colors=["blue", "green", "red"],
+    file_out_modifier="liv_uncert/lumi/2026-04-29/",
+    postfix="_postfit",
+)
+
+# ramses_scaling = multiplyHists(ramses_scaling, lumi_scaling)
+
+### percent of events detected by each
+
+################3
 
 
 ### this doesn't plot the fitted version, just the theoretical one

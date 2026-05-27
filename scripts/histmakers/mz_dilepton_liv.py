@@ -42,6 +42,11 @@ parser.add_argument(
     default=False,
     help="whether to select muons with the same sign in events",
 )
+parser.add_argument(
+    "--flipEventNumberSplitting",
+    action="store_true",
+    help="Flip even with odd event numbers to consider the positive or negative muon as the W-like muon",
+)
 
 
 def make_random_timehelper(filename):
@@ -410,7 +415,7 @@ axis_pt_tag = hist.axis.Variable(
         47,
         55,
         60,
-        65,
+        # 65,
         80,
     ],
     name="pt_tag",
@@ -431,7 +436,7 @@ axis_pt_tag_copy = hist.axis.Variable(
         47,
         55,
         60,
-        65,
+        # 65,
         80,
     ],
     name="pt_tag",
@@ -452,7 +457,7 @@ axis_pt_probe = hist.axis.Variable(
         47,
         55,
         60,
-        65,
+        # 65,
         80,
     ],
     name="pt_probe",
@@ -473,7 +478,7 @@ axis_pt_probe_copy = hist.axis.Variable(
         47,
         55,
         60,
-        65,
+        # 65,
         80,
     ],
     name="pt_probe",
@@ -487,6 +492,16 @@ axis_mll_copy = hist.axis.Variable(
     [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120], name="goodMed_mll"
 )
 
+axis_mVgen = hist.axis.Variable(
+    [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120],
+    name="genMass",
+    flow=False,
+)
+axis_mreco = hist.axis.Variable(
+    [15, 30, 40, 45, 50, 55, 60, 65, 70, 76, 106, 110, 115, 120],
+    name="recoMass",
+    flow=False,
+)
 
 axis_weight = hist.axis.Regular(50, 0.5, 1, name="weight")
 
@@ -554,10 +569,8 @@ datasets = getDatasets(
 ########################################################
 def build_graph_lumi(df, dataset):
     ## get the physics values
-    if not args.randTime:
-        df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
-    else:
-        df = df.Define("time", randomTime_helper, ["run", "luminosityBlock"])
+
+    df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
     hist_lumi_nom = df.HistoBoost("lumi_nom", [axis_date], ["time", "lumival"])
     df = df.Define("fill_count", lumi_bunch_helper, ["run", "luminosityBlock"])
 
@@ -622,7 +635,7 @@ def build_graph(df, dataset):
         if not args.randTime:
             df = df.Define("time", brilcalc_helper, ["run", "luminosityBlock"])
         else:
-            df = df.Define("time", randomTime_helper, ["run", "luminosityBlock"])
+            df = df.Define("time", "rand()%24")
 
         hist_time = df.HistoBoost("time", [axis_date], ["time"])
     else:
@@ -631,7 +644,10 @@ def build_graph(df, dataset):
         df = df.Define("weight", "std::copysign(1.0, genWeight)")
     weightsum = df.SumAndCount("weight")
 
-    ###### NEED TO GENERATE THE RIGHT VARIABLES ####
+    ###### NEED TO GENERATE THE RIGHT VARIABLES ####    )
+    df = df.Define(
+        "isEvenEvent", f"event % 2 {'!=' if args.flipEventNumberSplitting else '=='} 0"
+    )
 
     ### same as mW, allow for lower pt
     df = df.Define(
@@ -686,10 +702,9 @@ def build_graph(df, dataset):
     )
     ### define which one is the probe. if both pass all cuts, decide according to which one is even
     # if muon0 passes trigger & tight id (if muon1 passes trigger and tight id: then randomly select 0 vs 1, if muon1 fails, make it the probe), if muon0 fails make it 0
-    df = df.Define("eventEven", "event % 2")
     df = df.Define(
         "mu_probe",
-        "Muon_passIsoTrig[Muon_isGoodGlobal][0] == 1 ? (Muon_passIsoTrig[Muon_isGoodGlobal][1] == 1 ? eventEven: 1) : 0",
+        "Muon_passIsoTrig[Muon_isGoodGlobal][0] == 1 ? (Muon_passIsoTrig[Muon_isGoodGlobal][1] == 1 ? isEvenEvent: 1) : 0",
     )
 
     ### other muon should be the tag
@@ -710,20 +725,11 @@ def build_graph(df, dataset):
         "pt_tag", "mu_probe == 0 ? goodMed_smu_mom4.pt() : goodMed_mu_mom4.pt()"
     )
     df = df.Define(
-        "eta_tag", "mu_probe == 0 ? goodMed_smu_mom4.eta() :goodMed_mu_mom4.eta()"
+        "eta_tag", "mu_probe == 0 ? goodMed_smu_mom4.eta():goodMed_mu_mom4.eta()"
     )
 
-    # df = muon_calibration.define_genFiltered_recoMuonSel(
-    #         df, reco_sel, require_prompt
-    #     )
-    # reco_sel_GF = muon_calibration.getColName_genFiltered_recoMuonSel(
-    #         reco_sel, require_prompt
-    #     )
-    # df = muon_calibration.define_matched_gen_muons_kinematics(df, reco_sel_GF)
-    # df = muon_calibration.calculate_matched_gen_muon_kinematics(df, reco_sel_GF)
-    # df = muon_calibration.define_matched_reco_muon_kinematics(df, reco_sel_GF)
-
     if not dataset.is_data:
+
         df_positive = true_efficiencies(df_positive)
         df = df.Define(
             "reco_scalefactor_weight",
@@ -741,8 +747,23 @@ def build_graph(df, dataset):
             "weight", "weight * reco_scalefactor_weight * tracking_scalefactor_weight"
         )
         df = theory_tools.define_postfsr_vars(df)
+        df = theory_tools.define_prefsr_vars(df)
+
         df_positive = theory_tools.define_postfsr_vars(df_positive)
         ### positive stuff is just for comparison with mw efficincies
+
+        response_matrix = df.HistoBoost(
+            "mass_response",
+            [
+                axis_mVgen,
+                axis_mreco,
+            ],
+            [
+                "massVgen",
+                "goodMed_mll",
+                "weight",
+            ],
+        )
 
         pos_global = df_positive.HistoBoost(
             "pos_global",
@@ -851,6 +872,7 @@ def build_graph(df, dataset):
         results.append(pos_ID)
         results.append(pos_trig)
         results.append(pos_iso)
+        results.append(response_matrix)
 
         make_prefire_hists(df_iso, results, "pass_iso")
         make_prefire_hists(df_trig, results, "dtdt_prpg")
@@ -861,6 +883,7 @@ def build_graph(df, dataset):
         make_prefire_hists(df_loose_fg, results, "stst_prfg")
 
     else:  ### this is for real data
+
         stst = df
         dtst = stst.Filter("Muon_isGoodMedium[Muon_isGoodGlobal][mu_probe] == 1")
         dtdt = dtst.Filter("Muon_isGoodTrigger[Muon_isGoodGlobal][mu_probe] == 1")

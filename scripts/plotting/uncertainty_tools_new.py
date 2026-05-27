@@ -296,7 +296,7 @@ def background_syst(
     if res_str == "Ztautau_2016PostVFP":
         signal_proc = True
     else:
-        signal_proc = False
+        signa_proc = False
     ### MAKE THIS IMPLEMENTATION NOT STUPID
     if fail_gen:
         dtdt_prpg_BG, _, _ = get_era_vals(MC, "dtdt", "BG", "fail")
@@ -476,7 +476,6 @@ def make_mutually_exclusive(iso, dtdt, dtst, stst):
     iso_ex = iso
     dtdt_ex = addHists(dtdt, scaleHist(iso, -1))
     dtdt_iso_injected = dtdt.copy()
-    # pdb.set_trace()
     dtdt_iso_injected.values()[:, :, 0, :, :, :] = iso[:, :, 0, :, :, :].values()
     dtst_ex = addHists(dtst, scaleHist(dtdt_iso_injected, -1))
     stst_ex = addHists(stst, scaleHist(dtst, -1))
@@ -509,44 +508,6 @@ def create_variation(
         var = multiplyHists(scaleHist(var, var_size / (nbins_total)), refererence_hist)
         var = var.project("time", "mll", "pt_probe", "eta_probe")
     return var
-
-
-def create_variation_tag_and_probe_batch(
-    variation_hist,
-    reference_hist,
-    i,
-    j,
-    k,
-    nbins_total,
-    h2=False,
-    var_size=0.01,
-    scale_factor_tag=None,
-):
-    """
-    Optimized version that computes both tag and probe variations in one call.
-    Pre-computes the initial slicing and scaling factor to avoid redundant operations.
-
-    Returns: (var_tag, var_probe)
-    """
-    if h2:
-        i -= 1
-
-    # Pre-compute the scaling factor once
-    if scale_factor_tag is None:
-        scale_factor_tag = var_size / nbins_total
-
-    # Compute tag variation
-    # Index on probe coordinates to preserve tag coordinates for projection
-    var_tag = variation_hist[{"gen_time": k, "pt_probe": i, "eta_probe": j}]
-    var_tag = var_tag.project("time", "mll", "pt_tag", "eta_tag")
-    var_tag = broadcastSystHist(var_tag, reference_hist)
-    var_tag = multiplyHists(scaleHist(var_tag, scale_factor_tag), reference_hist)
-    var_tag = var_tag.project("time", "mll", "pt_probe", "eta_probe")
-
-    # Compute probe variation (index on tag coordinates)
-    var_probe = variation_hist[{"gen_time": k, "pt_tag": i, "eta_tag": j}]
-
-    return var_tag, var_probe
 
 
 def prefiring_syst(writer, iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire):
@@ -754,7 +715,6 @@ def get_corrected_mc(
         weightsum,
         xsec,
     )
-    # pdb.set_trace()
     iso, dtdt, dtst, stst = make_mutually_exclusive(iso, dtdt, dtst, stst)
     corrected_mc = [iso, dtdt, dtst, stst]
     corrected_prefiring = [iso_prefire, dtdt_prefire, dtst_prefire, stst_prefire]
